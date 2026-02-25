@@ -40,6 +40,18 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
+## What's in the spec (v2.1.0)
+
+- **Vaults** — CRUD, CMEK enable/disable, key rotation with job tracking
+- **Secrets** — CRUD, versioning, CMEK-encrypted flag
+- **Agents** — CRUD with `token_ttl_seconds`, `vault_ids`, crypto proxy, transaction guardrails
+- **Policies** — Glob-based access control
+- **Sharing** — Links, user/agent shares, accept/decline
+- **Billing** — Subscriptions, credits, x402
+- **Audit** — Hash-chained event log
+- **Chains** — Supported blockchain registry
+- **Auth** — JWT, API keys, agent tokens, MFA, device flow, Google OAuth
+
 ## Included files
 
 - `openapi.yaml` — The canonical YAML specification

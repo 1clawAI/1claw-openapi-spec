@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, crypto transaction proxy,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -843,6 +843,173 @@
         "responses": {
           "204": {
             "description": "Vault deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{vault_id}/cmek": {
+      "post": {
+        "tags": [
+          "CMEK"
+        ],
+        "summary": "Enable CMEK on a vault",
+        "operationId": "enableCmek",
+        "description": "Enable client-side encryption on a vault. Requires Business or Enterprise plan.\nOnly the key's SHA-256 fingerprint is stored — the key never touches the server.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnableCmekRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CMEK enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "CMEK"
+        ],
+        "summary": "Disable CMEK on a vault",
+        "operationId": "disableCmek",
+        "description": "Disable client-side encryption. Existing CMEK-encrypted secrets still require\nthe key to decrypt. New secrets will use HSM-only encryption.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CMEK disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{vault_id}/cmek-rotate": {
+      "post": {
+        "tags": [
+          "CMEK"
+        ],
+        "summary": "Start server-assisted CMEK key rotation",
+        "operationId": "rotateCmek",
+        "description": "Re-encrypts all secrets from the old CMEK key to the new one.\nKeys are passed in headers (TLS-only) and exist in server memory\nonly during the rotation. Batched in groups of 100 secrets.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "x-cmek-old-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Base64-encoded old CMEK key (32 bytes)"
+          },
+          {
+            "name": "x-cmek-new-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Base64-encoded new CMEK key (32 bytes)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CmekRotateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Rotation job started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CmekRotationJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{vault_id}/cmek-rotate/{job_id}": {
+      "get": {
+        "tags": [
+          "CMEK"
+        ],
+        "summary": "Get CMEK rotation job status",
+        "operationId": "getCmekRotationJob",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rotation job status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CmekRotationJobResponse"
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -3251,6 +3418,14 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "cmek_enabled": {
+            "type": "boolean",
+            "description": "Whether client-managed encryption is enabled"
+          },
+          "cmek_fingerprint": {
+            "type": "string",
+            "description": "SHA-256 fingerprint of the CMEK key (64 hex chars)"
           }
         }
       },
@@ -3262,6 +3437,87 @@
             "items": {
               "$ref": "#/components/schemas/VaultResponse"
             }
+          }
+        }
+      },
+      "EnableCmekRequest": {
+        "type": "object",
+        "required": [
+          "fingerprint"
+        ],
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 hex fingerprint of the CMEK key (64 chars)"
+          }
+        }
+      },
+      "CmekRotateRequest": {
+        "type": "object",
+        "required": [
+          "new_fingerprint"
+        ],
+        "properties": {
+          "new_fingerprint": {
+            "type": "string",
+            "description": "SHA-256 hex fingerprint of the new CMEK key"
+          }
+        }
+      },
+      "CmekRotationJobResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "vault_id",
+          "status",
+          "total_secrets",
+          "processed",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "old_fingerprint": {
+            "type": "string"
+          },
+          "new_fingerprint": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "total_secrets": {
+            "type": "integer"
+          },
+          "processed": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -3374,6 +3630,10 @@
           "expires_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "cmek_encrypted": {
+            "type": "boolean",
+            "description": "Whether this secret value is CMEK-encrypted (requires client-side decryption)"
           }
         }
       },
@@ -3557,6 +3817,19 @@
             "items": {
               "type": "string"
             }
+          },
+          "token_ttl_seconds": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Per-agent token TTL in seconds (overrides global default)"
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Restrict agent to specific vault UUIDs (empty = all vaults in org)"
           }
         }
       },
@@ -3598,6 +3871,17 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "token_ttl_seconds": {
+            "type": "integer",
+            "nullable": true
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         }
@@ -3654,6 +3938,17 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "token_ttl_seconds": {
+            "type": "integer",
+            "nullable": true
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           "created_at": {
