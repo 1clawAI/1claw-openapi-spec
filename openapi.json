@@ -3784,7 +3784,14 @@
             "type": "string"
           },
           "auth_method": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "api_key",
+              "mtls",
+              "oidc_client_credentials"
+            ],
+            "default": "api_key",
+            "description": "Authentication method. api_key generates a one-time key; mtls requires client_cert_fingerprint; oidc_client_credentials requires oidc_issuer and oidc_client_id."
           },
           "scopes": {
             "type": "array",
@@ -3830,6 +3837,18 @@
               "format": "uuid"
             },
             "description": "Restrict agent to specific vault UUIDs (empty = all vaults in org)"
+          },
+          "client_cert_fingerprint": {
+            "type": "string",
+            "description": "SHA-256 fingerprint of the client certificate (required for mTLS auth)"
+          },
+          "oidc_issuer": {
+            "type": "string",
+            "description": "OIDC issuer URL (required for oidc_client_credentials auth)"
+          },
+          "oidc_client_id": {
+            "type": "string",
+            "description": "OIDC client ID (required for oidc_client_credentials auth)"
           }
         }
       },
@@ -3908,7 +3927,12 @@
             "type": "string"
           },
           "auth_method": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "api_key",
+              "mtls",
+              "oidc_client_credentials"
+            ]
           },
           "scopes": {
             "type": "array",
@@ -3950,6 +3974,22 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "client_cert_fingerprint": {
+            "type": "string",
+            "description": "SHA-256 fingerprint of the client certificate (mTLS agents)"
+          },
+          "oidc_issuer": {
+            "type": "string",
+            "description": "OIDC issuer URL (oidc_client_credentials agents)"
+          },
+          "oidc_client_id": {
+            "type": "string",
+            "description": "OIDC client ID (oidc_client_credentials agents)"
+          },
+          "ssh_public_key": {
+            "type": "string",
+            "description": "Ed25519 SSH public key (base64-encoded, auto-generated at creation)"
           },
           "created_at": {
             "type": "string",
@@ -4009,14 +4049,17 @@
           "last_active_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "ssh_public_key": {
+            "type": "string",
+            "description": "Ed25519 SSH public key (base64-encoded)"
           }
         }
       },
       "AgentCreatedResponse": {
         "type": "object",
         "required": [
-          "agent",
-          "api_key"
+          "agent"
         ],
         "properties": {
           "agent": {
@@ -4024,7 +4067,7 @@
           },
           "api_key": {
             "type": "string",
-            "description": "One-time API key (store securely)"
+            "description": "One-time API key (only present for api_key auth method)"
           }
         }
       },
