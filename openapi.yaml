@@ -53,6 +53,8 @@ tags:
     description: Platform administration
   - name: Health
     description: Service health checks
+  - name: BlockRun
+    description: AI inference proxy via BlockRun (chat, images, search)
 
 # =============================================================================
 # PATHS
@@ -1791,6 +1793,202 @@ paths:
                 $ref: "#/components/schemas/OrgLimitsResponse"
 
   # ---------------------------------------------------------------------------
+  # BlockRun – AI inference proxy
+  # ---------------------------------------------------------------------------
+
+  /v1/agents/{agent_id}/blockrun:
+    put:
+      tags: [BlockRun]
+      summary: Configure BlockRun for an agent
+      operationId: configureBlockrun
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigureBlockrunRequest"
+      responses:
+        "200":
+          description: BlockRun configuration saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockrunConfig"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    get:
+      tags: [BlockRun]
+      summary: Get agent's BlockRun configuration
+      operationId: getBlockrunConfig
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Current BlockRun configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockrunConfig"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [BlockRun]
+      summary: Disable BlockRun for an agent
+      operationId: disableBlockrun
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "204":
+          description: BlockRun disabled
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/agents/{agent_id}/blockrun/chat/completions:
+    post:
+      tags: [BlockRun]
+      summary: OpenAI-compatible chat completion
+      operationId: blockrunChatCompletion
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockrunChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockrunChatCompletionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/agents/{agent_id}/blockrun/models:
+    get:
+      tags: [BlockRun]
+      summary: List available AI models with pricing
+      operationId: blockrunListModels
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [all, chat, reasoning, image, embedding]
+            default: all
+        - name: provider
+          in: query
+          schema:
+            type: string
+          description: Filter by provider (e.g. openai, anthropic, google)
+      responses:
+        "200":
+          description: Available models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlockrunModel"
+
+  /v1/agents/{agent_id}/blockrun/images/generations:
+    post:
+      tags: [BlockRun]
+      summary: Generate images from text
+      operationId: blockrunImageGeneration
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockrunImageRequest"
+      responses:
+        "200":
+          description: Generated image(s)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockrunImageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/agents/{agent_id}/blockrun/search:
+    post:
+      tags: [BlockRun]
+      summary: Grok Live Search (web, X, news)
+      operationId: blockrunSearch
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockrunSearchRequest"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockrunSearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/agents/{agent_id}/blockrun/usage:
+    get:
+      tags: [BlockRun]
+      summary: Get agent's AI spending and usage
+      operationId: blockrunUsage
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start of date range (inclusive)
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End of date range (inclusive)
+      responses:
+        "200":
+          description: Usage and spending summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockrunUsageResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ---------------------------------------------------------------------------
   # Health
   # ---------------------------------------------------------------------------
 
@@ -3469,6 +3667,348 @@ components:
                 type: integer
         description:
           type: string
+
+    # --- BlockRun ---
+
+    ConfigureBlockrunRequest:
+      type: object
+      required: [wallet_secret_path]
+      properties:
+        wallet_secret_path:
+          type: string
+          description: Vault secret path containing the BlockRun wallet private key
+        routing_profile:
+          type: string
+          enum: [fast, balanced, powerful, cheap, reasoning]
+          default: balanced
+          description: Default smart-routing profile for requests without an explicit model
+        max_daily_spend_usd:
+          type: number
+          format: double
+          description: Maximum daily AI spend in USD (0 = unlimited)
+          default: 0
+        allowed_models:
+          type: array
+          items:
+            type: string
+          description: Allowlist of model IDs the agent may use (empty = all)
+
+    BlockrunConfig:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+        wallet_secret_path:
+          type: string
+        routing_profile:
+          type: string
+          enum: [fast, balanced, powerful, cheap, reasoning]
+        max_daily_spend_usd:
+          type: number
+          format: double
+        allowed_models:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BlockrunChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlockrunToolCall"
+        tool_call_id:
+          type: string
+          description: Required when role is tool
+
+    BlockrunToolDefinition:
+      type: object
+      required: [type, function]
+      properties:
+        type:
+          type: string
+          enum: [function]
+        function:
+          type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            parameters:
+              type: object
+              description: JSON Schema for function parameters
+
+    BlockrunToolCall:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [function]
+        function:
+          type: object
+          properties:
+            name:
+              type: string
+            arguments:
+              type: string
+              description: JSON-encoded arguments
+
+    BlockrunChatCompletionRequest:
+      type: object
+      required: [messages]
+      properties:
+        model:
+          type: string
+          description: "Model ID (e.g. openai/gpt-4o). Falls back to agent's routing_profile if omitted."
+        mode:
+          type: string
+          enum: [fast, balanced, powerful, cheap, reasoning]
+          description: Smart routing mode (ignored when model is specified)
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlockrunChatMessage"
+        max_tokens:
+          type: integer
+          default: 1024
+        temperature:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 2
+          default: 1
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlockrunToolDefinition"
+        search_parameters:
+          type: object
+          description: Optional Grok live-search parameters
+          properties:
+            mode:
+              type: string
+              enum: [auto, on, off]
+            sources:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [web, x, news]
+
+    BlockrunChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                $ref: "#/components/schemas/BlockrunChatMessage"
+              finish_reason:
+                type: string
+                enum: [stop, length, tool_calls]
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+        citations:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                format: uri
+              title:
+                type: string
+        cost_usd:
+          type: number
+          format: double
+          description: Actual cost of this request in USD
+
+    BlockrunModel:
+      type: object
+      properties:
+        id:
+          type: string
+          description: "Model ID (e.g. openai/gpt-4o)"
+        name:
+          type: string
+        provider:
+          type: string
+        category:
+          type: string
+          enum: [chat, reasoning, image, embedding]
+        input_price_per_million:
+          type: number
+          format: double
+          description: Cost per 1M input tokens in USD
+        output_price_per_million:
+          type: number
+          format: double
+          description: Cost per 1M output tokens in USD
+        max_context:
+          type: integer
+          description: Maximum context window in tokens
+        supports_tools:
+          type: boolean
+        supports_search:
+          type: boolean
+
+    BlockrunImageRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          description: Text description of the image to generate
+        model:
+          type: string
+          enum: [openai/dall-e-3, together/flux-schnell]
+          default: openai/dall-e-3
+        size:
+          type: string
+          enum: [1024x1024, 1792x1024, 1024x1792]
+          default: 1024x1024
+        quality:
+          type: string
+          enum: [standard, hd]
+          default: standard
+
+    BlockrunImageResponse:
+      type: object
+      properties:
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                format: uri
+              revised_prompt:
+                type: string
+        model:
+          type: string
+        cost_usd:
+          type: number
+          format: double
+
+    BlockrunSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: Search query (can include @handles, topics)
+        max_results:
+          type: integer
+          minimum: 1
+          maximum: 25
+          default: 10
+
+    BlockrunSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              url:
+                type: string
+                format: uri
+              snippet:
+                type: string
+              source:
+                type: string
+                enum: [web, x, news]
+              published_at:
+                type: string
+                format: date-time
+        model:
+          type: string
+        cost_usd:
+          type: number
+          format: double
+
+    BlockrunUsageResponse:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        total_spend_usd:
+          type: number
+          format: double
+        total_requests:
+          type: integer
+        by_model:
+          type: array
+          items:
+            type: object
+            properties:
+              model:
+                type: string
+              requests:
+                type: integer
+              input_tokens:
+                type: integer
+              output_tokens:
+                type: integer
+              spend_usd:
+                type: number
+                format: double
+        daily_spend_usd:
+          type: number
+          format: double
+          description: Spend for the current UTC day
+        daily_limit_usd:
+          type: number
+          format: double
+          description: Configured daily limit (0 = unlimited)
 
     # --- Health ---
 
