@@ -44,7 +44,7 @@ import spec from "@1claw/openapi-spec/openapi.json";
 
 - **Vaults** — CRUD, CMEK enable/disable, key rotation with job tracking
 - **Secrets** — CRUD, versioning, CMEK-encrypted flag
-- **Agents** — CRUD with `auth_method` (api_key, mtls, oidc_client_credentials), auto-generated SSH keypairs, `token_ttl_seconds`, `vault_ids`, crypto proxy, transaction guardrails
+- **Agents** — CRUD with `auth_method` (api_key, mtls, oidc_client_credentials), auto-generated SSH keypairs, `token_ttl_seconds`, `vault_ids`, Intents API, transaction guardrails
 - **Policies** — Glob-based access control
 - **Sharing** — Links, user/agent shares, accept/decline
 - **Billing** — Subscriptions, credits, x402

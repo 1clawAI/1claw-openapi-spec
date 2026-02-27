@@ -3,7 +3,7 @@
   "info": {
     "title": "1Claw API",
     "version": "2.1.0",
-    "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, crypto transaction proxy,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
+    "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
     }
@@ -50,7 +50,7 @@
     },
     {
       "name": "Transactions",
-      "description": "Crypto transaction proxy (signing, simulation)"
+      "description": "Intents API (signing, simulation)"
     },
     {
       "name": "Chains",
@@ -1363,6 +1363,41 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/enroll": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Self-enroll an agent",
+        "operationId": "enrollAgent",
+        "description": "Public endpoint (no auth required). Creates an agent under the human's org\nand emails the credentials to the specified human email. The API key is NOT\nreturned in the response. Anti-spam: IP rate limiting + per-email cooldown.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Enrollment processed (uniform response to prevent email enumeration)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollAgentResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
           }
         }
       }
@@ -3991,6 +4026,42 @@
           }
         }
       },
+      "EnrollAgentRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "human_email"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name for the new agent"
+          },
+          "human_email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email of the human who will receive the agent credentials"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional agent description"
+          }
+        }
+      },
+      "EnrollAgentResponse": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the created agent (nil UUID when email not found — uniform response)"
+          },
+          "message": {
+            "type": "string",
+            "description": "Status message (always generic to prevent email enumeration)"
+          }
+        }
+      },
       "CreateAgentRequest": {
         "type": "object",
         "required": [
@@ -4023,7 +4094,7 @@
             "type": "string",
             "format": "date-time"
           },
-          "crypto_proxy_enabled": {
+          "intents_api_enabled": {
             "type": "boolean",
             "default": false
           },
@@ -4091,7 +4162,7 @@
             "type": "string",
             "format": "date-time"
           },
-          "crypto_proxy_enabled": {
+          "intents_api_enabled": {
             "type": "boolean"
           },
           "tx_to_allowlist": {
@@ -4132,7 +4203,7 @@
           "name",
           "auth_method",
           "is_active",
-          "crypto_proxy_enabled",
+          "intents_api_enabled",
           "created_at"
         ],
         "properties": {
@@ -4163,7 +4234,7 @@
           "is_active": {
             "type": "boolean"
           },
-          "crypto_proxy_enabled": {
+          "intents_api_enabled": {
             "type": "boolean"
           },
           "tx_to_allowlist": {
@@ -4255,7 +4326,7 @@
           "is_active": {
             "type": "boolean"
           },
-          "crypto_proxy_enabled": {
+          "intents_api_enabled": {
             "type": "boolean"
           },
           "created_by": {
@@ -5104,7 +5175,7 @@
               "team_members": {
                 "$ref": "#/components/schemas/UsageMeter"
               },
-              "proxy_transactions": {
+              "intent_transactions": {
                 "$ref": "#/components/schemas/UsageMeter"
               },
               "shares": {

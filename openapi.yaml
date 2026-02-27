@@ -5,7 +5,7 @@ info:
   version: 2.1.0
   description: |
     Secure secret management for AI agents. Provides vaults, secrets,
-    policy-based access control, agent identity, crypto transaction proxy,
+    policy-based access control, agent identity, Intents API,
     sharing, billing, and audit logging.
 
     All endpoints require JWT Bearer authentication unless marked with
@@ -36,7 +36,7 @@ tags:
   - name: Agents
     description: Agent identity and key management
   - name: Transactions
-    description: Crypto transaction proxy (signing, simulation)
+    description: Intents API (signing, simulation)
   - name: Chains
     description: Blockchain chain registry
   - name: Sharing
@@ -869,6 +869,35 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   # ---------------------------------------------------------------------------
+  # Agent Self-Enrollment (public)
+  # ---------------------------------------------------------------------------
+
+  /v1/agents/enroll:
+    post:
+      tags: [Agents]
+      summary: Self-enroll an agent
+      operationId: enrollAgent
+      description: |
+        Public endpoint (no auth required). Creates an agent under the human's org
+        and emails the credentials to the specified human email. The API key is NOT
+        returned in the response. Anti-spam: IP rate limiting + per-email cooldown.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollAgentRequest"
+      responses:
+        "201":
+          description: Enrollment processed (uniform response to prevent email enumeration)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollAgentResponse"
+        "429":
+          description: Rate limit exceeded
+
+  # ---------------------------------------------------------------------------
   # Agents
   # ---------------------------------------------------------------------------
 
@@ -986,7 +1015,7 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   # ---------------------------------------------------------------------------
-  # Transactions (Crypto Proxy)
+  # Transactions (Intents API)
   # ---------------------------------------------------------------------------
 
   /v1/agents/{agent_id}/transactions:
@@ -2593,6 +2622,34 @@ components:
           items:
             $ref: "#/components/schemas/PolicyResponse"
 
+    # --- Agent Enrollment ---
+
+    EnrollAgentRequest:
+      type: object
+      required: [name, human_email]
+      properties:
+        name:
+          type: string
+          description: Display name for the new agent
+        human_email:
+          type: string
+          format: email
+          description: Email of the human who will receive the agent credentials
+        description:
+          type: string
+          description: Optional agent description
+
+    EnrollAgentResponse:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+          description: UUID of the created agent (nil UUID when email not found — uniform response)
+        message:
+          type: string
+          description: Status message (always generic to prevent email enumeration)
+
     # --- Agents ---
 
     CreateAgentRequest:
@@ -2615,7 +2672,7 @@ components:
         expires_at:
           type: string
           format: date-time
-        crypto_proxy_enabled:
+        intents_api_enabled:
           type: boolean
           default: false
         tx_to_allowlist:
@@ -2664,7 +2721,7 @@ components:
         expires_at:
           type: string
           format: date-time
-        crypto_proxy_enabled:
+        intents_api_enabled:
           type: boolean
         tx_to_allowlist:
           type: array
@@ -2689,7 +2746,7 @@ components:
 
     AgentResponse:
       type: object
-      required: [id, name, auth_method, is_active, crypto_proxy_enabled, created_at]
+      required: [id, name, auth_method, is_active, intents_api_enabled, created_at]
       properties:
         id:
           type: string
@@ -2707,7 +2764,7 @@ components:
             type: string
         is_active:
           type: boolean
-        crypto_proxy_enabled:
+        intents_api_enabled:
           type: boolean
         tx_to_allowlist:
           type: array
@@ -2773,7 +2830,7 @@ components:
             type: string
         is_active:
           type: boolean
-        crypto_proxy_enabled:
+        intents_api_enabled:
           type: boolean
         created_by:
           type: string
@@ -3357,7 +3414,7 @@ components:
               $ref: "#/components/schemas/UsageMeter"
             team_members:
               $ref: "#/components/schemas/UsageMeter"
-            proxy_transactions:
+            intent_transactions:
               $ref: "#/components/schemas/UsageMeter"
             shares:
               $ref: "#/components/schemas/UsageMeter"
