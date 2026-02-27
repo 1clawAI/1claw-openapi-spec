@@ -389,6 +389,93 @@
         }
       }
     },
+    "/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Get current user profile",
+        "operationId": "getMe",
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Update user profile",
+        "operationId": "updateMe",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Delete current user account",
+        "operationId": "deleteMe",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "confirmation"
+                ],
+                "properties": {
+                  "confirmation": {
+                    "type": "string",
+                    "description": "Must be \"DELETE MY ACCOUNT\""
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Account deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
     "/v1/auth/mfa/status": {
       "get": {
         "tags": [
@@ -2854,6 +2941,48 @@
         }
       }
     },
+    "/v1/admin/orgs/{org_id}/billing-tier": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Set org billing tier (without Stripe)",
+        "operationId": "adminSetBillingTier",
+        "description": "Manually set an organization's billing tier to free, pro, or business.\nFor testing and manual upgrades — does not create a Stripe subscription.\nSetting to \"pro\" or \"business\" sets period_end to +1 year.\nSetting to \"free\" clears subscription data.\n",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBillingTierRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Billing tier updated"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/v1/health": {
       "get": {
         "tags": [
@@ -3340,6 +3469,51 @@
         "properties": {
           "user_code": {
             "type": "string"
+          }
+        }
+      },
+      "UserProfileResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "auth_method": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "email_verified": {
+            "type": "boolean"
+          },
+          "marketing_emails": {
+            "type": "boolean"
+          },
+          "totp_enabled": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "marketing_emails": {
+            "type": "boolean"
           }
         }
       },
@@ -5233,6 +5407,9 @@
                 "org_name": {
                   "type": "string"
                 },
+                "billing_tier": {
+                  "type": "string"
+                },
                 "created_at": {
                   "type": "string",
                   "format": "date-time"
@@ -5277,6 +5454,22 @@
           },
           "is_sponsored": {
             "type": "boolean"
+          }
+        }
+      },
+      "SetBillingTierRequest": {
+        "type": "object",
+        "required": [
+          "tier"
+        ],
+        "properties": {
+          "tier": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro",
+              "business"
+            ]
           }
         }
       },
