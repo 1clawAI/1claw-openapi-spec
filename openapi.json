@@ -1478,10 +1478,20 @@
           "Transactions"
         ],
         "summary": "Submit a transaction for signing",
+        "description": "Replay protection: send an optional **Idempotency-Key** header (e.g. UUID or opaque string).\nDuplicate requests with the same key within 24 hours return the cached transaction response\n(no second sign/broadcast). Omit the header for non-idempotent submissions.\n",
         "operationId": "submitTransaction",
         "parameters": [
           {
             "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Optional key for replay protection; duplicate requests return cached response.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1495,6 +1505,16 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Transaction previously created with same Idempotency-Key (replay-safe response)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Transaction signed (and optionally broadcast)",
             "content": {
@@ -1507,6 +1527,16 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "Idempotency-Key in use by another in-flight request; retry later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "422": {
             "description": "Simulation reverted (when simulate_first is true)",
@@ -1529,6 +1559,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "$ref": "#/components/parameters/IncludeSignedTx"
           }
         ],
         "responses": {
@@ -1564,6 +1597,9 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "$ref": "#/components/parameters/IncludeSignedTx"
           }
         ],
         "responses": {
@@ -2922,6 +2958,16 @@
           "type": "string",
           "format": "uuid"
         }
+      },
+      "IncludeSignedTx": {
+        "name": "include_signed_tx",
+        "in": "query",
+        "required": false,
+        "description": "Set to `true` to include the raw signed transaction hex in the response. Omitted by default to reduce key exfiltration risk.\n",
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
       }
     },
     "responses": {
@@ -3991,6 +4037,10 @@
             "type": "string",
             "description": "Ed25519 SSH public key (base64-encoded, auto-generated at creation)"
           },
+          "ecdh_public_key": {
+            "type": "string",
+            "description": "P-256 ECDH public key (base64 SEC1 uncompressed point, auto-generated at creation)"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -4053,6 +4103,10 @@
           "ssh_public_key": {
             "type": "string",
             "description": "Ed25519 SSH public key (base64-encoded)"
+          },
+          "ecdh_public_key": {
+            "type": "string",
+            "description": "P-256 ECDH public key (base64 SEC1 uncompressed point)"
           }
         }
       },
@@ -4214,7 +4268,9 @@
             ]
           },
           "signed_tx": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Raw signed transaction hex. Omitted (null) by default to reduce exfiltration risk. Pass `include_signed_tx=true` query param on GET endpoints to include it. Always returned on the initial POST submission response.\n"
           },
           "tx_hash": {
             "type": "string"

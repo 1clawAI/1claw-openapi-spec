@@ -941,9 +941,19 @@ paths:
     post:
       tags: [Transactions]
       summary: Submit a transaction for signing
+      description: |
+        Replay protection: send an optional **Idempotency-Key** header (e.g. UUID or opaque string).
+        Duplicate requests with the same key within 24 hours return the cached transaction response
+        (no second sign/broadcast). Omit the header for non-idempotent submissions.
       operationId: submitTransaction
       parameters:
         - $ref: "#/components/parameters/AgentId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Optional key for replay protection; duplicate requests return cached response.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -957,8 +967,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TransactionResponse"
+        "200":
+          description: Transaction previously created with same Idempotency-Key (replay-safe response)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Idempotency-Key in use by another in-flight request; retry later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "422":
           description: Simulation reverted (when simulate_first is true)
           content:
@@ -971,6 +993,7 @@ paths:
       operationId: listTransactions
       parameters:
         - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IncludeSignedTx"
       responses:
         "200":
           description: Transaction list
@@ -992,6 +1015,7 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/IncludeSignedTx"
       responses:
         "200":
           description: Transaction details
@@ -1871,6 +1895,16 @@ components:
       schema:
         type: string
         format: uuid
+    IncludeSignedTx:
+      name: include_signed_tx
+      in: query
+      required: false
+      description: >
+        Set to `true` to include the raw signed transaction hex in the response.
+        Omitted by default to reduce key exfiltration risk.
+      schema:
+        type: boolean
+        default: false
 
   responses:
     BadRequest:
@@ -2751,6 +2785,11 @@ components:
           enum: [pending, signed, broadcast, failed, simulation_failed]
         signed_tx:
           type: string
+          nullable: true
+          description: >
+            Raw signed transaction hex. Omitted (null) by default to reduce exfiltration risk.
+            Pass `include_signed_tx=true` query param on GET endpoints to include it.
+            Always returned on the initial POST submission response.
         tx_hash:
           type: string
         error_message:
