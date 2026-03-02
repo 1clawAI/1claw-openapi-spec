@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -16,6 +16,10 @@
     {
       "url": "https://api.1claw.xyz",
       "description": "Production"
+    },
+    {
+      "url": "https://shroud.1claw.xyz",
+      "description": "Shroud TEE Proxy (Intents API + LLM proxy)"
     }
   ],
   "security": [
@@ -1587,6 +1591,39 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/rotate-identity-keys": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Rotate agent identity keys (SSH + ECDH)",
+        "description": "Rotates the agent's Ed25519 SSH keypair and P-256 ECDH keypair.\nNew private keys are stored in the __agent-keys vault; old keys are overwritten.\nUser-only endpoint — agents cannot rotate their own identity keys.\n",
+        "operationId": "rotateAgentIdentityKeys",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent with updated public keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
