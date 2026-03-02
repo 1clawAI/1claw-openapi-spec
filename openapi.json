@@ -22,6 +22,9 @@
       "description": "Shroud TEE Proxy (Intents API + LLM proxy)"
     }
   ],
+  "x-agentcash-guidance": {
+    "llmsTxtUrl": "https://1claw.xyz/llms.txt"
+  },
   "security": [
     {
       "BearerAuth": []
@@ -1152,6 +1155,16 @@
         ],
         "summary": "Store or update a secret",
         "operationId": "putSecret",
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.0075"
+        },
         "parameters": [
           {
             "$ref": "#/components/parameters/VaultId"
@@ -1183,6 +1196,9 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
           }
         }
       },
@@ -1192,6 +1208,16 @@
         ],
         "summary": "Retrieve a decrypted secret",
         "operationId": "getSecret",
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.0015"
+        },
         "parameters": [
           {
             "$ref": "#/components/parameters/VaultId"
@@ -1637,6 +1663,15 @@
           "Transactions"
         ],
         "summary": "Submit a transaction for signing",
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "quote"
+        },
         "description": "Replay protection: send an optional **Idempotency-Key** header (e.g. UUID or opaque string).\nDuplicate requests with the same key within 24 hours return the cached transaction response\n(no second sign/broadcast). Omit the header for non-idempotent submissions.\n",
         "operationId": "submitTransaction",
         "parameters": [
@@ -1683,6 +1718,9 @@
                 }
               }
             }
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -1785,6 +1823,16 @@
         ],
         "summary": "Simulate a transaction via Tenderly",
         "operationId": "simulateTransaction",
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.075"
+        },
         "parameters": [
           {
             "$ref": "#/components/parameters/AgentId"
@@ -1814,6 +1862,9 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
@@ -1827,6 +1878,16 @@
         ],
         "summary": "Simulate a bundle of transactions",
         "operationId": "simulateBundle",
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.075"
+        },
         "parameters": [
           {
             "$ref": "#/components/parameters/AgentId"
@@ -1855,6 +1916,9 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
           }
         }
       }
@@ -2039,6 +2103,16 @@
         ],
         "summary": "Create a share link for a secret",
         "operationId": "createShare",
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.003"
+        },
         "parameters": [
           {
             "name": "secret_id",
@@ -2071,6 +2145,9 @@
               }
             }
           },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2085,6 +2162,16 @@
         "summary": "Access a shared secret",
         "operationId": "accessShare",
         "security": [],
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.0015"
+        },
         "parameters": [
           {
             "name": "share_id",
@@ -2617,6 +2704,16 @@
         ],
         "summary": "Query audit events",
         "operationId": "queryAuditEvents",
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.0008"
+        },
         "parameters": [
           {
             "name": "resource_id",
@@ -2682,6 +2779,9 @@
                 }
               }
             }
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
           }
         }
       }

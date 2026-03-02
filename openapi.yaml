@@ -21,6 +21,9 @@ servers:
   - url: https://shroud.1claw.xyz
     description: Shroud TEE Proxy (Intents API + LLM proxy)
 
+x-agentcash-guidance:
+  llmsTxtUrl: https://1claw.xyz/llms.txt
+
 security:
   - BearerAuth: []
 
@@ -745,6 +748,12 @@ paths:
       tags: [Secrets]
       summary: Store or update a secret
       operationId: putSecret
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: fixed
+        price: "0.0075"
       parameters:
         - $ref: "#/components/parameters/VaultId"
         - $ref: "#/components/parameters/SecretPath"
@@ -763,10 +772,18 @@ paths:
                 $ref: "#/components/schemas/SecretMetadataResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
     get:
       tags: [Secrets]
       summary: Retrieve a decrypted secret
       operationId: getSecret
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: fixed
+        price: "0.0015"
       parameters:
         - $ref: "#/components/parameters/VaultId"
         - $ref: "#/components/parameters/SecretPath"
@@ -1047,6 +1064,11 @@ paths:
     post:
       tags: [Transactions]
       summary: Submit a transaction for signing
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: quote
       description: |
         Replay protection: send an optional **Idempotency-Key** header (e.g. UUID or opaque string).
         Duplicate requests with the same key within 24 hours return the cached transaction response
@@ -1079,6 +1101,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TransactionResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
@@ -1137,6 +1161,12 @@ paths:
       tags: [Transactions]
       summary: Simulate a transaction via Tenderly
       operationId: simulateTransaction
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: fixed
+        price: "0.075"
       parameters:
         - $ref: "#/components/parameters/AgentId"
       requestBody:
@@ -1156,12 +1186,20 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
 
   /v1/agents/{agent_id}/transactions/simulate-bundle:
     post:
       tags: [Transactions]
       summary: Simulate a bundle of transactions
       operationId: simulateBundle
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: fixed
+        price: "0.075"
       parameters:
         - $ref: "#/components/parameters/AgentId"
       requestBody:
@@ -1179,6 +1217,8 @@ paths:
                 $ref: "#/components/schemas/BundleSimulationResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
 
   # ---------------------------------------------------------------------------
   # Chains
@@ -1300,6 +1340,12 @@ paths:
       tags: [Sharing]
       summary: Create a share link for a secret
       operationId: createShare
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: fixed
+        price: "0.003"
       parameters:
         - name: secret_id
           in: path
@@ -1320,6 +1366,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -1329,6 +1377,12 @@ paths:
       summary: Access a shared secret
       operationId: accessShare
       security: []
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: fixed
+        price: "0.0015"
       parameters:
         - name: share_id
           in: path
@@ -1671,6 +1725,12 @@ paths:
       tags: [Audit]
       summary: Query audit events
       operationId: queryAuditEvents
+      x-agentcash-auth:
+        mode: paid
+      x-payment-info:
+        protocols: [x402]
+        pricingMode: fixed
+        price: "0.0008"
       parameters:
         - name: resource_id
           in: query
@@ -1711,6 +1771,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuditEventsResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
 
   # ---------------------------------------------------------------------------
   # Security (IP Rules)
