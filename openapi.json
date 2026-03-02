@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -3020,7 +3020,7 @@
         ],
         "summary": "Set org billing tier (without Stripe)",
         "operationId": "adminSetBillingTier",
-        "description": "Manually set an organization's billing tier to free, pro, or business.\nFor testing and manual upgrades — does not create a Stripe subscription.\nSetting to \"pro\" or \"business\" sets period_end to +1 year.\nSetting to \"free\" clears subscription data.\n",
+        "description": "Manually set an organization's billing tier to free, pro, business, or enterprise.\nFor testing, manual upgrades, and trial grants — does not create a Stripe subscription.\nSetting to \"pro\", \"business\", or \"enterprise\" sets period_end to now + duration_days (default 365).\nSetting to \"free\" clears subscription data. Use duration_days: 90 for a 3-month trial.\n",
         "parameters": [
           {
             "name": "org_id",
@@ -5576,8 +5576,15 @@
             "enum": [
               "free",
               "pro",
-              "business"
+              "business",
+              "enterprise"
             ]
+          },
+          "duration_days": {
+            "type": "integer",
+            "description": "How many days the tier lasts (default 365). Use 90 for a 3-month trial.",
+            "minimum": 1,
+            "maximum": 3650
           }
         }
       },
