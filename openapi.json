@@ -4277,6 +4277,14 @@
           "oidc_client_id": {
             "type": "string",
             "description": "OIDC client ID (required for oidc_client_credentials auth)"
+          },
+          "shroud_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable Shroud LLM Proxy for this agent"
+          },
+          "shroud_config": {
+            "$ref": "#/components/schemas/ShroudConfig"
           }
         }
       },
@@ -4330,6 +4338,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "shroud_enabled": {
+            "type": "boolean",
+            "description": "Enable/disable Shroud LLM Proxy"
+          },
+          "shroud_config": {
+            "$ref": "#/components/schemas/ShroudConfig"
           }
         }
       },
@@ -4341,6 +4356,7 @@
           "auth_method",
           "is_active",
           "intents_api_enabled",
+          "shroud_enabled",
           "created_at"
         ],
         "properties": {
@@ -4423,6 +4439,13 @@
             "type": "string",
             "description": "P-256 ECDH public key (base64 SEC1 uncompressed point, auto-generated at creation)"
           },
+          "shroud_enabled": {
+            "type": "boolean",
+            "description": "Whether this agent routes LLM traffic through the Shroud TEE proxy"
+          },
+          "shroud_config": {
+            "$ref": "#/components/schemas/ShroudConfig"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -4489,6 +4512,91 @@
           "ecdh_public_key": {
             "type": "string",
             "description": "P-256 ECDH public key (base64 SEC1 uncompressed point)"
+          },
+          "shroud_enabled": {
+            "type": "boolean",
+            "description": "Whether this agent routes LLM traffic through the Shroud TEE proxy"
+          },
+          "shroud_config": {
+            "$ref": "#/components/schemas/ShroudConfig"
+          }
+        }
+      },
+      "ShroudConfig": {
+        "type": "object",
+        "description": "Per-agent Shroud LLM Proxy configuration",
+        "properties": {
+          "pii_policy": {
+            "type": "string",
+            "enum": [
+              "block",
+              "redact",
+              "warn",
+              "allow"
+            ],
+            "default": "redact",
+            "description": "How PII detections are handled"
+          },
+          "injection_threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.7,
+            "description": "Prompt injection score threshold (0.0–1.0). Requests above are blocked"
+          },
+          "context_injection_threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.7,
+            "description": "Context injection score threshold (0.0–1.0)"
+          },
+          "allowed_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "LLM providers this agent may use (empty = all)"
+          },
+          "allowed_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Specific models allowed (empty = all)"
+          },
+          "denied_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Models explicitly blocked"
+          },
+          "max_tokens_per_request": {
+            "type": "integer",
+            "description": "Maximum input tokens per request"
+          },
+          "max_requests_per_minute": {
+            "type": "integer",
+            "description": "Rate limit (requests per minute)"
+          },
+          "max_requests_per_day": {
+            "type": "integer",
+            "description": "Rate limit (requests per day)"
+          },
+          "daily_budget_usd": {
+            "type": "number",
+            "description": "Daily LLM spend cap in USD (0 = unlimited)"
+          },
+          "enable_secret_redaction": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether vault secrets are redacted from prompts/responses"
+          },
+          "enable_response_filtering": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether response credential scanning is active"
           }
         }
       },
