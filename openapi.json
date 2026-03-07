@@ -4597,6 +4597,242 @@
             "type": "boolean",
             "default": true,
             "description": "Whether response credential scanning is active"
+          },
+          "unicode_normalization": {
+            "$ref": "#/components/schemas/UnicodeNormalizationConfig"
+          },
+          "command_injection_detection": {
+            "$ref": "#/components/schemas/CommandInjectionConfig"
+          },
+          "social_engineering_detection": {
+            "$ref": "#/components/schemas/SocialEngineeringConfig"
+          },
+          "encoding_detection": {
+            "$ref": "#/components/schemas/EncodingDetectionConfig"
+          },
+          "network_detection": {
+            "$ref": "#/components/schemas/NetworkDetectionConfig"
+          },
+          "filesystem_detection": {
+            "$ref": "#/components/schemas/FilesystemDetectionConfig"
+          },
+          "sanitization_mode": {
+            "type": "string",
+            "enum": [
+              "block",
+              "surgical",
+              "log_only"
+            ],
+            "default": "block",
+            "description": "Global behavior when threats are detected (block=reject, surgical=remove only malicious parts, log_only=audit without action)"
+          },
+          "threat_logging": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to log all detected threats to audit (even when action is allow/warn)"
+          }
+        }
+      },
+      "UnicodeNormalizationConfig": {
+        "type": "object",
+        "description": "Unicode normalization and homoglyph detection settings",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable Unicode normalization"
+          },
+          "strip_zero_width": {
+            "type": "boolean",
+            "default": true,
+            "description": "Remove zero-width and invisible Unicode characters"
+          },
+          "normalize_homoglyphs": {
+            "type": "boolean",
+            "default": true,
+            "description": "Replace look-alike characters (e.g., Cyrillic а → Latin a)"
+          },
+          "normalization_form": {
+            "type": "string",
+            "enum": [
+              "NFC",
+              "NFKC",
+              "NFD",
+              "NFKD"
+            ],
+            "default": "NFKC",
+            "description": "Unicode normalization form to apply"
+          }
+        }
+      },
+      "CommandInjectionConfig": {
+        "type": "object",
+        "description": "Shell/command injection detection settings",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable command injection detection"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "block",
+              "sanitize",
+              "warn",
+              "log"
+            ],
+            "default": "block",
+            "description": "Action when command injection is detected"
+          },
+          "patterns": {
+            "type": "string",
+            "enum": [
+              "default",
+              "strict",
+              "custom"
+            ],
+            "default": "default",
+            "description": "Pattern strictness level"
+          },
+          "custom_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Custom regex patterns for detection (only used when patterns=custom)"
+          }
+        }
+      },
+      "SocialEngineeringConfig": {
+        "type": "object",
+        "description": "Social engineering and manipulation detection settings",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable social engineering detection"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "block",
+              "warn",
+              "log"
+            ],
+            "default": "warn",
+            "description": "Action when manipulation attempts are detected"
+          },
+          "sensitivity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "medium",
+            "description": "Detection sensitivity level"
+          }
+        }
+      },
+      "EncodingDetectionConfig": {
+        "type": "object",
+        "description": "Encoding/obfuscation detection settings",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable encoding detection"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "block",
+              "decode",
+              "warn",
+              "log"
+            ],
+            "default": "warn",
+            "description": "Action when obfuscated content is detected"
+          },
+          "detect_base64": {
+            "type": "boolean",
+            "default": true,
+            "description": "Detect Base64-encoded content"
+          },
+          "detect_hex": {
+            "type": "boolean",
+            "default": true,
+            "description": "Detect hex-encoded content (\\\\x41, 0x41)"
+          },
+          "detect_unicode_escape": {
+            "type": "boolean",
+            "default": true,
+            "description": "Detect Unicode escape sequences (\\\\u0041)"
+          }
+        }
+      },
+      "NetworkDetectionConfig": {
+        "type": "object",
+        "description": "Suspicious URL/domain detection settings",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable network/URL detection"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "block",
+              "warn",
+              "log"
+            ],
+            "default": "warn",
+            "description": "Action when suspicious URLs are detected"
+          },
+          "blocked_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Domains to always block (e.g., pastebin.com, ngrok.io)"
+          },
+          "allowed_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Domains to always allow (allowlist mode when non-empty)"
+          }
+        }
+      },
+      "FilesystemDetectionConfig": {
+        "type": "object",
+        "description": "Filesystem path detection settings",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable filesystem path detection (disabled by default as it can be noisy)"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "block",
+              "sanitize",
+              "warn",
+              "log"
+            ],
+            "default": "log",
+            "description": "Action when filesystem paths are detected"
+          },
+          "blocked_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Path patterns to block (e.g., /etc/passwd, ~/.ssh)"
           }
         }
       },
