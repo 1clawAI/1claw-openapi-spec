@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.4.0
+    version: 2.4.1
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2097,8 +2097,8 @@ components:
             in: query
             required: false
             description: >
-                Set to `true` to include the raw signed transaction hex in the response.
-                Omitted by default to reduce key exfiltration risk.
+                Set to `true` or `1` to include the raw signed transaction hex in the response.
+                Omitted by default to reduce key exfiltration risk. Only the literal values "true" or "1" enable inclusion; any other value or omission returns responses without signed_tx.
             schema:
                 type: boolean
                 default: false
