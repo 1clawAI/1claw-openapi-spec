@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.4.1",
+    "version": "2.5.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -252,6 +252,43 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/auth/jwt-public-key": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Get JWT verification public key",
+        "description": "Returns the Ed25519 public key used to sign JWTs.\nUse this to verify tokens independently (e.g. in a TEE proxy or\ngateway). No authentication required.\n",
+        "operationId": "getJwtPublicKey",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "JWT public key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "alg",
+                    "public_key_base64"
+                  ],
+                  "properties": {
+                    "alg": {
+                      "type": "string",
+                      "example": "EdDSA"
+                    },
+                    "public_key_base64": {
+                      "type": "string",
+                      "description": "Base64-encoded Ed25519 public key"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
