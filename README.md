@@ -40,7 +40,7 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.12.0)
+## What's in the spec (v0.14.0)
 
 - **Vaults** — CRUD, CMEK enable/disable, key rotation with job tracking
 - **Secrets** — CRUD, versioning, CMEK-encrypted flag
@@ -59,4 +59,4 @@ import spec from "@1claw/openapi-spec/openapi.json";
 
 ## License
 
-PolyForm Noncommercial 1.0.0
+[MIT](./LICENSE)
