@@ -84,6 +84,10 @@
       "description": "IP rules and security configuration"
     },
     {
+      "name": "Treasury",
+      "description": "Multi-sig treasury wallets (Safe) and agent access requests"
+    },
+    {
       "name": "Admin",
       "description": "Platform administration"
     },
@@ -2894,6 +2898,375 @@
         "responses": {
           "204": {
             "description": "Rule deleted"
+          }
+        }
+      }
+    },
+    "/v1/treasury": {
+      "post": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Create a treasury (Safe multisig)",
+        "operationId": "createTreasury",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTreasuryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Treasury created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreasuryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "List treasuries",
+        "operationId": "listTreasuries",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of treasuries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "treasuries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TreasuryResponse"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/treasury/{treasury_id}": {
+      "get": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Get treasury details",
+        "operationId": "getTreasury",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Treasury details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreasuryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/treasury/{treasury_id}/signers": {
+      "post": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Add a signer to a treasury",
+        "operationId": "addTreasurySigner",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSignerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Signer added"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/treasury/{treasury_id}/signers/{signer_id}": {
+      "delete": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Remove a signer from a treasury",
+        "operationId": "removeTreasurySigner",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "signer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Signer removed"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/treasury/{treasury_id}/access-requests": {
+      "post": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Request access to a treasury (agent-only)",
+        "operationId": "requestTreasuryAccess",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Access request created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "List access requests for a treasury",
+        "operationId": "listTreasuryAccessRequests",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of access requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_requests": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccessRequestResponse"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/treasury/{treasury_id}/access-requests/{request_id}/approve": {
+      "post": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Approve an access request",
+        "operationId": "approveTreasuryAccess",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Access request approved"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/treasury/{treasury_id}/access-requests/{request_id}/deny": {
+      "post": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Deny an access request",
+        "operationId": "denyTreasuryAccess",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Access request denied"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -6066,6 +6439,151 @@
             "description": "How many days the tier lasts (default 365). Use 90 for a 3-month trial.",
             "minimum": 1,
             "maximum": 3650
+          }
+        }
+      },
+      "CreateTreasuryRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "chain",
+          "chain_id",
+          "threshold"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "chain_id": {
+            "type": "integer"
+          },
+          "threshold": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "safe_address": {
+            "type": "string",
+            "description": "Pre-deployed Safe address (optional)"
+          }
+        }
+      },
+      "TreasuryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "safe_address": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "chain_id": {
+            "type": "integer"
+          },
+          "threshold": {
+            "type": "integer"
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TreasurySignerResponse"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TreasurySignerResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "signer_type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent"
+            ]
+          },
+          "signer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "evm_address": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AddSignerRequest": {
+        "type": "object",
+        "required": [
+          "signer_type",
+          "signer_id"
+        ],
+        "properties": {
+          "signer_type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent"
+            ]
+          },
+          "signer_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AccessRequestResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "treasury_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "denied"
+            ]
+          },
+          "evm_address": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

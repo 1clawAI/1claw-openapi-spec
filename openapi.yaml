@@ -1518,6 +1518,22 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/OrgMemberListResponse"
 
+    /v1/org/agent-keys-vault:
+        get:
+            tags: [Organization]
+            summary: Get the org's __agent-keys vault id
+            description: Returns the vault id for the caller's org agent-keys vault (used for revealing agent identity keys). Users only; 404 if the vault does not exist.
+            operationId: getAgentKeysVault
+            responses:
+                "200":
+                    description: Agent-keys vault id
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentKeysVaultResponse"
+                "404":
+                    description: Agent-keys vault not found
+
     /v1/org/invite:
         post:
             tags: [Organization]
@@ -3880,6 +3896,13 @@ components:
                     type: string
                 email:
                     type: string
+
+        AgentKeysVaultResponse:
+            type: object
+            properties:
+                vault_id:
+                    type: string
+                    format: uuid
 
         # --- Billing ---
 
