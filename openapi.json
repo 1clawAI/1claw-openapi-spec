@@ -2763,6 +2763,72 @@
         }
       }
     },
+    "/v1/billing/llm-token-billing": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Get LLM token billing status",
+        "operationId": "getLlmTokenBilling",
+        "description": "Returns whether LLM token billing is enabled for the caller's org.",
+        "responses": {
+          "200": {
+            "description": "LLM token billing status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmTokenBillingStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/llm-token-billing/subscribe": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Subscribe to LLM token billing",
+        "operationId": "subscribeLlmTokenBilling",
+        "description": "Creates a Stripe Checkout session for the LLM token billing pricing plan. Returns a checkout URL to redirect the user. After the user completes checkout, a webhook activates LLM billing for the org.\n",
+        "responses": {
+          "200": {
+            "description": "Stripe Checkout URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmCheckoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/llm-token-billing/disable": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Disable LLM token billing",
+        "operationId": "disableLlmTokenBilling",
+        "description": "Disables LLM token billing for the org. Agents will fall back to direct provider routing. Does not cancel the Stripe subscription.\n",
+        "responses": {
+          "200": {
+            "description": "LLM billing disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmDisableResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/billing/overage-method": {
       "patch": {
         "tags": [
@@ -6308,6 +6374,38 @@
           },
           "limit": {
             "type": "integer"
+          }
+        }
+      },
+      "LlmTokenBillingStatus": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "subscription_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ]
+          }
+        }
+      },
+      "LlmCheckoutResponse": {
+        "type": "object",
+        "properties": {
+          "checkout_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "LlmDisableResponse": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
           }
         }
       },
