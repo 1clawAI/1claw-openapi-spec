@@ -2447,9 +2447,11 @@ components:
             description: >
                 Set to `true` or `1` to include the raw signed transaction hex in the response.
                 Omitted by default to reduce key exfiltration risk. Only the literal values "true" or "1" enable inclusion; any other value or omission returns responses without signed_tx.
+                Applies to GET /v1/agents/{agent_id}/transactions and GET /v1/agents/{agent_id}/transactions/{tx_id}.
             schema:
                 type: boolean
                 default: false
+                example: false
 
     responses:
         BadRequest:
@@ -3686,9 +3688,7 @@ components:
                     type: string
                     nullable: true
                     description: >
-                        Raw signed transaction hex. Omitted (null) by default to reduce exfiltration risk.
-                        Pass `include_signed_tx=true` query param on GET endpoints to include it.
-                        Always returned on the initial POST submission response.
+                        Raw signed transaction hex. On GET list and GET by id, this property is omitted by default (absent from the response). Pass `include_signed_tx=true` on those endpoints to include it. Always present on the initial POST submit response.
                 tx_hash:
                     type: string
                 error_message:
