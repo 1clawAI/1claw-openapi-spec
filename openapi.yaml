@@ -1083,6 +1083,36 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/agents/{agent_id}/smart-accounts:
+        post:
+            tags: [Agents]
+            summary: Add a smart account (Safe) for this agent on a chain
+            description: |
+                Use after deploying a Safe on a new chain. Multi-chain; one Safe per chain.
+                Replaces any existing entry for the same chain_id.
+            operationId: addAgentSmartAccount
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/AddSmartAccountRequest"
+            responses:
+                "200":
+                    description: Agent with updated smart_accounts list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     # ---------------------------------------------------------------------------
     # Transactions (Intents API)
     # ---------------------------------------------------------------------------
@@ -3200,6 +3230,47 @@ components:
                 last_active_at:
                     type: string
                     format: date-time
+                smart_accounts:
+                    type: array
+                    description: Multi-chain; one Safe per chain
+                    items:
+                        $ref: "#/components/schemas/AgentSmartAccountResponse"
+
+        AgentSmartAccountResponse:
+            type: object
+            description: One Safe smart account per chain for an agent
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                chain_id:
+                    type: integer
+                safe_address:
+                    type: string
+                nonce:
+                    type: string
+                init_data:
+                    type: object
+                created_at:
+                    type: string
+                    format: date-time
+
+        AddSmartAccountRequest:
+            type: object
+            required: [chain, chain_id, safe_address]
+            properties:
+                chain:
+                    type: string
+                chain_id:
+                    type: integer
+                safe_address:
+                    type: string
+                nonce:
+                    type: string
+                init_data:
+                    type: object
 
         AgentSelfResponse:
             type: object
