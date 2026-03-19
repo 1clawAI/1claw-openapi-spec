@@ -1698,6 +1698,52 @@
         }
       }
     },
+    "/v1/agents/{agent_id}/smart-accounts": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Add a smart account (Safe) for this agent on a chain",
+        "description": "Use after deploying a Safe on a new chain. Multi-chain; one Safe per chain.\nReplaces any existing entry for the same chain_id.\n",
+        "operationId": "addAgentSmartAccount",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSmartAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent with updated smart_accounts list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/transactions": {
       "post": {
         "tags": [
@@ -3042,6 +3088,88 @@
             "$ref": "#/components/responses/NotFound"
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Update treasury name and/or threshold",
+        "operationId": "updateTreasury",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTreasuryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Treasury updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreasuryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Treasury"
+        ],
+        "summary": "Delete a treasury and its signers",
+        "operationId": "deleteTreasury",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "treasury_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Treasury deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/v1/treasury/{treasury_id}/signers": {
@@ -3198,7 +3326,7 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "access_requests": {
+                    "requests": {
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/AccessRequestResponse"
@@ -4892,6 +5020,67 @@
           "last_active_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "smart_accounts": {
+            "type": "array",
+            "description": "Multi-chain; one Safe per chain",
+            "items": {
+              "$ref": "#/components/schemas/AgentSmartAccountResponse"
+            }
+          }
+        }
+      },
+      "AgentSmartAccountResponse": {
+        "type": "object",
+        "description": "One Safe smart account per chain for an agent",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "chain_id": {
+            "type": "integer"
+          },
+          "safe_address": {
+            "type": "string"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "init_data": {
+            "type": "object"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AddSmartAccountRequest": {
+        "type": "object",
+        "required": [
+          "chain",
+          "chain_id",
+          "safe_address"
+        ],
+        "properties": {
+          "chain": {
+            "type": "string"
+          },
+          "chain_id": {
+            "type": "integer"
+          },
+          "safe_address": {
+            "type": "string"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "init_data": {
+            "type": "object"
           }
         }
       },
@@ -6480,27 +6669,72 @@
         "type": "object",
         "required": [
           "name",
-          "chain",
-          "chain_id",
-          "threshold"
+          "safe_address"
         ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name (1–128 characters)"
+          },
+          "safe_address": {
+            "type": "string",
+            "description": "Deployed Safe contract address (0x-prefixed, 42 characters)"
+          },
+          "chain": {
+            "type": "string",
+            "description": "Chain name (default base)"
+          },
+          "chain_id": {
+            "type": "integer",
+            "description": "EVM chain ID (default 8453 for Base)"
+          },
+          "threshold": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Safe threshold (default 1)"
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTreasurySignerEntry"
+            }
+          }
+        }
+      },
+      "CreateTreasurySignerEntry": {
+        "type": "object",
+        "required": [
+          "signer_type",
+          "signer_id",
+          "signer_address"
+        ],
+        "properties": {
+          "signer_type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent"
+            ]
+          },
+          "signer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "signer_address": {
+            "type": "string",
+            "description": "EVM address (0x-prefixed)"
+          }
+        }
+      },
+      "UpdateTreasuryRequest": {
+        "type": "object",
         "properties": {
           "name": {
             "type": "string"
           },
-          "chain": {
-            "type": "string"
-          },
-          "chain_id": {
-            "type": "integer"
-          },
           "threshold": {
             "type": "integer",
             "minimum": 1
-          },
-          "safe_address": {
-            "type": "string",
-            "description": "Pre-deployed Safe address (optional)"
           }
         }
       },
@@ -6511,10 +6745,6 @@
             "type": "string",
             "format": "uuid"
           },
-          "org_id": {
-            "type": "string",
-            "format": "uuid"
-          },
           "name": {
             "type": "string"
           },
@@ -6529,6 +6759,10 @@
           },
           "threshold": {
             "type": "integer"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
           },
           "signers": {
             "type": "array",
@@ -6560,10 +6794,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "evm_address": {
+          "signer_address": {
             "type": "string"
           },
-          "created_at": {
+          "added_at": {
             "type": "string",
             "format": "date-time"
           }
@@ -6573,7 +6807,8 @@
         "type": "object",
         "required": [
           "signer_type",
-          "signer_id"
+          "signer_id",
+          "signer_address"
         ],
         "properties": {
           "signer_type": {
@@ -6586,6 +6821,9 @@
           "signer_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "signer_address": {
+            "type": "string"
           }
         }
       },
@@ -6612,10 +6850,18 @@
               "denied"
             ]
           },
-          "evm_address": {
+          "reason": {
             "type": "string"
           },
-          "created_at": {
+          "requested_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolved_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resolved_at": {
             "type": "string",
             "format": "date-time"
           }

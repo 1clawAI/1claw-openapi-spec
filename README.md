@@ -42,6 +42,7 @@ import spec from "@1claw/openapi-spec/openapi.json";
 
 ## What's in the spec (v0.15.x)
 
+- **Treasury** — Safe multisig treasuries: `POST/GET /v1/treasury`, `GET/PATCH/DELETE /v1/treasury/{id}`, signers, agent access requests (`requests[]` on list)
 - **Vaults** — CRUD, CMEK enable/disable, key rotation with job tracking
 - **Secrets** — CRUD, versioning, CMEK-encrypted flag
 - **Agents** — CRUD with `auth_method` (api_key, mtls, oidc_client_credentials), auto-generated SSH keypairs, `token_ttl_seconds`, `vault_ids`, Intents API, transaction guardrails
