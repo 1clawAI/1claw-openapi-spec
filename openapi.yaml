@@ -1213,6 +1213,46 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/agents/{agent_id}/transactions/sign:
+        post:
+            tags: [Transactions]
+            summary: Sign a transaction without broadcasting
+            description: |
+                Signs a transaction inside the server (or TEE when using Shroud) but does
+                **not** broadcast it. The caller receives the raw `signed_tx` hex and
+                `tx_hash` so it can submit to any RPC of its choosing.
+
+                All agent guardrails (allowlists, value caps, daily limits) are enforced
+                exactly as for the submit endpoint. The signed transaction is recorded for
+                audit and daily-limit tracking with `status: "sign_only"`.
+            operationId: signTransaction
+            x-agentcash-auth:
+                mode: paid
+            x-payment-info:
+                protocols: [x402]
+                pricingMode: quote
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SignTransactionRequest"
+            responses:
+                "200":
+                    description: Transaction signed successfully (not broadcast)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SignTransactionResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "402":
+                    $ref: "#/components/responses/PaymentRequired"
+
     /v1/agents/{agent_id}/transactions/simulate:
         post:
             tags: [Transactions]
@@ -2595,11 +2635,12 @@ components:
 
         AgentTokenRequest:
             type: object
-            required: [agent_id, api_key]
+            required: [api_key]
             properties:
                 agent_id:
                     type: string
                     format: uuid
+                    description: Optional when using key-only auth (ocv_ keys auto-resolve agent)
                 api_key:
                     type: string
 
@@ -3688,6 +3729,76 @@ components:
                 simulate_first:
                     type: boolean
                     default: false
+                mode:
+                    type: string
+                    description: Transaction mode
+                    enum: [eoa, smart_account]
+                    default: eoa
+
+        SignTransactionRequest:
+            type: object
+            required: [to, value, chain]
+            properties:
+                to:
+                    type: string
+                    description: Destination address (0x-prefixed)
+                value:
+                    type: string
+                    description: Value in ETH
+                chain:
+                    type: string
+                    description: Chain name or numeric ID
+                data:
+                    type: string
+                    description: Hex-encoded calldata
+                signing_key_path:
+                    type: string
+                nonce:
+                    type: integer
+                gas_price:
+                    type: string
+                gas_limit:
+                    type: integer
+                max_fee_per_gas:
+                    type: string
+                max_priority_fee_per_gas:
+                    type: string
+                simulate_first:
+                    type: boolean
+                    default: false
+
+        SignTransactionResponse:
+            type: object
+            properties:
+                signed_tx:
+                    type: string
+                    description: Raw signed transaction hex (always included)
+                tx_hash:
+                    type: string
+                from:
+                    type: string
+                    description: Derived sender address
+                to:
+                    type: string
+                chain:
+                    type: string
+                chain_id:
+                    type: integer
+                nonce:
+                    type: integer
+                value_wei:
+                    type: string
+                status:
+                    type: string
+                    enum: [sign_only]
+                simulation_id:
+                    type: string
+                simulation_status:
+                    type: string
+                max_fee_per_gas:
+                    type: string
+                max_priority_fee_per_gas:
+                    type: string
 
         SimulateTransactionRequest:
             type: object
@@ -3735,7 +3846,7 @@ components:
                 status:
                     type: string
                     enum:
-                        [pending, signed, broadcast, failed, simulation_failed]
+                        [pending, signed, sign_only, broadcast, failed, simulation_failed]
                 signed_tx:
                     type: string
                     nullable: true
