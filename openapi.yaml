@@ -1801,8 +1801,9 @@ paths:
             summary: Disable LLM token billing
             operationId: disableLlmTokenBilling
             description: >
-                Disables LLM token billing for the org. Agents will fall back to
-                direct provider routing. Does not cancel the Stripe subscription.
+                Disables LLM token billing for the org and cancels all active
+                Stripe subscriptions for the LLM pricing plan. Agents will fall
+                back to direct provider routing. You can re-enable it at any time.
             responses:
                 "200":
                     description: LLM billing disabled
