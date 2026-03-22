@@ -2744,10 +2744,14 @@ components:
 
         DeviceCodeRequest:
             type: object
-            required: [client_id]
+            required: [client_id, email]
             properties:
                 client_id:
                     type: string
+                email:
+                    type: string
+                    format: email
+                    description: Account email; only that user may approve the code in the dashboard.
 
         DeviceCodeResponse:
             type: object
