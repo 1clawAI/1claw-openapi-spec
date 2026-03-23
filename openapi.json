@@ -3839,6 +3839,31 @@
         }
       }
     },
+    "/v1/admin/usage/reset": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reset all API usage events (testing)",
+        "operationId": "adminResetUsageEvents",
+        "description": "Deletes every row in `usage_events` for all organizations. Resets monthly\nrequest counts used for free-tier / x402 quota. Does not change prepaid credit\nbalances or Stripe. **Platform admin only** (same guard as other `/v1/admin/*` routes).\n",
+        "responses": {
+          "200": {
+            "description": "Usage table cleared; returns number of deleted rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetUsageEventsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/v1/health": {
       "get": {
         "tags": [
@@ -4024,6 +4049,19 @@
           },
           "detail": {
             "type": "string"
+          }
+        }
+      },
+      "ResetUsageEventsResponse": {
+        "type": "object",
+        "required": [
+          "deleted_events"
+        ],
+        "properties": {
+          "deleted_events": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of usage_events rows removed"
           }
         }
       },
