@@ -1854,7 +1854,10 @@ paths:
             tags: [Billing]
             summary: Get LLM token billing status
             operationId: getLlmTokenBilling
-            description: Returns whether LLM token billing is enabled for the caller's org.
+            description: >
+                Returns whether LLM token billing is enabled, optional Stripe billing credit balance
+                (metered scope), and estimated cycle usage from the upcoming invoice—including per-line
+                metered rows when Stripe returns them (amounts; quantities such as tokens when present).
             responses:
                 "200":
                     description: LLM token billing status
@@ -4487,14 +4490,74 @@ components:
                 limit:
                     type: integer
 
+        LlmMeteredInvoiceLine:
+            type: object
+            description: Metered line from Stripe upcoming invoice (usage detail when available).
+            properties:
+                description:
+                    type: string
+                    nullable: true
+                amount_cents:
+                    type: integer
+                    format: int64
+                quantity:
+                    type: number
+                    nullable: true
+                    description: Billed usage units when Stripe returns quantity (e.g. tokens).
+                price_nickname:
+                    type: string
+                    nullable: true
+
+        LlmBillingCycleUsage:
+            type: object
+            description: Accrued LLM charges for the current Stripe subscription period (upcoming invoice).
+            properties:
+                period_start:
+                    type: string
+                    format: date-time
+                    nullable: true
+                period_end:
+                    type: string
+                    format: date-time
+                    nullable: true
+                accrued_usage_cents:
+                    type: integer
+                    format: int64
+                currency:
+                    type: string
+                metered_lines:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/LlmMeteredInvoiceLine"
+
+        LlmCreditBalance:
+            type: object
+            properties:
+                available_cents:
+                    type: integer
+                    format: int64
+                ledger_cents:
+                    type: integer
+                    format: int64
+                used_cents:
+                    type: integer
+                    format: int64
+                currency:
+                    type: string
+
         LlmTokenBillingStatus:
             type: object
+            required: [enabled]
             properties:
                 enabled:
                     type: boolean
                 subscription_status:
                     type: string
                     enum: [active, inactive]
+                credit_balance:
+                    $ref: "#/components/schemas/LlmCreditBalance"
+                billing_cycle_usage:
+                    $ref: "#/components/schemas/LlmBillingCycleUsage"
 
         LlmCheckoutResponse:
             type: object
