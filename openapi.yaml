@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.5.0
+    version: 2.6.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -242,6 +242,51 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/TokenResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+
+    /v1/auth/forgot-password:
+        post:
+            tags: [Authentication]
+            summary: Request password reset email
+            description: |
+                Always returns the same message whether or not the email exists (no account enumeration).
+                Only password-based accounts receive mail.
+            operationId: forgotPassword
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ForgotPasswordRequest"
+            responses:
+                "200":
+                    description: Acknowledgement (check email if account exists)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ForgotPasswordResponse"
+
+    /v1/auth/reset-password:
+        post:
+            tags: [Authentication]
+            summary: Set a new password using reset token from email
+            operationId: resetPassword
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ResetPasswordRequest"
+            responses:
+                "200":
+                    description: Password updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ResetPasswordResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
 
@@ -2774,6 +2819,35 @@ components:
                 current_password:
                     type: string
                 new_password:
+                    type: string
+
+        ForgotPasswordRequest:
+            type: object
+            required: [email]
+            properties:
+                email:
+                    type: string
+                    format: email
+
+        ForgotPasswordResponse:
+            type: object
+            properties:
+                message:
+                    type: string
+
+        ResetPasswordRequest:
+            type: object
+            required: [token, new_password]
+            properties:
+                token:
+                    type: string
+                new_password:
+                    type: string
+
+        ResetPasswordResponse:
+            type: object
+            properties:
+                message:
                     type: string
 
         # --- MFA ---
