@@ -3864,6 +3864,47 @@
         }
       }
     },
+    "/v1/admin/usage/reset-for-user": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reset API usage for a user's organization",
+        "operationId": "adminResetUsageForUserByEmail",
+        "description": "Looks up a registered user by email and deletes all `usage_events` rows for that\nuser's `org_id`. Resets free-tier / monthly quota for the whole org (not other orgs).\n**Platform admin only.**\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetUsageForUserEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usage cleared for the user's org",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetUsageForUserEmailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/health": {
       "get": {
         "tags": [
@@ -4062,6 +4103,48 @@
             "type": "integer",
             "format": "int64",
             "description": "Number of usage_events rows removed"
+          }
+        }
+      },
+      "ResetUsageForUserEmailRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "ResetUsageForUserEmailResponse": {
+        "type": "object",
+        "required": [
+          "deleted_events",
+          "org_id",
+          "user_id",
+          "email",
+          "display_name"
+        ],
+        "properties": {
+          "deleted_events": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
           }
         }
       },
