@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.6.0
+    version: 2.7.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2597,6 +2597,72 @@ paths:
                                         type: string
                                         enum: [ok, degraded, unavailable]
 
+    # --- Shroud Activity ---
+
+    /v1/shroud/activity:
+        get:
+            tags: [Shroud]
+            summary: List Shroud activity events
+            description: Returns recent Shroud proxy activity for the organization (LLM requests, inspections, policy actions).
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: query
+                  name: agent_id
+                  schema:
+                      type: string
+                  description: Filter by agent ID
+                - in: query
+                  name: action
+                  schema:
+                      type: string
+                  description: Filter by action (allowed, blocked, warned)
+                - in: query
+                  name: limit
+                  schema:
+                      type: integer
+                      default: 50
+                  description: Maximum events to return
+                - in: query
+                  name: offset
+                  schema:
+                      type: integer
+                      default: 0
+                  description: Pagination offset
+            responses:
+                "200":
+                    description: Activity events
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    events:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/ShroudActivityEvent"
+                                    total:
+                                        type: integer
+                "401":
+                    description: Unauthorized
+        post:
+            tags: [Shroud]
+            summary: Ingest Shroud activity event (internal)
+            description: Called by the Shroud proxy to record activity events. Not intended for external use.
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/IngestShroudActivityRequest"
+            responses:
+                "201":
+                    description: Event recorded
+                "401":
+                    description: Unauthorized
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -3715,6 +3781,21 @@ components:
                     type: boolean
                     default: true
                     description: Whether to log all detected threats to audit (even when action is allow/warn)
+                tool_call_inspection:
+                    $ref: "#/components/schemas/ToolCallPolicy"
+                output_policy:
+                    $ref: "#/components/schemas/OutputPolicy"
+                secret_injection_detection:
+                    $ref: "#/components/schemas/SecretInjectionConfig"
+                advanced_redaction:
+                    $ref: "#/components/schemas/AdvancedRedactionConfig"
+                semantic_policy:
+                    $ref: "#/components/schemas/SemanticPolicy"
+                flagged_request_retention_days:
+                    type: integer
+                    minimum: 0
+                    maximum: 365
+                    description: Number of days to retain flagged request bodies for replay/investigation
 
         UnicodeNormalizationConfig:
             type: object
@@ -3849,6 +3930,150 @@ components:
                     items:
                         type: string
                     description: Path patterns to block (e.g., /etc/passwd, ~/.ssh)
+
+        ToolCallPolicy:
+            type: object
+            description: Tool/function call inspection settings
+            properties:
+                enabled:
+                    type: boolean
+                    default: false
+                    description: Enable tool call inspection
+                allowed_tool_names:
+                    type: array
+                    items:
+                        type: string
+                    description: Allowed tool/function names (empty = all allowed)
+                denied_tool_names:
+                    type: array
+                    items:
+                        type: string
+                    description: Denied tool/function names
+                scan_arguments:
+                    type: boolean
+                    default: true
+                    description: Scan tool call arguments for credential exfiltration
+                block_credential_exfil:
+                    type: boolean
+                    default: true
+                    description: Block tool calls that appear to exfiltrate credentials
+                action:
+                    type: string
+                    enum: [block, sanitize, warn, log]
+                    default: block
+                    description: Action when a tool call violation is detected
+
+        OutputPolicy:
+            type: object
+            description: Output content policy settings for LLM responses
+            properties:
+                enabled:
+                    type: boolean
+                    default: false
+                    description: Enable output content policies
+                blocked_patterns:
+                    type: array
+                    items:
+                        type: string
+                    description: Custom regex patterns to block in responses
+                blocked_entities:
+                    type: array
+                    items:
+                        type: string
+                    description: Named entities to block (e.g., competitor names)
+                block_harmful_content:
+                    type: boolean
+                    default: false
+                    description: Block responses containing harmful content categories
+                harmful_categories:
+                    type: array
+                    items:
+                        type: string
+                        enum: [violence, self_harm, illegal, hate, sexual, malware]
+                    description: Harm categories to block
+                action:
+                    type: string
+                    enum: [block, sanitize, warn, log]
+                    default: warn
+                    description: Action when output policy is violated
+
+        SecretInjectionConfig:
+            type: object
+            description: Detects credentials injected into prompts that are not from the vault
+            properties:
+                enabled:
+                    type: boolean
+                    default: false
+                    description: Enable secret injection detection
+                action:
+                    type: string
+                    enum: [block, sanitize, warn, log]
+                    default: block
+                    description: Action when injected credentials are detected
+                sensitivity:
+                    type: string
+                    enum: [low, medium, high]
+                    default: medium
+                    description: Detection sensitivity level
+
+        AdvancedRedactionConfig:
+            type: object
+            description: Advanced secret redaction settings (base64-encoded, split, prefix leaks)
+            properties:
+                enabled:
+                    type: boolean
+                    default: false
+                    description: Enable advanced redaction checks
+                detect_base64_encoded:
+                    type: boolean
+                    default: false
+                    description: Detect base64-encoded vault secrets
+                detect_split_secrets:
+                    type: boolean
+                    default: false
+                    description: Detect secrets split across tokens or messages
+                detect_prefix_leak:
+                    type: boolean
+                    default: false
+                    description: Detect partial/prefix leaks of vault secrets
+                min_secret_length:
+                    type: integer
+                    default: 16
+                    description: Minimum secret length to consider for advanced matching
+
+        SemanticPolicy:
+            type: object
+            description: Semantic/intent-level policy enforcement
+            properties:
+                enabled:
+                    type: boolean
+                    default: false
+                    description: Enable semantic policy enforcement
+                allowed_topics:
+                    type: array
+                    items:
+                        type: string
+                    description: Topics the agent is allowed to discuss (empty = all)
+                denied_topics:
+                    type: array
+                    items:
+                        type: string
+                    description: Topics to block
+                allowed_tasks:
+                    type: array
+                    items:
+                        type: string
+                    description: Tasks the agent is allowed to perform (empty = all)
+                denied_tasks:
+                    type: array
+                    items:
+                        type: string
+                    description: Tasks to block (e.g., code_generation, data_export)
+                action:
+                    type: string
+                    enum: [block, sanitize, warn, log]
+                    default: warn
+                    description: Action when semantic policy is violated
 
         AgentCreatedResponse:
             type: object
@@ -4994,6 +5219,84 @@ components:
                                 type: integer
                 description:
                     type: string
+
+        # --- Shroud Activity ---
+
+        ShroudActivityEvent:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                provider:
+                    type: string
+                model:
+                    type: string
+                action:
+                    type: string
+                    description: Action taken (allowed, blocked, warned)
+                request_tokens:
+                    type: integer
+                response_tokens:
+                    type: integer
+                latency_ms:
+                    type: integer
+                had_secrets_redacted:
+                    type: boolean
+                had_pii_detected:
+                    type: boolean
+                injection_score:
+                    type: number
+                policy_violations:
+                    type: array
+                    items:
+                        type: string
+                metadata:
+                    type: object
+                timestamp:
+                    type: string
+                    format: date-time
+
+        IngestShroudActivityRequest:
+            type: object
+            required: [agent_id, action]
+            properties:
+                agent_id:
+                    type: string
+                provider:
+                    type: string
+                model:
+                    type: string
+                action:
+                    type: string
+                request_tokens:
+                    type: integer
+                    default: 0
+                response_tokens:
+                    type: integer
+                    default: 0
+                latency_ms:
+                    type: integer
+                had_secrets_redacted:
+                    type: boolean
+                    default: false
+                had_pii_detected:
+                    type: boolean
+                    default: false
+                injection_score:
+                    type: number
+                    default: 0
+                policy_violations:
+                    type: array
+                    items:
+                        type: string
+                metadata:
+                    type: object
 
         # --- Health ---
 
