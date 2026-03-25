@@ -153,6 +153,7 @@
           "Authentication"
         ],
         "summary": "Exchange agent credentials for JWT",
+        "description": "Returns a short-lived EdDSA-signed JWT (`access_token`). Standard claims include `sub`\n(`agent:<uuid>`), `org`, `scopes`, `vault_ids`, optional `intents_api_enabled`, optional\n`shroud_enabled`, optional `llm_token_billing` / `stripe_customer_id` when org LLM billing is on.\n\nWhen **`shroud_enabled`** is true, the JWT payload may include **`shroud_config`**: a JSON object\nmirroring the agent row in Vault (same shape as `ShroudConfig` on `GET /v1/agents/{id}`).\n**Shroud** (TEE proxy) decodes this on each LLM request and runs **PolicyEngine** after the\nglobal inspection pipeline so per-agent limits and threat **block** actions apply without a\nseparate policy fetch. Re-exchange the agent token after changing `shroud_config` so the JWT\nis fresh.\n\nUser JWTs from password, API key, or device flow do **not** include `shroud_config`.\n",
         "operationId": "agentToken",
         "security": [],
         "requestBody": {
