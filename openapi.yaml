@@ -2663,6 +2663,36 @@ paths:
                 "401":
                     description: Unauthorized
 
+    /v1/shroud/threat-summary:
+        get:
+            tags: [Shroud]
+            summary: Shroud threat analytics summary
+            description: >
+                Aggregated threat metrics for the organization from `shroud_activity`
+                (detectors, blocked counts, recent flagged requests). Query `period` selects
+                the window; the previous window of equal length is used for request volume trend.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: query
+                  name: period
+                  schema:
+                      type: string
+                      enum: [1h, 24h, 7d, 30d]
+                      default: 24h
+                  description: Rolling window ending now
+            responses:
+                "200":
+                    description: Threat summary
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ShroudThreatSummary"
+                "400":
+                    description: Invalid period
+                "401":
+                    description: Unauthorized
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -5297,6 +5327,77 @@ components:
                         type: string
                 metadata:
                     type: object
+
+        ShroudThreatSummary:
+            type: object
+            properties:
+                total_requests:
+                    type: integer
+                    format: int64
+                total_requests_prev:
+                    type: integer
+                    format: int64
+                blocked_requests:
+                    type: integer
+                    format: int64
+                detectors_triggered:
+                    type: integer
+                    format: int64
+                active_agents:
+                    type: integer
+                    format: int64
+                detectors:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ShroudDetectorStats"
+                flagged_requests:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ShroudFlaggedRequest"
+
+        ShroudDetectorStats:
+            type: object
+            properties:
+                detector:
+                    type: string
+                detections:
+                    type: integer
+                    format: int64
+                blocks:
+                    type: integer
+                    format: int64
+                actions:
+                    type: object
+                    properties:
+                        blocked:
+                            type: integer
+                            format: int64
+                        warned:
+                            type: integer
+                            format: int64
+                        logged:
+                            type: integer
+                            format: int64
+
+        ShroudFlaggedRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                timestamp:
+                    type: string
+                    format: date-time
+                agent_id:
+                    type: string
+                agent_name:
+                    type: string
+                score:
+                    type: number
+                reason:
+                    type: string
+                action:
+                    type: string
+                    enum: [blocked, warned, logged]
 
         # --- Health ---
 
