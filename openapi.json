@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.7.0",
+    "version": "2.8.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -1221,6 +1221,52 @@
         }
       }
     },
+    "/v1/vaults/{vault_id}/mpc": {
+      "post": {
+        "tags": [
+          "Vaults"
+        ],
+        "summary": "Enable MPC custody on a vault",
+        "operationId": "enableMpc",
+        "description": "Enable MPC custody on an existing vault. Requires Business or Enterprise plan.\nSplits secret encryption keys across multiple providers using the specified\ncustody mode (e.g. 2-of-2, 2-of-3).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnableMpcRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MPC custody enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/vaults/{vault_id}/secrets": {
       "get": {
         "tags": [
@@ -1299,7 +1345,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SecretMetadataResponse"
+                  "$ref": "#/components/schemas/SecretCreatedResponse"
                 }
               }
             }
@@ -1334,6 +1380,15 @@
           },
           {
             "$ref": "#/components/parameters/SecretPath"
+          },
+          {
+            "name": "x-client-share",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Base64-encoded client key share for MPC 2-of-2 vaults. Required when the vault uses 2-of-2 MPC custody."
           }
         ],
         "responses": {
@@ -4133,6 +4188,55 @@
           }
         }
       }
+    },
+    "/v1/shroud/threat-summary": {
+      "get": {
+        "tags": [
+          "Shroud"
+        ],
+        "summary": "Shroud threat analytics summary",
+        "description": "Aggregated threat metrics for the organization from `shroud_activity` (detectors, blocked counts, recent flagged requests). Query `period` selects the window; the previous window of equal length is used for request volume trend.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1h",
+                "24h",
+                "7d",
+                "30d"
+              ],
+              "default": "24h"
+            },
+            "description": "Rolling window ending now"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Threat summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShroudThreatSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid period"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4810,6 +4914,10 @@
           },
           "description": {
             "type": "string"
+          },
+          "mpc_custody": {
+            "type": "string",
+            "description": "MPC custody mode to enable at creation (e.g. \"2-of-2\", \"2-of-3\")"
           }
         }
       },
@@ -4848,6 +4956,21 @@
           "cmek_fingerprint": {
             "type": "string",
             "description": "SHA-256 fingerprint of the CMEK key (64 hex chars)"
+          },
+          "mpc_custody": {
+            "type": "string",
+            "description": "MPC custody mode (e.g. \"2-of-2\", \"2-of-3\"), absent when MPC is not enabled"
+          },
+          "mpc_threshold": {
+            "type": "integer",
+            "description": "Number of shares required to reconstruct the key"
+          },
+          "mpc_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of MPC share providers (e.g. [\"server\", \"client\"])"
           }
         }
       },
@@ -4943,6 +5066,18 @@
           }
         }
       },
+      "EnableMpcRequest": {
+        "type": "object",
+        "required": [
+          "mpc_custody"
+        ],
+        "properties": {
+          "mpc_custody": {
+            "type": "string",
+            "description": "MPC custody mode (e.g. \"2-of-2\", \"2-of-3\")"
+          }
+        }
+      },
       "PutSecretRequest": {
         "type": "object",
         "required": [
@@ -5008,6 +5143,48 @@
           "expires_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "SecretCreatedResponse": {
+        "description": "Returned when a secret is created or updated. Extends SecretMetadataResponse with an optional client_share for MPC vaults.",
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "type",
+          "version",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "client_share": {
+            "type": "string",
+            "description": "Base64-encoded client key share. Returned only for MPC 2-of-2 vaults. The client must store this share securely — it is not persisted server-side."
           }
         }
       },
@@ -7931,6 +8108,108 @@
           },
           "metadata": {
             "type": "object"
+          }
+        }
+      },
+      "ShroudThreatSummary": {
+        "type": "object",
+        "properties": {
+          "total_requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total_requests_prev": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "blocked_requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "detectors_triggered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "active_agents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "detectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShroudDetectorStats"
+            }
+          },
+          "flagged_requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShroudFlaggedRequest"
+            }
+          }
+        }
+      },
+      "ShroudDetectorStats": {
+        "type": "object",
+        "properties": {
+          "detector": {
+            "type": "string"
+          },
+          "detections": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "blocks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actions": {
+            "type": "object",
+            "properties": {
+              "blocked": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "warned": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "logged": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          }
+        }
+      },
+      "ShroudFlaggedRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "blocked",
+              "warned",
+              "logged"
+            ]
           }
         }
       },

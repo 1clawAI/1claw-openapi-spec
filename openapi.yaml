@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.7.0
+    version: 2.8.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -803,6 +803,41 @@ paths:
                     $ref: "#/components/responses/NotFound"
 
     # ---------------------------------------------------------------------------
+    # MPC
+    # ---------------------------------------------------------------------------
+
+    /v1/vaults/{vault_id}/mpc:
+        post:
+            tags: [Vaults]
+            summary: Enable MPC custody on a vault
+            operationId: enableMpc
+            description: |
+                Enable MPC custody on an existing vault. Requires Business or Enterprise plan.
+                Splits secret encryption keys across multiple providers using the specified
+                custody mode (e.g. 2-of-2, 2-of-3).
+            parameters:
+                - $ref: "#/components/parameters/VaultId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/EnableMpcRequest"
+            responses:
+                "200":
+                    description: MPC custody enabled
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/VaultResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
     # Secrets
     # ---------------------------------------------------------------------------
 
@@ -854,7 +889,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/SecretMetadataResponse"
+                                $ref: "#/components/schemas/SecretCreatedResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "402":
@@ -872,6 +907,12 @@ paths:
             parameters:
                 - $ref: "#/components/parameters/VaultId"
                 - $ref: "#/components/parameters/SecretPath"
+                - name: x-client-share
+                  in: header
+                  required: false
+                  schema:
+                      type: string
+                  description: Base64-encoded client key share for MPC 2-of-2 vaults. Required when the vault uses 2-of-2 MPC custody.
             responses:
                 "200":
                     description: Decrypted secret value
@@ -3173,6 +3214,9 @@ components:
                     type: string
                 description:
                     type: string
+                mpc_custody:
+                    type: string
+                    description: MPC custody mode to enable at creation (e.g. "2-of-2", "2-of-3")
 
         VaultResponse:
             type: object
@@ -3198,6 +3242,17 @@ components:
                 cmek_fingerprint:
                     type: string
                     description: SHA-256 fingerprint of the CMEK key (64 hex chars)
+                mpc_custody:
+                    type: string
+                    description: MPC custody mode (e.g. "2-of-2", "2-of-3"), absent when MPC is not enabled
+                mpc_threshold:
+                    type: integer
+                    description: Number of shares required to reconstruct the key
+                mpc_providers:
+                    type: array
+                    items:
+                        type: string
+                    description: List of MPC share providers (e.g. ["server", "client"])
 
         VaultListResponse:
             type: object
@@ -3259,6 +3314,16 @@ components:
                     type: string
                     format: date-time
 
+        # --- MPC ---
+
+        EnableMpcRequest:
+            type: object
+            required: [mpc_custody]
+            properties:
+                mpc_custody:
+                    type: string
+                    description: MPC custody mode (e.g. "2-of-2", "2-of-3")
+
         # --- Secrets ---
 
         PutSecretRequest:
@@ -3305,6 +3370,33 @@ components:
                 expires_at:
                     type: string
                     format: date-time
+
+        SecretCreatedResponse:
+            description: Returned when a secret is created or updated. Extends SecretMetadataResponse with an optional client_share for MPC vaults.
+            type: object
+            required: [id, path, type, version, created_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                path:
+                    type: string
+                type:
+                    type: string
+                version:
+                    type: integer
+                metadata:
+                    type: object
+                    additionalProperties: true
+                created_at:
+                    type: string
+                    format: date-time
+                expires_at:
+                    type: string
+                    format: date-time
+                client_share:
+                    type: string
+                    description: Base64-encoded client key share. Returned only for MPC 2-of-2 vaults. The client must store this share securely — it is not persisted server-side.
 
         SecretResponse:
             type: object
