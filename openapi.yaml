@@ -937,6 +937,100 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/vaults/{vault_id}/secret-versions/{path}:
+        get:
+            tags: [Secrets]
+            summary: List all versions of a secret
+            operationId: listSecretVersions
+            parameters:
+                - $ref: "#/components/parameters/VaultId"
+                - $ref: "#/components/parameters/SecretPath"
+            responses:
+                "200":
+                    description: Version list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SecretVersionListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/vaults/{vault_id}/secret-version/{path}/{version}:
+        get:
+            tags: [Secrets]
+            summary: Retrieve a specific version of a secret
+            operationId: getSecretVersion
+            parameters:
+                - $ref: "#/components/parameters/VaultId"
+                - $ref: "#/components/parameters/SecretPath"
+                - name: version
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+            responses:
+                "200":
+                    description: Decrypted secret value at the specified version
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SecretResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "410":
+                    description: Version has been disabled or expired
+
+    /v1/vaults/{vault_id}/secret-version/{path}/{version}/disable:
+        post:
+            tags: [Secrets]
+            summary: Disable a specific secret version
+            operationId: disableSecretVersion
+            description: |
+                Disables a version so it can no longer be read. The version is
+                retained for audit purposes but returns 410 on read attempts.
+            parameters:
+                - $ref: "#/components/parameters/VaultId"
+                - $ref: "#/components/parameters/SecretPath"
+                - name: version
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+            responses:
+                "204":
+                    description: Version disabled
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/vaults/{vault_id}/secret-rotate/{path}:
+        post:
+            tags: [Secrets]
+            summary: Server-side secret rotation
+            operationId: rotateSecret
+            description: |
+                Generates a cryptographically random value and stores it as a new
+                version of the secret. The previous version is preserved in history.
+                Requires rotate or write permission.
+            parameters:
+                - $ref: "#/components/parameters/VaultId"
+                - $ref: "#/components/parameters/SecretPath"
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/RotateSecretRequest"
+            responses:
+                "201":
+                    description: New version created with server-generated value
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SecretCreatedResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     # ---------------------------------------------------------------------------
     # Policies
     # ---------------------------------------------------------------------------
@@ -3370,6 +3464,9 @@ components:
                 expires_at:
                     type: string
                     format: date-time
+                is_disabled:
+                    type: boolean
+                    description: Whether this version has been disabled (retained for audit but unreadable)
 
         SecretCreatedResponse:
             description: Returned when a secret is created or updated. Extends SecretMetadataResponse with an optional client_share for MPC vaults.
@@ -3435,6 +3532,30 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/SecretMetadataResponse"
+
+        SecretVersionListResponse:
+            type: object
+            properties:
+                versions:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/SecretMetadataResponse"
+
+        RotateSecretRequest:
+            type: object
+            properties:
+                length:
+                    type: integer
+                    minimum: 8
+                    maximum: 1024
+                    description: Length of the generated value (default 32)
+                charset:
+                    type: string
+                    enum: [hex, base64, alphanumeric, ascii]
+                    description: Character set for the generated value (default hex)
+                type:
+                    type: string
+                    description: Override the secret type (defaults to existing secret's type)
 
         # --- Policies ---
 
