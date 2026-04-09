@@ -5803,6 +5803,10 @@
           "tx_daily_limit_eth": {
             "type": "string"
           },
+          "tx_spent_today_eth": {
+            "type": "string",
+            "description": "ETH value already spent today (UTC) from recorded transactions; used with daily limit guardrails"
+          },
           "tx_allowed_chains": {
             "type": "array",
             "items": {
