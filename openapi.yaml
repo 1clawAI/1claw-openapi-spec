@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.9.0
+    version: 2.10.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -625,6 +625,147 @@ paths:
                     description: Key revoked
                 "404":
                     $ref: "#/components/responses/NotFound"
+
+    /v1/auth/export-data:
+        post:
+            tags: [Authentication]
+            summary: Export user data (GDPR)
+            description: |
+                Returns a full export of the authenticated user's data including
+                profile, vaults, agents, secrets metadata, and policies. Intended
+                for GDPR data-portability requests. Only available to human users
+                (not agents).
+            operationId: exportUserData
+            responses:
+                "200":
+                    description: User data export
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required:
+                                    - export_version
+                                    - exported_at
+                                    - user
+                                    - vaults
+                                    - agents
+                                    - secrets_metadata
+                                    - policies
+                                properties:
+                                    export_version:
+                                        type: string
+                                        example: "1.0"
+                                    exported_at:
+                                        type: string
+                                        format: date-time
+                                    user:
+                                        type: object
+                                        required:
+                                            - id
+                                            - email
+                                            - display_name
+                                            - auth_method
+                                            - created_at
+                                        properties:
+                                            id:
+                                                type: string
+                                                format: uuid
+                                            email:
+                                                type: string
+                                                format: email
+                                            display_name:
+                                                type: string
+                                            auth_method:
+                                                type: string
+                                            created_at:
+                                                type: string
+                                                format: date-time
+                                    vaults:
+                                        type: array
+                                        items:
+                                            type: object
+                                            required: [id, name, created_at]
+                                            properties:
+                                                id:
+                                                    type: string
+                                                    format: uuid
+                                                name:
+                                                    type: string
+                                                created_at:
+                                                    type: string
+                                                    format: date-time
+                                    agents:
+                                        type: array
+                                        items:
+                                            type: object
+                                            required: [id, name, created_at]
+                                            properties:
+                                                id:
+                                                    type: string
+                                                    format: uuid
+                                                name:
+                                                    type: string
+                                                created_at:
+                                                    type: string
+                                                    format: date-time
+                                    secrets_metadata:
+                                        type: array
+                                        items:
+                                            type: object
+                                            required:
+                                                - vault_id
+                                                - path
+                                                - type
+                                                - version
+                                                - created_at
+                                            properties:
+                                                vault_id:
+                                                    type: string
+                                                    format: uuid
+                                                path:
+                                                    type: string
+                                                type:
+                                                    type: string
+                                                version:
+                                                    type: integer
+                                                created_at:
+                                                    type: string
+                                                    format: date-time
+                                    policies:
+                                        type: array
+                                        items:
+                                            type: object
+                                            required:
+                                                - id
+                                                - vault_id
+                                                - principal_type
+                                                - principal_id
+                                                - secret_path_pattern
+                                                - permissions
+                                                - created_at
+                                            properties:
+                                                id:
+                                                    type: string
+                                                    format: uuid
+                                                vault_id:
+                                                    type: string
+                                                    format: uuid
+                                                principal_type:
+                                                    type: string
+                                                principal_id:
+                                                    type: string
+                                                    format: uuid
+                                                secret_path_pattern:
+                                                    type: string
+                                                permissions:
+                                                    type: array
+                                                    items:
+                                                        type: string
+                                                created_at:
+                                                    type: string
+                                                    format: date-time
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     # ---------------------------------------------------------------------------
     # Vaults
