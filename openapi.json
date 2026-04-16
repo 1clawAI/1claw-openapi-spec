@@ -1922,7 +1922,7 @@
         ],
         "summary": "Self-enroll an agent",
         "operationId": "enrollAgent",
-        "description": "Public endpoint (no auth required). Creates an agent under the human's org\nand emails the credentials to the specified human email. The API key is NOT\nreturned in the response. Anti-spam: IP rate limiting + per-email cooldown.\n",
+        "description": "Public endpoint (no auth required).\n\n**With `human_email`:** Creates a pending enrollment for that account's org,\nemails Allow/Deny links, and returns `approval_url` in the JSON body (use if email\nis delayed). The API key is NOT returned until the human approves.\n\n**Name only (omit `human_email`):** Creates a link-only pending enrollment.\nThe response includes `approval_url`; the human opens it while signed in to\napprove the agent into their org.\n\nAnti-spam: IP rate limiting, per-email cooldown, caps on pending rows.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5766,8 +5766,7 @@
       "EnrollAgentRequest": {
         "type": "object",
         "required": [
-          "name",
-          "human_email"
+          "name"
         ],
         "properties": {
           "name": {
@@ -5777,7 +5776,7 @@
           "human_email": {
             "type": "string",
             "format": "email",
-            "description": "Email of the human who will receive the agent credentials"
+            "description": "Optional. If set, pending enrollment is bound to that 1Claw account email\nand Allow/Deny links are emailed. If omitted, only `approval_url` is used\n(link-only enrollment; human must open the URL while signed in).\n"
           },
           "description": {
             "type": "string",
@@ -5791,11 +5790,16 @@
           "agent_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID of the created agent (nil UUID when email not found — uniform response)"
+            "description": "UUID of the created agent (nil UUID until approved — uniform response)"
           },
           "message": {
             "type": "string",
-            "description": "Status message (always generic to prevent email enumeration)"
+            "description": "Status message (worded to limit email enumeration where applicable)"
+          },
+          "approval_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Present when a pending enrollment was created and the client should show\nthis link (email flow includes it as a fallback; name-only flow requires it).\n"
           }
         }
       },
