@@ -1708,7 +1708,7 @@
         }
       }
     },
-    "/v1/vaults/{vault_id}/secret-version/{path}/{version}/disable": {
+    "/v1/vaults/{vault_id}/secret-version-disable/{path}/{version}": {
       "post": {
         "tags": [
           "Secrets"

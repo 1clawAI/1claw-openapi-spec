@@ -1121,7 +1121,7 @@ paths:
                 "410":
                     description: Version has been disabled or expired
 
-    /v1/vaults/{vault_id}/secret-version/{path}/{version}/disable:
+    /v1/vaults/{vault_id}/secret-version-disable/{path}/{version}:
         post:
             tags: [Secrets]
             summary: Disable a specific secret version
