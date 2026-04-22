@@ -5660,6 +5660,31 @@ components:
                     type: array
                     items:
                         type: string
+                # Response-side inspection signals (Shroud v0.5.0+,
+                # H-RESP-INSPECT). Optional — pre-v0.5.0 events have them
+                # unset; treat as zero / empty.
+                response_injection_score:
+                    type: number
+                    description: Response-side prompt-injection score (0.0–1.0).
+                response_context_injection_score:
+                    type: number
+                    description: Response-side context-injection score (0.0–1.0).
+                response_injection_categories:
+                    type: array
+                    items:
+                        type: string
+                    description: Category tags emitted by the response-side filters (e.g. `markdown_image_exfil`, `data_uri_blob`, `echoed_instruction`).
+                external_urls_flagged:
+                    type: array
+                    items:
+                        type: string
+                    description: URLs emitted by the model that were flagged as potential exfil / callback targets.
+                unexpected_code_blocks:
+                    type: integer
+                    description: Number of code fences in the response that were not expected for the agent's allowed task set.
+                content_filtered:
+                    type: boolean
+                    description: True when Shroud rewrote or blocked response content before returning it to the agent.
                 metadata:
                     type: object
                 timestamp:
@@ -5701,6 +5726,28 @@ components:
                         type: string
                 metadata:
                     type: object
+                # Response-side inspection signals (Shroud v0.5.0+,
+                # H-RESP-INSPECT). Optional for backward compatibility.
+                response_injection_score:
+                    type: number
+                    default: 0
+                response_context_injection_score:
+                    type: number
+                    default: 0
+                response_injection_categories:
+                    type: array
+                    items:
+                        type: string
+                external_urls_flagged:
+                    type: array
+                    items:
+                        type: string
+                unexpected_code_blocks:
+                    type: integer
+                    default: 0
+                content_filtered:
+                    type: boolean
+                    default: false
 
         ShroudThreatSummary:
             type: object
