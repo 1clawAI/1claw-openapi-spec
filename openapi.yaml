@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.10.0
+    version: 2.10.1
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -192,6 +192,12 @@ paths:
                 Returns the Ed25519 public key used to sign JWTs.
                 Use this to verify tokens independently (e.g. in a TEE proxy or
                 gateway). No authentication required.
+
+                For OIDC-compliant relying parties (Anthropic Workload Identity
+                Federation, etc.) prefer the JWKS endpoint at
+                `/.well-known/jwks.json` together with the discovery document
+                at `/.well-known/openid-configuration` — those advertise both
+                Ed25519 and RS256 keys keyed by `kid` and survive key rotation.
             operationId: getJwtPublicKey
             security: []
             responses:
@@ -209,6 +215,100 @@ paths:
                                     public_key_base64:
                                         type: string
                                         description: Base64-encoded Ed25519 public key
+
+    /v1/auth/federated-token:
+        post:
+            tags: [Authentication]
+            summary: Exchange a 1claw token for an OIDC federation token (RFC 8693)
+            description: |
+                Mints a short-lived RS256-signed JWT targeted at an external
+                relying party (e.g. Anthropic Workload Identity Federation).
+                The relying party validates the token via this issuer's JWKS
+                URL (`/.well-known/jwks.json`) and exchanges it for its own
+                short-lived service credentials.
+
+                Requirements:
+                - The agent that owns the `subject_token` must have
+                  `federation_enabled = true` and the requested `audience`
+                  must appear in `federation_audiences`.
+                - The `subject_token` must be a valid 1claw agent JWT or
+                  `ocv_` API key.
+                - Optional `scope` narrows the agent's existing scopes — it
+                  cannot escalate.
+
+                Returns 503 when `ONECLAW_JWT_RS256_SIGNING_KEY_ID` is not
+                configured on the server.
+            operationId: exchangeFederatedToken
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/TokenExchangeRequest"
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: "#/components/schemas/TokenExchangeRequest"
+            responses:
+                "200":
+                    description: Federation token issued
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TokenExchangeResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "503":
+                    description: RS256 signing key not configured
+
+    /.well-known/openid-configuration:
+        get:
+            tags: [Authentication]
+            summary: OIDC discovery document
+            description: |
+                Standard OpenID Connect discovery document advertising the
+                issuer URL, JWKS URL, supported algorithms (`EdDSA`, `RS256`),
+                and the RFC 8693 token-exchange endpoint. External IdPs
+                (Anthropic WIF, Okta, Auth0, etc.) read this URL to learn
+                where 1claw publishes its JWKS.
+            operationId: openidConfiguration
+            security: []
+            responses:
+                "200":
+                    description: Discovery document
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+
+    /.well-known/jwks.json:
+        get:
+            tags: [Authentication]
+            summary: JSON Web Key Set
+            description: |
+                Public keys for every active version of every JWT signing
+                key (Ed25519 + RSA-2048). Each entry includes a `kid` so
+                consumers can validate tokens issued before the most recent
+                key rotation. Cached for 5 minutes via `Cache-Control` and
+                CORS-permissive for browser-based IdP consoles.
+            operationId: jwks
+            security: []
+            responses:
+                "200":
+                    description: JWK Set
+                    content:
+                        application/jwk-set+json:
+                            schema:
+                                type: object
+                                properties:
+                                    keys:
+                                        type: array
+                                        items:
+                                            type: object
 
     /v1/auth/signup:
         post:
@@ -3176,6 +3276,55 @@ components:
                 api_key:
                     type: string
 
+        TokenExchangeRequest:
+            type: object
+            required: [grant_type, subject_token, subject_token_type, audience]
+            description: |
+                RFC 8693 token-exchange request body. `subject_token_type`
+                accepts the standard JWT URI or 1claw's API-key URI:
+                  - `urn:ietf:params:oauth:token-type:jwt`
+                  - `urn:1claw:params:oauth:token-type:api-key`
+            properties:
+                grant_type:
+                    type: string
+                    enum:
+                        - "urn:ietf:params:oauth:grant-type:token-exchange"
+                subject_token:
+                    type: string
+                    description: 1claw JWT or `ocv_` API key authorising the exchange.
+                subject_token_type:
+                    type: string
+                    enum:
+                        - "urn:ietf:params:oauth:token-type:jwt"
+                        - "urn:1claw:params:oauth:token-type:api-key"
+                audience:
+                    type: string
+                    format: uri
+                    description: Required `aud` claim for the issued federation token (must be in agent's allowlist).
+                    example: "https://api.anthropic.com"
+                scope:
+                    type: string
+                    description: Optional space-separated subset of the agent's existing scopes.
+                requested_token_type:
+                    type: string
+                    description: Optional. Defaults to `urn:ietf:params:oauth:token-type:jwt`.
+
+        TokenExchangeResponse:
+            type: object
+            required: [access_token, issued_token_type, token_type, expires_in]
+            properties:
+                access_token:
+                    type: string
+                    description: RS256-signed federation JWT.
+                issued_token_type:
+                    type: string
+                token_type:
+                    type: string
+                expires_in:
+                    type: integer
+                scope:
+                    type: string
+
         SignupRequest:
             type: object
             required: [email, password]
@@ -3937,6 +4086,30 @@ components:
                     description: Enable/disable Shroud LLM Proxy
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
+                federation_enabled:
+                    type: boolean
+                    description: |
+                        Enable OIDC federation (RFC 8693 token-exchange) for this agent.
+                        When true, the agent may call POST /v1/auth/federated-token to mint
+                        federation tokens for the audiences listed in `federation_audiences`.
+                federation_audiences:
+                    type: array
+                    items:
+                        type: string
+                        format: uri
+                    description: |
+                        Allowlist of `aud` values the federation token-exchange may issue
+                        tokens for (e.g. `["https://api.anthropic.com"]`). Empty array
+                        blocks all federation requests (zero-trust default).
+                federated_token_ttl_seconds:
+                    type: integer
+                    minimum: 60
+                    maximum: 3600
+                    nullable: true
+                    description: |
+                        Per-agent TTL override for federation tokens (seconds). NULL falls
+                        back to the global default (`ONECLAW_JWT_FEDERATED_TOKEN_EXPIRY_SECS`).
+                        Hard-capped at 3600 seconds.
 
         AgentResponse:
             type: object
@@ -4012,6 +4185,21 @@ components:
                     description: Whether this agent routes LLM traffic through the Shroud TEE proxy
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
+                federation_enabled:
+                    type: boolean
+                    description: |
+                        Whether this agent may mint OIDC federation tokens via
+                        POST /v1/auth/federated-token. False by default.
+                federation_audiences:
+                    type: array
+                    items:
+                        type: string
+                        format: uri
+                    description: Allowlist of audience URIs the agent may federate to.
+                federated_token_ttl_seconds:
+                    type: integer
+                    nullable: true
+                    description: Per-agent TTL override for federation tokens (60..=3600).
                 created_at:
                     type: string
                     format: date-time
