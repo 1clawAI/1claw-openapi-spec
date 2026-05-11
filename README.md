@@ -50,6 +50,8 @@ import spec from "@1claw/openapi-spec/openapi.json";
 - **Vaults** — CRUD, CMEK enable/disable, key rotation with job tracking, MPC enable/disable (`POST /v1/vaults/{id}/mpc`, `DELETE /v1/vaults/{id}/mpc`)
 - **Secrets** — CRUD, versioning, CMEK-encrypted flag, `client_share` in responses (MPC vaults)
 - **Agents** — CRUD with `auth_method` (api_key, mtls, oidc_client_credentials), auto-generated SSH keypairs, `token_ttl_seconds`, `vault_ids`, Intents API, transaction guardrails (`tx_to_allowlist`, `tx_max_value_eth`, `tx_daily_limit_eth`, `tx_allowed_chains`), **OIDC federation knobs** (`federation_enabled`, `federation_audiences`, `federated_token_ttl_seconds`); **`GET /v1/agents/{id}`** includes **`tx_spent_today_eth`** (rolling UTC-day spend from recorded txs) for clients such as **Shroud** that enforce the daily cap alongside per-tx limits
+- **Signing Keys** — Multi-chain key management: `POST /v1/agents/{id}/signing-keys` (provision), `GET .../signing-keys` (list), `POST .../signing-keys/{chain}/rotate`, `DELETE .../signing-keys/{chain}` (deactivate). Supports ethereum, bitcoin, solana, xrp, cardano, tron
+- **Unified Signing** — `POST /v1/agents/{id}/sign` — single endpoint for EIP-191 personal_sign, EIP-712 typed_data, and EIP-2718 transaction types (legacy, EIP-1559, EIP-4844, EIP-7702)
 - **Policies** — Glob-based access control
 - **Sharing** — Links, user/agent shares, accept/decline
 - **Billing** — Subscriptions, credits, x402, LLM token billing (see above)

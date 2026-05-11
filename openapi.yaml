@@ -3276,6 +3276,12 @@ components:
                 application/json:
                     schema:
                         $ref: "#/components/schemas/PaymentRequirement"
+        Conflict:
+            description: Resource already exists or conflict
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ProblemDetails"
 
     schemas:
         ProblemDetails:
