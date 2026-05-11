@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.10.1
+    version: 2.11.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -1758,6 +1758,117 @@ paths:
                     $ref: "#/components/responses/BadRequest"
                 "402":
                     $ref: "#/components/responses/PaymentRequired"
+
+    # ---------------------------------------------------------------------------
+    # Agent Signing Keys (Multi-Chain)
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/signing-keys:
+        post:
+            tags: [Signing Keys]
+            summary: Provision a signing key for a chain
+            operationId: createSigningKey
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateSigningKeyRequest"
+            responses:
+                "201":
+                    description: Signing key created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SigningKeyResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+        get:
+            tags: [Signing Keys]
+            summary: List signing keys for an agent
+            operationId: listSigningKeys
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Signing keys list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SigningKeyListResponse"
+
+    /v1/agents/{agent_id}/signing-keys/{chain}/rotate:
+        post:
+            tags: [Signing Keys]
+            summary: Rotate a signing key for a chain
+            operationId: rotateSigningKey
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Rotated signing key
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SigningKeyResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/signing-keys/{chain}:
+        delete:
+            tags: [Signing Keys]
+            summary: Deactivate a signing key for a chain
+            operationId: deactivateSigningKey
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "204":
+                    description: Key deactivated
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
+    # Unified Signing Intent
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/sign:
+        post:
+            tags: [Signing]
+            summary: Unified signing intent (EIP-191, EIP-712, EIP-2718 types 0-4)
+            operationId: signIntent
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SignIntentRequest"
+            responses:
+                "200":
+                    description: Signed result
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SignIntentResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     # ---------------------------------------------------------------------------
     # Chains
@@ -4200,6 +4311,23 @@ components:
                     type: integer
                     nullable: true
                     description: Per-agent TTL override for federation tokens (60..=3600).
+                signing_chains:
+                    type: array
+                    items:
+                        type: string
+                    description: Chains for which this agent has provisioned signing keys.
+                eip712_domain_allowlist:
+                    type: array
+                    items:
+                        type: object
+                    description: JSON array of allowed EIP-712 domain entries.
+                eip712_default_policy:
+                    type: string
+                    enum: [deny, allow]
+                    description: Default EIP-712 policy (deny blocks all unless allowlisted).
+                message_signing_enabled:
+                    type: boolean
+                    description: Whether EIP-191 personal_sign is enabled.
                 created_at:
                     type: string
                     format: date-time
@@ -4820,6 +4948,133 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/SimulateTransactionRequest"
+
+        # Signing Keys (Multi-Chain)
+        CreateSigningKeyRequest:
+            type: object
+            required: [chain]
+            properties:
+                chain:
+                    type: string
+                    enum: [ethereum, bitcoin, solana, xrp, cardano, tron]
+
+        SigningKeyResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                curve:
+                    type: string
+                public_key:
+                    type: string
+                address:
+                    type: string
+                    nullable: true
+                key_version:
+                    type: integer
+                is_active:
+                    type: boolean
+                created_at:
+                    type: string
+                    format: date-time
+                rotated_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+        SigningKeyListResponse:
+            type: object
+            properties:
+                keys:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/SigningKeyResponse"
+
+        # Unified Signing Intent
+        SignIntentRequest:
+            type: object
+            required: [intent_type, chain]
+            properties:
+                intent_type:
+                    type: string
+                    enum: [personal_sign, typed_data, transaction]
+                chain:
+                    type: string
+                signing_key_path:
+                    type: string
+                message:
+                    type: string
+                    description: Hex-encoded message bytes (for personal_sign)
+                typed_data:
+                    type: object
+                    description: EIP-712 typed data JSON (for typed_data)
+                tx_type:
+                    type: integer
+                    description: "EIP-2718 type: 0=legacy, 1=2930, 2=1559, 3=4844, 4=7702"
+                to:
+                    type: string
+                value:
+                    type: string
+                data:
+                    type: string
+                nonce:
+                    type: integer
+                gas_limit:
+                    type: integer
+                gas_price:
+                    type: string
+                max_fee_per_gas:
+                    type: string
+                max_priority_fee_per_gas:
+                    type: string
+                access_list:
+                    type: array
+                    items:
+                        type: object
+                max_fee_per_blob_gas:
+                    type: string
+                blob_versioned_hashes:
+                    type: array
+                    items:
+                        type: string
+                authorization_list:
+                    type: array
+                    items:
+                        type: object
+
+        SignIntentResponse:
+            type: object
+            properties:
+                intent_type:
+                    type: string
+                chain:
+                    type: string
+                from:
+                    type: string
+                signature:
+                    type: string
+                    nullable: true
+                signed_tx:
+                    type: string
+                    nullable: true
+                tx_hash:
+                    type: string
+                    nullable: true
+                message_hash:
+                    type: string
+                    nullable: true
+                typed_data_hash:
+                    type: string
+                    nullable: true
+                tx_type:
+                    type: integer
+                    nullable: true
 
         TransactionResponse:
             type: object
