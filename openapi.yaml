@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.11.0
+    version: 2.12.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -56,6 +56,8 @@ tags:
       description: IP rules and security configuration
     - name: Treasury
       description: Multi-sig treasury wallets (Safe) and agent access requests
+    - name: Treasury Wallets
+      description: Multi-chain wallet generation for human users (replaces CDP embedded wallets)
     - name: Admin
       description: Platform administration
     - name: Health
@@ -2816,6 +2818,172 @@ paths:
             responses:
                 "200":
                     description: Access request denied
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
+    # Treasury Wallets (multi-chain key generation for human users)
+    # ---------------------------------------------------------------------------
+
+    /v1/treasury/wallets/generate:
+        post:
+            tags: [Treasury Wallets]
+            summary: Generate multi-chain wallets for the authenticated user
+            description: |
+                Generates keypairs for the requested chains (or all supported chains if omitted).
+                Private keys are stored in a per-org `__treasury-keys` vault with tier-appropriate
+                MPC custody. Skips chains where the user already has an active wallet. Requires
+                Pro or higher billing tier. Human users only — agents get 403.
+            operationId: generateTreasuryWallets
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/GenerateTreasuryWalletsRequest"
+            responses:
+                "201":
+                    description: Wallets generated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletListResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/treasury/wallets:
+        get:
+            tags: [Treasury Wallets]
+            summary: List the authenticated user's treasury wallets
+            operationId: listTreasuryWallets
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Wallet list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/treasury/wallets/{chain}:
+        get:
+            tags: [Treasury Wallets]
+            summary: Get the user's active wallet for a specific chain
+            operationId: getTreasuryWallet
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: "Chain name (e.g. ethereum, solana, bitcoin)"
+            responses:
+                "200":
+                    description: Wallet details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Treasury Wallets]
+            summary: Deactivate the user's wallet for a specific chain
+            operationId: deactivateTreasuryWallet
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "204":
+                    description: Wallet deactivated
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/treasury/wallets/{chain}/export:
+        post:
+            tags: [Treasury Wallets]
+            summary: Export the private key for a treasury wallet
+            description: |
+                Returns the raw private key hex for the user's active wallet on
+                the given chain. Audit-logged as `treasury_wallet.export`.
+                Human users only.
+            operationId: exportTreasuryWallet
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Private key exported
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletExportResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/wallets/{chain}/rotate:
+        post:
+            tags: [Treasury Wallets]
+            summary: Rotate the user's wallet key for a chain
+            description: |
+                Generates a new keypair, deactivates the old wallet, and creates a
+                new active wallet. The old private key version is retained in the
+                vault for audit. Requires Pro or higher.
+            operationId: rotateTreasuryWallet
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Wallet rotated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -6047,6 +6215,57 @@ components:
                 resolved_at:
                     type: string
                     format: date-time
+
+        # --- Treasury Wallets ---
+
+        GenerateTreasuryWalletsRequest:
+            type: object
+            properties:
+                chains:
+                    type: array
+                    items:
+                        type: string
+                    description: "Chains to generate wallets for (e.g. [\"ethereum\", \"solana\"]). Omit for all supported chains."
+
+        TreasuryWalletResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                curve:
+                    type: string
+                    description: "Cryptographic curve (e.g. secp256k1, ed25519)"
+                public_key_hex:
+                    type: string
+                address:
+                    type: string
+                is_active:
+                    type: boolean
+                created_at:
+                    type: string
+                    format: date-time
+
+        TreasuryWalletListResponse:
+            type: object
+            properties:
+                wallets:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/TreasuryWalletResponse"
+
+        TreasuryWalletExportResponse:
+            type: object
+            properties:
+                chain:
+                    type: string
+                address:
+                    type: string
+                private_key_hex:
+                    type: string
+                    description: Raw private key in hex encoding. Handle with extreme care.
 
         # --- x402 ---
 
