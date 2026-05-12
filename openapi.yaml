@@ -3661,9 +3661,19 @@ components:
 
         ForgotPasswordResponse:
             type: object
+            required: [message, status]
             properties:
                 message:
                     type: string
+                status:
+                    type: string
+                    enum: [email_sent, no_account, social_account, invalid]
+                    description: |
+                        Outcome of the reset request:
+                        - email_sent: password reset email dispatched
+                        - no_account: no account found for the email
+                        - social_account: account uses Google/SSO sign-in
+                        - invalid: request was malformed
 
         ResetPasswordRequest:
             type: object
