@@ -40,7 +40,7 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.21.x — API `info.version` 2.11.x)
+## What's in the spec (v0.23.0 — API `info.version` 2.12.x)
 
 - **OIDC Federation (1claw as IdP)** — `GET /.well-known/openid-configuration` (public discovery: issuer, jwks_uri, supported algs `["EdDSA","RS256"]`, supported grant types incl. token-exchange), `GET /.well-known/jwks.json` (public JWKS — every active EdDSA + RS256 key version, keyed by deterministic `kid`), `POST /v1/auth/federated-token` (RFC 8693 token exchange — accepts JSON or `application/x-www-form-urlencoded`; subject token is an agent JWT or `ocv_` API key; returns RS256 JWT scoped to `audience`). Agent fields: `federation_enabled`, `federation_audiences[]`, `federated_token_ttl_seconds`. Designed for Anthropic Workload Identity Federation, GCP STS, AWS STS, etc.
 - **Auth — agent JWT** — `POST /v1/auth/agent-token` documents optional JWT claim **`shroud_config`** when the agent has Shroud enabled (mirrors DB; consumed by Shroud PolicyEngine on LLM requests). Re-exchange after changing agent Shroud settings. Federation tokens use a separate KMS RSA-2048 key and are signed RS256.
@@ -59,6 +59,7 @@ import spec from "@1claw/openapi-spec/openapi.json";
 - **Audit** — Hash-chained event log
 - **Chains** — Supported blockchain registry
 - **Auth** — JWT, API keys, agent tokens, MFA, device flow, Google OAuth, **federated tokens (RFC 8693)**
+- **Platform** — Platform API for building multi-tenant apps on 1Claw: `POST/GET /v1/platform/apps`, `GET/PATCH/DELETE /v1/platform/apps/{id}`, `POST/GET /v1/platform/apps/{id}/templates`, `POST /v1/platform/users/upsert`, `POST /v1/platform/connections/{id}/bootstrap`, `GET /v1/platform/apps/{id}/users`, `GET /v1/platform/apps/{id}/audit`, `GET/DELETE /v1/platform/connected-apps`. Platform apps authenticate with `plt_` prefixed API keys. Supports OIDC user provisioning, bootstrap templates, and billing models (platform_pays, user_pays, hybrid).
 - **Org** — List members, invite, update/remove member; `GET /v1/org/agent-keys-vault` (users only, returns __agent-keys vault id or 404)
 
 ## Included files

@@ -62,6 +62,8 @@ tags:
       description: Platform administration
     - name: Health
       description: Service health checks
+    - name: Platform
+      description: Platform API for developers building on 1Claw (plt_ keys, user provisioning, bootstrap templates)
 
 # =============================================================================
 # PATHS
@@ -3356,6 +3358,318 @@ paths:
                 "401":
                     description: Unauthorized
 
+    # --- Platform API ---
+
+    /v1/platform/apps:
+        post:
+            tags: [Platform]
+            summary: Register a platform app
+            description: Register a new platform app for building on top of 1Claw. Returns an API key (plt_ prefix) that must be saved immediately.
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreatePlatformAppRequest"
+            responses:
+                "201":
+                    description: Platform app created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformAppCreatedResponse"
+                "400":
+                    description: Invalid request
+                "403":
+                    description: Only human users can register platform apps
+        get:
+            tags: [Platform]
+            summary: List platform apps
+            description: List all platform apps in the organization.
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: List of platform apps
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/PlatformAppResponse"
+
+    /v1/platform/apps/{appId}:
+        get:
+            tags: [Platform]
+            summary: Get platform app details
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Platform app details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformAppResponse"
+                "404":
+                    description: Not found
+        patch:
+            tags: [Platform]
+            summary: Update platform app
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdatePlatformAppRequest"
+            responses:
+                "200":
+                    description: Updated platform app
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformAppResponse"
+        delete:
+            tags: [Platform]
+            summary: Delete platform app
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Deleted
+                "403":
+                    description: Only human users can delete platform apps
+
+    /v1/platform/apps/{appId}/templates:
+        post:
+            tags: [Platform]
+            summary: Create bootstrap template
+            description: Create a template that defines what vault, agents, and policies to bootstrap for each connected user.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateTemplateRequest"
+            responses:
+                "201":
+                    description: Template created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformTemplateResponse"
+        get:
+            tags: [Platform]
+            summary: List templates
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: List of templates
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/PlatformTemplateResponse"
+
+    /v1/platform/users/upsert:
+        post:
+            tags: [Platform]
+            summary: Provision or look up a platform user
+            description: Upserts a user using either an OIDC subject_token (verified against the platform app's JWKS) or an email address. Returns the user handle and connection ID.
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpsertPlatformUserRequest"
+            responses:
+                "200":
+                    description: Existing user found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformUserResponse"
+                "201":
+                    description: New user created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformUserResponse"
+
+    /v1/platform/apps/{appId}/users:
+        get:
+            tags: [Platform]
+            summary: List connected users
+            description: List all users connected to this platform app.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Connected users
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/PlatformConnectedUserResponse"
+
+    /v1/platform/connections/{connectionId}/bootstrap:
+        post:
+            tags: [Platform]
+            summary: Bootstrap resources for a connected user
+            description: Executes a template to create vault, agent, and policies for the connected user. Returns a claim URL and token for the user to claim their resources.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/BootstrapRequest"
+            responses:
+                "201":
+                    description: Resources bootstrapped
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/BootstrapResponse"
+
+    /v1/platform/apps/{appId}/audit:
+        get:
+            tags: [Platform]
+            summary: Platform audit log
+            description: Returns audit events related to this platform app.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: query
+                  name: limit
+                  schema:
+                      type: integer
+                      default: 50
+                - in: query
+                  name: offset
+                  schema:
+                      type: integer
+                      default: 0
+            responses:
+                "200":
+                    description: Audit events
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    events:
+                                        type: array
+                                        items:
+                                            type: object
+
+    /v1/platform/connected-apps:
+        get:
+            tags: [Platform]
+            summary: List connected apps (user side)
+            description: Returns platform apps connected to the calling user's account.
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Connected apps
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    connected_apps:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/ConnectedAppResponse"
+
+    /v1/platform/connected-apps/{connectionId}:
+        delete:
+            tags: [Platform]
+            summary: Disconnect a platform app
+            description: Disconnect the calling user from a platform app.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Disconnected
+                "404":
+                    description: Connection not found
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -6512,3 +6826,298 @@ components:
                     enum: [healthy, degraded]
                 version:
                     type: string
+
+        # --- Platform API Schemas ---
+
+        CreatePlatformAppRequest:
+            type: object
+            required: [name, slug]
+            properties:
+                name:
+                    type: string
+                slug:
+                    type: string
+                    minLength: 3
+                    maxLength: 64
+                    pattern: "^[a-zA-Z0-9_-]+$"
+                description:
+                    type: string
+                oidc_jwks_url:
+                    type: string
+                    format: uri
+                oidc_issuer:
+                    type: string
+                    format: uri
+                redirect_uris:
+                    type: array
+                    items:
+                        type: string
+                        format: uri
+                billing_model:
+                    type: string
+                    enum: [platform_pays, user_pays, hybrid]
+                    default: platform_pays
+                auth_mode:
+                    type: string
+                    enum: [silent, user_signin, configurable]
+                    default: silent
+                max_connected_users:
+                    type: integer
+                    nullable: true
+
+        UpdatePlatformAppRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                description:
+                    type: string
+                logo_url:
+                    type: string
+                oidc_jwks_url:
+                    type: string
+                oidc_issuer:
+                    type: string
+                redirect_uris:
+                    type: array
+                    items:
+                        type: string
+                webhook_url:
+                    type: string
+                billing_model:
+                    type: string
+                    enum: [platform_pays, user_pays, hybrid]
+                auth_mode:
+                    type: string
+                    enum: [silent, user_signin, configurable]
+                max_connected_users:
+                    type: integer
+                    nullable: true
+                is_active:
+                    type: boolean
+
+        PlatformAppResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                slug:
+                    type: string
+                description:
+                    type: string
+                logo_url:
+                    type: string
+                    nullable: true
+                api_key_prefix:
+                    type: string
+                oidc_jwks_url:
+                    type: string
+                    nullable: true
+                oidc_issuer:
+                    type: string
+                    nullable: true
+                redirect_uris:
+                    type: array
+                    items:
+                        type: string
+                webhook_url:
+                    type: string
+                    nullable: true
+                is_active:
+                    type: boolean
+                billing_model:
+                    type: string
+                auth_mode:
+                    type: string
+                max_connected_users:
+                    type: integer
+                    nullable: true
+                connected_users:
+                    type: integer
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        PlatformAppCreatedResponse:
+            allOf:
+                - $ref: "#/components/schemas/PlatformAppResponse"
+                - type: object
+                  required: [api_key]
+                  properties:
+                      api_key:
+                          type: string
+                          description: The platform API key. Save immediately - it cannot be retrieved again.
+
+        CreateTemplateRequest:
+            type: object
+            required: [name, spec]
+            properties:
+                name:
+                    type: string
+                description:
+                    type: string
+                spec:
+                    type: object
+                    description: Template specification defining vault, agents, and policies to bootstrap.
+
+        PlatformTemplateResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                platform_app_id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                description:
+                    type: string
+                version:
+                    type: integer
+                spec:
+                    type: object
+                is_active:
+                    type: boolean
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        UpsertPlatformUserRequest:
+            type: object
+            properties:
+                subject_token:
+                    type: string
+                    description: OIDC JWT from the platform's IdP (verified against JWKS)
+                subject_token_type:
+                    type: string
+                    default: "urn:ietf:params:oauth:token-type:jwt"
+                email:
+                    type: string
+                    format: email
+                    description: Fallback when subject_token is not provided
+                display_name:
+                    type: string
+
+        PlatformUserResponse:
+            type: object
+            properties:
+                user_handle:
+                    type: string
+                    format: uuid
+                is_new:
+                    type: boolean
+                connection_id:
+                    type: string
+                    format: uuid
+                email:
+                    type: string
+
+        PlatformConnectedUserResponse:
+            type: object
+            properties:
+                connection_id:
+                    type: string
+                    format: uuid
+                user_id:
+                    type: string
+                    format: uuid
+                external_subject:
+                    type: string
+                status:
+                    type: string
+                vault_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                agent_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                created_at:
+                    type: string
+                    format: date-time
+                claimed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+        BootstrapRequest:
+            type: object
+            properties:
+                template_id:
+                    type: string
+                    format: uuid
+                    description: Template to use. Falls back to the app's default template.
+                return_to:
+                    type: string
+                    format: uri
+                    description: URL to redirect the user to after claiming resources.
+
+        BootstrapResponse:
+            type: object
+            properties:
+                claim_url:
+                    type: string
+                    format: uri
+                claim_token:
+                    type: string
+                expires_in:
+                    type: integer
+                    description: Seconds until the claim token expires
+                connection_id:
+                    type: string
+                    format: uuid
+                summary:
+                    type: object
+                    properties:
+                        vault_id:
+                            type: string
+                            format: uuid
+                            nullable: true
+                        agent_id:
+                            type: string
+                            format: uuid
+                            nullable: true
+                        policy_ids:
+                            type: array
+                            items:
+                                type: string
+                                format: uuid
+
+        ConnectedAppResponse:
+            type: object
+            properties:
+                connection_id:
+                    type: string
+                    format: uuid
+                app_name:
+                    type: string
+                app_slug:
+                    type: string
+                status:
+                    type: string
+                vault_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                agent_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                created_at:
+                    type: string
+                    format: date-time
