@@ -4472,7 +4472,7 @@
           "Treasury Wallets"
         ],
         "summary": "Export the private key for a treasury wallet",
-        "description": "Returns the raw private key hex for the user's active wallet on\nthe given chain. Audit-logged as `treasury_wallet.export`.\nHuman users only.\n",
+        "description": "Returns the raw private key hex for the user's active wallet on\nthe given chain. Requires re-authentication via the `X-Auth-Confirm`\nheader (account password). Audit-logged as `treasury_wallet.export`.\nHuman users only.\n",
         "operationId": "exportTreasuryWallet",
         "security": [
           {
@@ -4486,6 +4486,16 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Auth-Confirm",
+            "in": "header",
+            "required": true,
+            "description": "Account password for re-authentication",
+            "schema": {
+              "type": "string",
+              "format": "password"
             }
           }
         ],

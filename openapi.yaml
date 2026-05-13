@@ -2931,7 +2931,8 @@ paths:
             summary: Export the private key for a treasury wallet
             description: |
                 Returns the raw private key hex for the user's active wallet on
-                the given chain. Audit-logged as `treasury_wallet.export`.
+                the given chain. Requires re-authentication via the `X-Auth-Confirm`
+                header (account password). Audit-logged as `treasury_wallet.export`.
                 Human users only.
             operationId: exportTreasuryWallet
             security:
@@ -2942,6 +2943,13 @@ paths:
                   required: true
                   schema:
                       type: string
+                - name: X-Auth-Confirm
+                  in: header
+                  required: true
+                  description: Account password for re-authentication
+                  schema:
+                      type: string
+                      format: password
             responses:
                 "200":
                     description: Private key exported
