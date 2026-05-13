@@ -7491,7 +7491,8 @@
             "description": "Hex-encoded calldata"
           },
           "signing_key_path": {
-            "type": "string"
+            "type": "string",
+            "description": "Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer."
           },
           "nonce": {
             "type": "integer"
@@ -7548,7 +7549,8 @@
             "description": "Hex-encoded calldata"
           },
           "signing_key_path": {
-            "type": "string"
+            "type": "string",
+            "description": "Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer."
           },
           "nonce": {
             "type": "integer"
@@ -7641,7 +7643,8 @@
             "type": "string"
           },
           "signing_key_path": {
-            "type": "string"
+            "type": "string",
+            "description": "Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer."
           },
           "gas_limit": {
             "type": "integer"
@@ -7752,7 +7755,8 @@
             "type": "string"
           },
           "signing_key_path": {
-            "type": "string"
+            "type": "string",
+            "description": "Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer."
           },
           "message": {
             "type": "string",

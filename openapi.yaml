@@ -5023,6 +5023,7 @@ components:
                     description: Hex-encoded calldata
                 signing_key_path:
                     type: string
+                    description: Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer.
                 nonce:
                     type: integer
                 gas_price:
@@ -5060,6 +5061,7 @@ components:
                     description: Hex-encoded calldata
                 signing_key_path:
                     type: string
+                    description: Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer.
                 nonce:
                     type: integer
                 gas_price:
@@ -5121,6 +5123,7 @@ components:
                     type: string
                 signing_key_path:
                     type: string
+                    description: Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer.
                 gas_limit:
                     type: integer
 
@@ -5192,6 +5195,7 @@ components:
                     type: string
                 signing_key_path:
                     type: string
+                    description: Vault path to signing key. Auto-resolves per-chain signing key if provisioned, otherwise keys/{chain}-signer.
                 message:
                     type: string
                     description: Hex-encoded message bytes (for personal_sign)
