@@ -1845,6 +1845,58 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/agents/{agent_id}/signing-keys/{chain}/export:
+        post:
+            tags: [Signing Keys]
+            summary: Export a signing key (private key included)
+            description: |
+                Export the private key for an agent's signing key. Requires re-authentication
+                via the X-Auth-Confirm header containing the user's account password.
+                Human users only — agents cannot export keys.
+            operationId: exportSigningKey
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: X-Auth-Confirm
+                  in: header
+                  required: true
+                  description: Account password for re-authentication
+                  schema:
+                      type: string
+                      format: password
+            responses:
+                "200":
+                    description: Signing key exported successfully
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [chain, curve, public_key, private_key, key_version, agent_id]
+                                properties:
+                                    chain:
+                                        type: string
+                                    curve:
+                                        type: string
+                                    public_key:
+                                        type: string
+                                    address:
+                                        type: string
+                                    private_key:
+                                        type: string
+                                    key_version:
+                                        type: integer
+                                    agent_id:
+                                        type: string
+                                        format: uuid
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     # ---------------------------------------------------------------------------
     # Unified Signing Intent
     # ---------------------------------------------------------------------------
