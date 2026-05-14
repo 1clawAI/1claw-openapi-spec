@@ -6856,6 +6856,9 @@ components:
                 oidc_issuer:
                     type: string
                     format: uri
+                oidc_audience:
+                    type: string
+                    description: Expected audience claim for OIDC token validation
                 redirect_uris:
                     type: array
                     items:
@@ -6886,6 +6889,9 @@ components:
                     type: string
                 oidc_issuer:
                     type: string
+                oidc_audience:
+                    type: string
+                    description: Expected audience claim for OIDC token validation
                 redirect_uris:
                     type: array
                     items:
@@ -6927,6 +6933,10 @@ components:
                 oidc_issuer:
                     type: string
                     nullable: true
+                oidc_audience:
+                    type: string
+                    nullable: true
+                    description: Expected audience claim for OIDC token validation
                 redirect_uris:
                     type: array
                     items:
