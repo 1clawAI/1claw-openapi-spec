@@ -2787,6 +2787,89 @@
         }
       }
     },
+    "/v1/agents/{agent_id}/signing-keys/{chain}/export": {
+      "post": {
+        "tags": [
+          "Signing Keys"
+        ],
+        "summary": "Export a signing key (private key included)",
+        "description": "Export the private key for an agent's signing key. Requires re-authentication\nvia the X-Auth-Confirm header containing the user's account password.\nHuman users only — agents cannot export keys.\n",
+        "operationId": "exportSigningKey",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Auth-Confirm",
+            "in": "header",
+            "required": true,
+            "description": "Account password for re-authentication",
+            "schema": {
+              "type": "string",
+              "format": "password"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signing key exported successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "chain",
+                    "curve",
+                    "public_key",
+                    "private_key",
+                    "key_version",
+                    "agent_id"
+                  ],
+                  "properties": {
+                    "chain": {
+                      "type": "string"
+                    },
+                    "curve": {
+                      "type": "string"
+                    },
+                    "public_key": {
+                      "type": "string"
+                    },
+                    "address": {
+                      "type": "string"
+                    },
+                    "private_key": {
+                      "type": "string"
+                    },
+                    "key_version": {
+                      "type": "integer"
+                    },
+                    "agent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/sign": {
       "post": {
         "tags": [
@@ -10206,6 +10289,10 @@
             "type": "string",
             "format": "uri"
           },
+          "oidc_audience": {
+            "type": "string",
+            "description": "Expected audience claim for OIDC token validation"
+          },
           "redirect_uris": {
             "type": "array",
             "items": {
@@ -10254,6 +10341,10 @@
           },
           "oidc_issuer": {
             "type": "string"
+          },
+          "oidc_audience": {
+            "type": "string",
+            "description": "Expected audience claim for OIDC token validation"
           },
           "redirect_uris": {
             "type": "array",
@@ -10319,6 +10410,11 @@
           "oidc_issuer": {
             "type": "string",
             "nullable": true
+          },
+          "oidc_audience": {
+            "type": "string",
+            "nullable": true,
+            "description": "Expected audience claim for OIDC token validation"
           },
           "redirect_uris": {
             "type": "array",
@@ -10390,7 +10486,7 @@
           },
           "spec": {
             "type": "object",
-            "description": "Template specification defining vault, agents, and policies to bootstrap."
+            "description": "Template specification defining vault, agents, policies, and signing keys to bootstrap.\nTop-level fields: `vault` (object with name, description), `agents` (array of agent specs\nwith name, description, shroud_enabled, intents, shroud_config), `policies` (array with\nvault_ref, principal_ref, paths, permissions, conditions), and `signing_keys` (array of\n`{ chain }` objects — supported chains: ethereum, bitcoin, solana, xrp, cardano, tron).\nWhen `signing_keys` is present, HSM-backed signing keys are auto-provisioned for the\nbootstrapped agent.\n"
           }
         }
       },
