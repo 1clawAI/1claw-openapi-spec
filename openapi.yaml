@@ -7034,7 +7034,14 @@ components:
                     type: string
                 spec:
                     type: object
-                    description: Template specification defining vault, agents, and policies to bootstrap.
+                    description: |
+                        Template specification defining vault, agents, policies, and signing keys to bootstrap.
+                        Top-level fields: `vault` (object with name, description), `agents` (array of agent specs
+                        with name, description, shroud_enabled, intents, shroud_config), `policies` (array with
+                        vault_ref, principal_ref, paths, permissions, conditions), and `signing_keys` (array of
+                        `{ chain }` objects — supported chains: ethereum, bitcoin, solana, xrp, cardano, tron).
+                        When `signing_keys` is present, HSM-backed signing keys are auto-provisioned for the
+                        bootstrapped agent.
 
         PlatformTemplateResponse:
             type: object
