@@ -5749,6 +5749,80 @@
           }
         }
       }
+    },
+    "/v1/platform/claim/{token}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Preview a claim token",
+        "description": "Verify a claim token and preview what was provisioned (app name, vaults, agents, policies).\nPublic endpoint — the token itself is the authentication.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `ct_` prefixed claim token from the bootstrap response"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claim preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimPreviewResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid or expired claim token"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Redeem a claim token",
+        "description": "Redeem a one-time claim token, marking the connection as claimed.\nPublic endpoint — the token itself is the authentication. Returns 409 if already claimed, 410 if expired.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `ct_` prefixed claim token from the bootstrap response"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claim redeemed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimRedeemResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid claim token"
+          },
+          "409": {
+            "description": "Claim token already used"
+          },
+          "410": {
+            "description": "Claim token has expired"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10698,6 +10772,87 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ClaimPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "app_name": {
+            "type": "string"
+          },
+          "app_slug": {
+            "type": "string"
+          },
+          "app_logo_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "auth_mode": {
+            "type": "string"
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "agent_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "policy_count": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "already_claimed": {
+            "type": "boolean"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "return_to": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ClaimRedeemResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "connection_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "agent_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "return_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "dashboard_url": {
+            "type": "string"
           }
         }
       }
