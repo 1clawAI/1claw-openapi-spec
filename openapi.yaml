@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.12.0
+    version: 2.13.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -7222,6 +7222,29 @@ components:
                             items:
                                 type: string
                                 format: uuid
+                        signing_key_chains:
+                            type: array
+                            items:
+                                type: string
+                            description: Chains with provisioned signing keys
+                        agent_api_key:
+                            type: string
+                            nullable: true
+                            description: One-time agent API key (ocv_ prefix). Store securely — not retrievable later.
+                        signing_keys:
+                            type: array
+                            description: Provisioned signing key details (chain, address, public key)
+                            items:
+                                type: object
+                                properties:
+                                    chain:
+                                        type: string
+                                    curve:
+                                        type: string
+                                    public_key:
+                                        type: string
+                                    address:
+                                        type: string
 
         ConnectedAppResponse:
             type: object
