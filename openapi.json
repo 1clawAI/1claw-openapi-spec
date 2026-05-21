@@ -622,6 +622,538 @@
         }
       }
     },
+    "/v1/auth/set-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Set initial password for platform users",
+        "description": "Only allowed when the user has no password set (platform_oidc users after claiming).",
+        "operationId": "setPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "password",
+                  "password_confirm"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 12
+                  },
+                  "password_confirm": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password set successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/auth/change-email": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Request email change",
+        "description": "Sends a 6-digit verification code to the new email address. Code expires in 10 minutes.",
+        "operationId": "changeEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "new_email"
+                ],
+                "properties": {
+                  "new_email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "new_email": {
+                      "type": "string"
+                    },
+                    "expires_in_seconds": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "description": "Email already in use"
+          }
+        }
+      }
+    },
+    "/v1/auth/verify-email-change": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Verify email change with code",
+        "operationId": "verifyEmailChange",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/auth/passkeys/register/begin": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Begin passkey registration",
+        "description": "Returns a WebAuthn challenge for creating a new passkey credential.",
+        "operationId": "passkeyRegisterBegin",
+        "responses": {
+          "200": {
+            "description": "Registration options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string"
+                    },
+                    "rp_id": {
+                      "type": "string"
+                    },
+                    "rp_name": {
+                      "type": "string"
+                    },
+                    "user_id": {
+                      "type": "string"
+                    },
+                    "user_name": {
+                      "type": "string"
+                    },
+                    "user_display_name": {
+                      "type": "string"
+                    },
+                    "attestation": {
+                      "type": "string"
+                    },
+                    "authenticator_selection": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/passkeys/register/complete": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete passkey registration",
+        "operationId": "passkeyRegisterComplete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "credential_id",
+                  "attestation_object",
+                  "client_data_json"
+                ],
+                "properties": {
+                  "credential_id": {
+                    "type": "string"
+                  },
+                  "attestation_object": {
+                    "type": "string"
+                  },
+                  "client_data_json": {
+                    "type": "string"
+                  },
+                  "transports": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Passkey registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "passkey_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "credential_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/passkeys/assert/begin": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Begin passkey authentication",
+        "operationId": "passkeyAssertBegin",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assertion options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string"
+                    },
+                    "rp_id": {
+                      "type": "string"
+                    },
+                    "timeout": {
+                      "type": "integer"
+                    },
+                    "user_verification": {
+                      "type": "string"
+                    },
+                    "allow_credentials": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/passkeys/assert/complete": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete passkey authentication",
+        "operationId": "passkeyAssertComplete",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "credential_id",
+                  "authenticator_data",
+                  "client_data_json",
+                  "signature"
+                ],
+                "properties": {
+                  "credential_id": {
+                    "type": "string"
+                  },
+                  "authenticator_data": {
+                    "type": "string"
+                  },
+                  "client_data_json": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "refresh_token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/passkeys": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "List registered passkeys",
+        "operationId": "listPasskeys",
+        "responses": {
+          "200": {
+            "description": "List of passkeys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "passkeys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "credential_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "last_used_at": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/passkeys/{passkey_id}": {
+      "delete": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Delete a passkey",
+        "operationId": "deletePasskey",
+        "parameters": [
+          {
+            "name": "passkey_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passkey deleted"
+          }
+        }
+      }
+    },
+    "/v1/approvals/request": {
+      "post": {
+        "tags": [
+          "Approvals"
+        ],
+        "summary": "Request human approval (agent-only)",
+        "description": "Agents can request policy changes or other sensitive actions that require human approval.",
+        "operationId": "requestApproval",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action",
+                  "target_type",
+                  "target_id",
+                  "summary"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "description": "Type of action (e.g. policy_change)"
+                  },
+                  "target_type": {
+                    "type": "string"
+                  },
+                  "target_id": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "object",
+                    "description": "JSON payload describing the request"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "risk_tier": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Approval request created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/v1/auth/me": {
       "get": {
         "tags": [
@@ -5846,6 +6378,81 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/reissue-claim": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Reissue a claim URL",
+        "description": "Mints a fresh 10-minute claim token for an already-bootstrapped connection without re-provisioning resources. Use when the original claim URL has expired.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "return_to": {
+                    "type": "string",
+                    "description": "Optional redirect URL after claim"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New claim URL issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "claim_url": {
+                      "type": "string"
+                    },
+                    "claim_token": {
+                      "type": "string"
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "Seconds until expiry (600 = 10 min)"
+                    },
+                    "connection_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Connection not yet bootstrapped"
+          },
+          "404": {
+            "description": "Connection not found"
           }
         }
       }
