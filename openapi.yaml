@@ -4006,6 +4006,51 @@ paths:
                 "403":
                     description: Only human users can delete platform apps
 
+    /v1/platform/apps/{appId}/rotate-key:
+        post:
+            tags: [Platform]
+            summary: Rotate platform API key
+            description: Generate a new API key for the platform app. The old key is immediately invalidated. Returns the new key (one-time).
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: appId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                api_key_expires_at:
+                                    type: string
+                                    format: date-time
+                                    nullable: true
+                                    description: Optional expiration for the new key.
+            responses:
+                "200":
+                    description: New key generated
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    api_key:
+                                        type: string
+                                        description: The new API key (shown once)
+                                    api_key_prefix:
+                                        type: string
+                                    api_key_expires_at:
+                                        type: string
+                                        format: date-time
+                                        nullable: true
+                "403":
+                    description: Only human users can rotate platform keys
+
     /v1/platform/apps/{appId}/templates:
         post:
             tags: [Platform]
@@ -5393,6 +5438,11 @@ components:
                     description: Enable Shroud LLM Proxy for this agent
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
+                api_key_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Optional expiration time for the agent's API key.
 
         UpdateAgentRequest:
             type: object
@@ -5459,6 +5509,11 @@ components:
                         Per-agent TTL override for federation tokens (seconds). NULL falls
                         back to the global default (`ONECLAW_JWT_FEDERATED_TOKEN_EXPIRY_SECS`).
                         Hard-capped at 3600 seconds.
+                api_key_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Optional expiration time for the agent's API key. Set to null to clear.
 
         AgentResponse:
             type: object
@@ -5566,6 +5621,11 @@ components:
                 message_signing_enabled:
                     type: boolean
                     description: Whether EIP-191 personal_sign is enabled.
+                api_key_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Optional expiration time for the agent's API key.
                 created_at:
                     type: string
                     format: date-time
@@ -7607,6 +7667,11 @@ components:
                 max_connected_users:
                     type: integer
                     nullable: true
+                api_key_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Optional expiration time for the platform API key.
 
         UpdatePlatformAppRequest:
             type: object
@@ -7641,6 +7706,11 @@ components:
                     nullable: true
                 is_active:
                     type: boolean
+                api_key_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Optional expiration time for the platform API key. Set to null to clear.
 
         PlatformAppResponse:
             type: object
@@ -7687,6 +7757,16 @@ components:
                     nullable: true
                 connected_users:
                     type: integer
+                api_key_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: When the platform API key expires.
+                api_key_rotated_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: When the platform API key was last rotated.
                 created_at:
                     type: string
                     format: date-time
