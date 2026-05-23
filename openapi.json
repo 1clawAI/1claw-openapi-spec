@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.14.0",
+    "version": "2.15.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -6165,6 +6165,77 @@
         }
       }
     },
+    "/v1/platform/apps/{appId}/rotate-key": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Rotate platform API key",
+        "description": "Generate a new API key for the platform app. The old key is immediately invalidated. Returns the new key (one-time).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "api_key_expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true,
+                    "description": "Optional expiration for the new key."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New key generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "api_key": {
+                      "type": "string",
+                      "description": "The new API key (shown once)"
+                    },
+                    "api_key_prefix": {
+                      "type": "string"
+                    },
+                    "api_key_expires_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only human users can rotate platform keys"
+          }
+        }
+      }
+    },
     "/v1/platform/apps/{appId}/templates": {
       "post": {
         "tags": [
@@ -8207,6 +8278,12 @@
           },
           "shroud_config": {
             "$ref": "#/components/schemas/ShroudConfig"
+          },
+          "api_key_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Optional expiration time for the agent's API key."
           }
         }
       },
@@ -8286,6 +8363,12 @@
             "maximum": 3600,
             "nullable": true,
             "description": "Per-agent TTL override for federation tokens (seconds). NULL falls\nback to the global default (`ONECLAW_JWT_FEDERATED_TOKEN_EXPIRY_SECS`).\nHard-capped at 3600 seconds.\n"
+          },
+          "api_key_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Optional expiration time for the agent's API key. Set to null to clear."
           }
         }
       },
@@ -8433,6 +8516,12 @@
           "message_signing_enabled": {
             "type": "boolean",
             "description": "Whether EIP-191 personal_sign is enabled."
+          },
+          "api_key_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Optional expiration time for the agent's API key."
           },
           "created_at": {
             "type": "string",
@@ -11386,6 +11475,12 @@
           "max_connected_users": {
             "type": "integer",
             "nullable": true
+          },
+          "api_key_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Optional expiration time for the platform API key."
           }
         }
       },
@@ -11442,6 +11537,12 @@
           },
           "is_active": {
             "type": "boolean"
+          },
+          "api_key_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Optional expiration time for the platform API key. Set to null to clear."
           }
         }
       },
@@ -11506,6 +11607,18 @@
           },
           "connected_users": {
             "type": "integer"
+          },
+          "api_key_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the platform API key expires."
+          },
+          "api_key_rotated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the platform API key was last rotated."
           },
           "created_at": {
             "type": "string",
