@@ -5626,6 +5626,10 @@ components:
                     format: date-time
                     nullable: true
                     description: Optional expiration time for the agent's API key.
+                evm_address:
+                    type: string
+                    nullable: true
+                    description: Agent's Ethereum EOA address (used as Safe signer for smart accounts and Intents API).
                 created_at:
                     type: string
                     format: date-time
