@@ -40,7 +40,7 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.25.0 — API `info.version` 2.14.0)
+## What's in the spec (v0.28.0 — API `info.version` 2.15.0)
 
 - **OIDC Federation (1claw as IdP)** — `GET /.well-known/openid-configuration` (public discovery: issuer, jwks_uri, supported algs `["EdDSA","RS256"]`, supported grant types incl. token-exchange), `GET /.well-known/jwks.json` (public JWKS — every active EdDSA + RS256 key version, keyed by deterministic `kid`), `POST /v1/auth/federated-token` (RFC 8693 token exchange — accepts JSON or `application/x-www-form-urlencoded`; subject token is an agent JWT or `ocv_` API key; returns RS256 JWT scoped to `audience`). Agent fields: `federation_enabled`, `federation_audiences[]`, `federated_token_ttl_seconds`. Designed for Anthropic Workload Identity Federation, GCP STS, AWS STS, etc.
 - **Auth — agent JWT** — `POST /v1/auth/agent-token` documents optional JWT claim **`shroud_config`** when the agent has Shroud enabled (mirrors DB; consumed by Shroud PolicyEngine on LLM requests). Re-exchange after changing agent Shroud settings. Federation tokens use a separate KMS RSA-2048 key and are signed RS256.
@@ -52,6 +52,8 @@ import spec from "@1claw/openapi-spec/openapi.json";
 - **Billing — LLM token billing** — `GET /v1/billing/llm-token-billing` (`LlmTokenBillingStatus`: `enabled`, `subscription_status`, optional `credit_balance`, optional `billing_cycle_usage` with `metered_lines[]`), `POST .../subscribe`, `POST .../disable` (Stripe AI Gateway add-on; optional org feature)
 - **Treasury** — Safe multisig treasuries: `POST/GET /v1/treasury`, `GET/PATCH/DELETE /v1/treasury/{id}`, signers, agent access requests (`requests[]` on list)
 - **Treasury Wallets** — Multi-chain wallet generation for human users (replaces CDP embedded wallets): `POST /v1/treasury/wallets/generate`, `GET /v1/treasury/wallets`, `GET /v1/treasury/wallets/{chain}`, `POST .../export`, `POST .../rotate`, `DELETE /v1/treasury/wallets/{chain}`. Supported chains: ethereum, bitcoin, solana, xrp, cardano, tron. Private keys stored in per-org `__treasury-keys` vault with tier-appropriate MPC custody.
+- **Treasury Proposals** — Full propose/confirm/execute pipeline for Safe multisig transactions: `POST /v1/treasury/{id}/proposals`, `GET .../proposals`, `GET .../proposals/{pid}`, `POST .../proposals/{pid}/sign`, `POST .../proposals/{pid}/execute`, `DELETE .../proposals/{pid}`. Auto-execute when threshold met.
+- **Smart Accounts** — Per-agent multi-chain Safe accounts: `POST /v1/agents/{id}/smart-accounts`, `GET /v1/agents/{id}` returns `smart_accounts[]`. One EOA signer per agent, Intents API resolves Safe by `chain_id`.
 - **Vaults** — CRUD, CMEK enable/disable, key rotation with job tracking, MPC enable/disable (`POST /v1/vaults/{id}/mpc`, `DELETE /v1/vaults/{id}/mpc`)
 - **Secrets** — CRUD, versioning, CMEK-encrypted flag, `client_share` in responses (MPC vaults)
 - **Agents** — CRUD with `auth_method` (api_key, mtls, oidc_client_credentials), auto-generated SSH keypairs, `token_ttl_seconds`, `vault_ids`, Intents API, transaction guardrails (`tx_to_allowlist`, `tx_max_value_eth`, `tx_daily_limit_eth`, `tx_allowed_chains`), **OIDC federation knobs** (`federation_enabled`, `federation_audiences`, `federated_token_ttl_seconds`); **`GET /v1/agents/{id}`** includes **`tx_spent_today_eth`** (rolling UTC-day spend from recorded txs) for clients such as **Shroud** that enforce the daily cap alongside per-tx limits
