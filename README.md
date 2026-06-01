@@ -40,7 +40,16 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.28.0 — API `info.version` 2.15.0)
+## What's in the spec (v0.31.0 — API `info.version` 2.17.0)
+
+### CDP parity & embedded wallet (2.16+)
+- **Deposit destinations** — `POST/GET/PATCH /v1/deposit-destinations`, `GET /v1/deposit-destinations/{id}`
+- **Internal accounts** — `POST/GET /v1/internal-accounts`, `POST /v1/internal-transfers` (supports `Idempotency-Key`), `GET /v1/internal-accounts/{id}/ledger`
+- **Fiat ramps** — `POST /v1/fiat/onramp/session`, `POST /v1/fiat/offramp/initiate`, `POST /v1/fiat/webhooks` (MoonPay signature required in production)
+- **Social login** — `POST /v1/auth/social-login` (Google/Apple ID tokens with audience validation; Discord authorization code + `oauth_redirect_uri`; no email auto-linking — 409 on conflict)
+- **Passkey tx auth** — `POST /v1/auth/passkeys/tx-assert/begin|complete` → `X-Passkey-Token` (+ optional `X-Passkey-Tx-Digest`) on treasury send
+
+### Core API (summary)
 
 - **OIDC Federation (1claw as IdP)** — `GET /.well-known/openid-configuration` (public discovery: issuer, jwks_uri, supported algs `["EdDSA","RS256"]`, supported grant types incl. token-exchange), `GET /.well-known/jwks.json` (public JWKS — every active EdDSA + RS256 key version, keyed by deterministic `kid`), `POST /v1/auth/federated-token` (RFC 8693 token exchange — accepts JSON or `application/x-www-form-urlencoded`; subject token is an agent JWT or `ocv_` API key; returns RS256 JWT scoped to `audience`). Agent fields: `federation_enabled`, `federation_audiences[]`, `federated_token_ttl_seconds`. Designed for Anthropic Workload Identity Federation, GCP STS, AWS STS, etc.
 - **Auth — agent JWT** — `POST /v1/auth/agent-token` documents optional JWT claim **`shroud_config`** when the agent has Shroud enabled (mirrors DB; consumed by Shroud PolicyEngine on LLM requests). Re-exchange after changing agent Shroud settings. Federation tokens use a separate KMS RSA-2048 key and are signed RS256.

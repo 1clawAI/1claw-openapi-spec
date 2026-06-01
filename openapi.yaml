@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.16.0
+    version: 2.17.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -5150,12 +5150,24 @@ paths:
                             required: [provider, id_token]
                             properties:
                                 provider: { type: string, enum: [google, apple, discord] }
-                                id_token: { type: string }
+                                id_token:
+                                    type: string
+                                    description: Google/Apple ID token, or Discord OAuth authorization code
+                                oauth_redirect_uri:
+                                    type: string
+                                    description: Required for Discord — must match the redirect URI used in the OAuth flow
+                                auto_provision_chains:
+                                    type: array
+                                    items: { type: string }
             responses:
                 "200":
                     description: Login successful
                 "201":
                     description: New user created
+                "409":
+                    description: Email already registered (no auto-linking)
+                "401":
+                    description: Invalid or unverified token
 
     /v1/auth/passkeys/tx-assert/begin:
         post:
