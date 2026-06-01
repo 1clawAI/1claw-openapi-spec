@@ -12166,6 +12166,11 @@
           "gas_limit": {
             "type": "integer",
             "description": "Gas limit override"
+          },
+          "gasless": {
+            "type": "boolean",
+            "description": "When true, submits as a gasless (ERC-4337) transaction via Pimlico paymaster. The paymaster sponsors the gas cost.",
+            "default": false
           }
         }
       },
@@ -12197,6 +12202,10 @@
           },
           "status": {
             "type": "string"
+          },
+          "user_op_hash": {
+            "type": "string",
+            "description": "UserOperation hash (only present for gasless sends via paymaster)"
           }
         }
       },

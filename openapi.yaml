@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.15.0
+    version: 2.16.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -4956,6 +4956,229 @@ paths:
                 "409":
                     $ref: "#/components/responses/Conflict"
 
+    /v1/deposit-destinations:
+        post:
+            tags: [Treasury]
+            summary: Create deposit destination
+            operationId: createDepositDestination
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [chain]
+                            properties:
+                                chain: { type: string }
+                                label: { type: string }
+                                treasury_wallet_id: { type: string, format: uuid }
+            responses:
+                "201":
+                    description: Destination created
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+        get:
+            tags: [Treasury]
+            summary: List deposit destinations
+            operationId: listDepositDestinations
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: List of destinations
+
+    /v1/deposit-destinations/{id}:
+        get:
+            tags: [Treasury]
+            summary: Get deposit destination
+            operationId: getDepositDestination
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Destination detail with events
+        patch:
+            tags: [Treasury]
+            summary: Update deposit destination status
+            operationId: updateDepositDestination
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                status: { type: string, enum: [active, paused, archived] }
+            responses:
+                "200":
+                    description: Updated destination
+
+    /v1/internal-accounts:
+        post:
+            tags: [Treasury]
+            summary: Create internal account
+            operationId: createInternalAccount
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [name]
+                            properties:
+                                name: { type: string }
+                                description: { type: string }
+            responses:
+                "201":
+                    description: Account created
+        get:
+            tags: [Treasury]
+            summary: List internal accounts
+            operationId: listInternalAccounts
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Account list with balances
+
+    /v1/internal-accounts/{id}:
+        get:
+            tags: [Treasury]
+            summary: Get internal account
+            operationId: getInternalAccount
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Account detail
+
+    /v1/internal-accounts/{id}/ledger:
+        get:
+            tags: [Treasury]
+            summary: Get account ledger
+            operationId: getInternalAccountLedger
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Ledger entries
+
+    /v1/internal-transfers:
+        post:
+            tags: [Treasury]
+            summary: Transfer between internal accounts
+            operationId: createInternalTransfer
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [from_account_id, to_account_id, asset, amount]
+                            properties:
+                                from_account_id: { type: string, format: uuid }
+                                to_account_id: { type: string, format: uuid }
+                                asset: { type: string }
+                                amount: { type: string }
+                                memo: { type: string }
+            responses:
+                "201":
+                    description: Transfer completed
+
+    /v1/fiat/onramp/session:
+        post:
+            tags: [Billing]
+            summary: Create fiat onramp session
+            operationId: createFiatOnrampSession
+            security:
+                - BearerAuth: []
+            responses:
+                "201":
+                    description: Onramp widget URL
+
+    /v1/fiat/offramp/initiate:
+        post:
+            tags: [Billing]
+            summary: Initiate fiat offramp
+            operationId: initiateFiatOfframp
+            security:
+                - BearerAuth: []
+            responses:
+                "201":
+                    description: Offramp widget URL
+
+    /v1/auth/social-login:
+        post:
+            tags: [Authentication]
+            summary: Social login (Google, Apple, Discord)
+            operationId: socialLogin
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [provider, id_token]
+                            properties:
+                                provider: { type: string, enum: [google, apple, discord] }
+                                id_token: { type: string }
+            responses:
+                "200":
+                    description: Login successful
+                "201":
+                    description: New user created
+
+    /v1/auth/passkeys/tx-assert/begin:
+        post:
+            tags: [Authentication]
+            summary: Begin passkey transaction authorization
+            operationId: passkeyTxAssertBegin
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: WebAuthn challenge
+
+    /v1/auth/passkeys/tx-assert/complete:
+        post:
+            tags: [Authentication]
+            summary: Complete passkey transaction authorization
+            operationId: passkeyTxAssertComplete
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Passkey token for X-Passkey-Token header
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -8078,6 +8301,10 @@ components:
                 gas_limit:
                     type: integer
                     description: Gas limit override
+                gasless:
+                    type: boolean
+                    description: When true, submits as a gasless (ERC-4337) transaction via Pimlico paymaster. The paymaster sponsors the gas cost.
+                    default: false
 
         TreasuryWalletSendResponse:
             type: object
@@ -8095,6 +8322,9 @@ components:
                     type: string
                 status:
                     type: string
+                user_op_hash:
+                    type: string
+                    description: UserOperation hash (only present for gasless sends via paymaster)
 
         TreasuryWalletSwapRequest:
             type: object
