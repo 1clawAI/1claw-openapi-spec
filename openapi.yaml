@@ -5173,12 +5173,29 @@ paths:
         post:
             tags: [Authentication]
             summary: Begin passkey transaction authorization
+            description: |
+                Requires `tx_digest` — SHA-256 hex of canonical `chain|to|value_wei|data`
+                for the treasury send being authorized. The server recomputes this digest
+                on send and rejects passkey tokens that do not match.
             operationId: passkeyTxAssertBegin
             security:
                 - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [tx_digest]
+                            properties:
+                                tx_digest:
+                                    type: string
+                                    description: 64-char hex SHA-256 of canonical send params
             responses:
                 "200":
                     description: WebAuthn challenge
+                "400":
+                    description: Missing or invalid tx_digest
 
     /v1/auth/passkeys/tx-assert/complete:
         post:
