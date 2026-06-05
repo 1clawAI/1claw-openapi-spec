@@ -3693,7 +3693,7 @@
           "Bankr Keys"
         ],
         "summary": "Lease a short-lived Bankr wallet API key",
-        "description": "Provision a scoped, time-limited Bankr wallet API key for an agent.\nRequires `BANKR_PARTNER_KEY` configured on the Vault service.\nDefault TTL 1 hour, max 24 hours. Max 5 concurrent leases per agent.\n",
+        "description": "Provision a scoped, time-limited Bankr wallet API key for an agent.\n**Privileged, deny-by-default:** agent callers need an explicit access policy\non `agents/{agent_id}/bankr/*` in the `__agent-keys` vault (JWT scope\n`agents/{agent_id}/bankr/lease`). Agents may only lease for their own ID.\nThe `bk_usr_` key is **omitted** from the JSON response for agent JWTs —\nstored server-side for Shroud resolution. Human callers receive `api_key` once.\nRequires `BANKR_PARTNER_KEY` on Vault. Agent default TTL 15 min when omitted;\nhuman/org default 1 hour (`BANKR_DEFAULT_LEASE_TTL_SECS`). Recommend 5–15 min\nfor autonomous agents. Max TTL 24 hours. Max 5 concurrent leases per agent.\n",
         "operationId": "leaseBankrKey",
         "parameters": [
           {
@@ -10934,7 +10934,7 @@
           },
           "api_key": {
             "type": "string",
-            "description": "Ephemeral bk_usr_ key (one-time display)."
+            "description": "Ephemeral bk_usr_ key. Present for human callers only; omitted for agent JWTs."
           },
           "wallet_id": {
             "type": "string"
