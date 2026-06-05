@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.17.0",
+    "version": "2.18.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -3680,6 +3680,109 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/bankr-keys/lease": {
+      "post": {
+        "tags": [
+          "Bankr Keys"
+        ],
+        "summary": "Lease a short-lived Bankr wallet API key",
+        "description": "Provision a scoped, time-limited Bankr wallet API key for an agent.\nRequires `BANKR_PARTNER_KEY` configured on the Vault service.\nDefault TTL 1 hour, max 24 hours. Max 5 concurrent leases per agent.\n",
+        "operationId": "leaseBankrKey",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaseBankrKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bankr key leased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseBankrKeyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/bankr-keys": {
+      "get": {
+        "tags": [
+          "Bankr Keys"
+        ],
+        "summary": "List active Bankr key leases for an agent",
+        "operationId": "listBankrKeys",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active leases (no secret values)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankrKeyLeaseListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/bankr-keys/{lease_id}": {
+      "delete": {
+        "tags": [
+          "Bankr Keys"
+        ],
+        "summary": "Revoke an active Bankr key lease",
+        "operationId": "revokeBankrKey",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Lease revoked"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -8094,15 +8197,38 @@
           "Authentication"
         ],
         "summary": "Begin passkey transaction authorization",
+        "description": "Requires `tx_digest` — SHA-256 hex of canonical `chain|to|value_wei|data`\nfor the treasury send being authorized. The server recomputes this digest\non send and rejects passkey tokens that do not match.\n",
         "operationId": "passkeyTxAssertBegin",
         "security": [
           {
             "BearerAuth": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "tx_digest"
+                ],
+                "properties": {
+                  "tx_digest": {
+                    "type": "string",
+                    "description": "64-char hex SHA-256 of canonical send params"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "WebAuthn challenge"
+          },
+          "400": {
+            "description": "Missing or invalid tx_digest"
           }
         }
       }
@@ -10760,6 +10886,98 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SigningKeyResponse"
+            }
+          }
+        }
+      },
+      "LeaseBankrKeyRequest": {
+        "type": "object",
+        "properties": {
+          "wallet_id": {
+            "type": "string",
+            "description": "Bankr wallet ID (wlt_...). Uses org default if omitted."
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "description": "Lease TTL in seconds (default 3600, max 86400).",
+            "minimum": 60,
+            "maximum": 86400
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/LeaseBankrPermissions"
+          }
+        }
+      },
+      "LeaseBankrPermissions": {
+        "type": "object",
+        "properties": {
+          "llm_gateway_enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "agent_api_enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "read_only": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "LeaseBankrKeyResponse": {
+        "type": "object",
+        "properties": {
+          "lease_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Ephemeral bk_usr_ key (one-time display)."
+          },
+          "wallet_id": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BankrKeyLeaseResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wallet_id": {
+            "type": "string"
+          },
+          "bankr_key_id": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "object"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BankrKeyLeaseListResponse": {
+        "type": "object",
+        "properties": {
+          "leases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankrKeyLeaseResponse"
             }
           }
         }

@@ -40,7 +40,11 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.31.0 — API `info.version` 2.17.0)
+## What's in the spec (v0.32.0 — API `info.version` 2.18.0)
+
+### Bankr dynamic key vending (2.18)
+- **Bankr keys** — `POST /v1/agents/{id}/bankr-keys/lease`, `GET /v1/agents/{id}/bankr-keys`, `DELETE /v1/agents/{id}/bankr-keys/{lease_id}`. Partner key vending for scoped, TTL-bound `bk_usr_` wallet API keys.
+
 
 ### CDP parity & embedded wallet (2.16+)
 - **Deposit destinations** — `POST/GET/PATCH /v1/deposit-destinations`, `GET /v1/deposit-destinations/{id}`
