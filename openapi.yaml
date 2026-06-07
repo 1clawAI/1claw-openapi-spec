@@ -70,6 +70,8 @@ tags:
       description: Event webhook registration and management
     - name: Platform
       description: Platform API for developers building on 1Claw (plt_ keys, user provisioning, bootstrap templates)
+    - name: OAuth
+      description: OAuth 2.0 authorization server (PKCE, consent, token exchange, OIDC UserInfo)
 
 # =============================================================================
 # PATHS
@@ -3984,6 +3986,32 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/treasury/wallets/spend-policy:
+        get:
+            tags: [Treasury Wallets]
+            summary: Get effective spend policy for current user
+            description: |
+                Returns the effective spend policy governing the authenticated user's
+                wallet transactions. Resolves from per-user override (if set) or the
+                app-wide default. Returns null if no policy is configured.
+            operationId: getEffectiveSpendPolicy
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Effective spend policy
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    policy:
+                                        nullable: true
+                                        allOf:
+                                            - $ref: "#/components/schemas/SpendPolicyResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
     # ---------------------------------------------------------------------------
     # Webhooks
     # ---------------------------------------------------------------------------
@@ -4929,6 +4957,132 @@ paths:
                 "410":
                     description: Claim token has expired
 
+    # --- Spend Policies ---
+
+    /v1/platform/apps/{appId}/spend-policies:
+        post:
+            tags: [Platform]
+            summary: Create wallet spend policy
+            description: |
+                Create an app-wide spend policy that governs what embedded wallet users
+                can do with their wallets. Policies apply to all connected users by default
+                and can be overridden per-user via connection-level policies.
+            operationId: createSpendPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateSpendPolicyRequest"
+            responses:
+                "201":
+                    description: Spend policy created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SpendPolicyResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        get:
+            tags: [Platform]
+            summary: List spend policies for app
+            description: Returns all spend policies configured for the platform app.
+            operationId: listSpendPolicies
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Spend policies
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    policies:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/SpendPolicyResponse"
+
+    /v1/platform/apps/{appId}/spend-policies/{policyId}:
+        delete:
+            tags: [Platform]
+            summary: Delete a spend policy
+            operationId: deleteSpendPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: policyId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Deleted
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/spend-policy:
+        put:
+            tags: [Platform]
+            summary: Set per-user spend policy override
+            description: |
+                Override the app-wide spend policy for a specific connected user. This
+                policy takes precedence over the app default. Remove by deleting the
+                connection-level policy.
+            operationId: setUserSpendPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateSpendPolicyRequest"
+            responses:
+                "200":
+                    description: Spend policy set
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SpendPolicyResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     # --- Approvals ---
 
     /v1/approvals:
@@ -5282,6 +5436,251 @@ paths:
             responses:
                 "200":
                     description: Passkey token for X-Passkey-Token header
+
+    # ---------------------------------------------------------------------------
+    # Email OTP
+    # ---------------------------------------------------------------------------
+
+    /v1/auth/email-otp/send:
+        post:
+            tags: [Authentication]
+            summary: Send email OTP code
+            description: |
+                Sends a 6-digit one-time code to the specified email address.
+                No authentication required. Rate-limited per IP and per email.
+            operationId: sendEmailOtp
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [email]
+                            properties:
+                                email:
+                                    type: string
+                                    format: email
+                                platform_app_id:
+                                    type: string
+                                    format: uuid
+                                    description: Optional platform app context for embedded wallet flows
+            responses:
+                "200":
+                    description: OTP sent
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    status:
+                                        type: string
+                                        enum: [sent]
+                "429":
+                    description: Rate limited
+
+    /v1/auth/email-otp/verify:
+        post:
+            tags: [Authentication]
+            summary: Verify email OTP and get JWT
+            description: |
+                Verifies the 6-digit code sent to the user's email. If the user does not
+                exist, a new account is created. Optionally auto-provisions treasury wallets
+                for the specified chains. Returns a JWT for subsequent API calls.
+            operationId: verifyEmailOtp
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [email, code]
+                            properties:
+                                email:
+                                    type: string
+                                    format: email
+                                code:
+                                    type: string
+                                    description: 6-digit OTP code
+                                platform_app_id:
+                                    type: string
+                                    format: uuid
+                                auto_provision_chains:
+                                    type: array
+                                    items: { type: string }
+                                    description: Chains to auto-generate wallets for (e.g. ["ethereum", "base"])
+            responses:
+                "200":
+                    description: Existing user authenticated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/EmailOtpVerifyResponse"
+                "201":
+                    description: New user created and authenticated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/EmailOtpVerifyResponse"
+                "400":
+                    description: Invalid or expired code
+                "429":
+                    description: Rate limited
+
+    # ---------------------------------------------------------------------------
+    # OAuth
+    # ---------------------------------------------------------------------------
+
+    /v1/oauth/authorize:
+        get:
+            tags: [OAuth]
+            summary: Get OAuth consent info
+            description: |
+                Returns information about the platform app requesting authorization so the
+                UI can display a consent screen. Used by the 1Claw-hosted consent page.
+            operationId: getOAuthConsent
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: client_id
+                  in: query
+                  required: true
+                  schema: { type: string }
+                  description: Platform app slug
+                - name: redirect_uri
+                  in: query
+                  required: true
+                  schema: { type: string, format: uri }
+                - name: response_type
+                  in: query
+                  required: true
+                  schema: { type: string, enum: [code] }
+                - name: scope
+                  in: query
+                  schema: { type: string }
+                  description: Space-delimited scopes (e.g. "openid email wallet")
+                - name: state
+                  in: query
+                  schema: { type: string }
+                - name: code_challenge
+                  in: query
+                  schema: { type: string }
+                  description: PKCE code challenge
+                - name: code_challenge_method
+                  in: query
+                  schema: { type: string, enum: [S256, plain] }
+                - name: nonce
+                  in: query
+                  schema: { type: string }
+                  description: OIDC nonce for ID token replay protection
+            responses:
+                "200":
+                    description: Consent screen data
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OAuthConsentResponse"
+                "400":
+                    description: Invalid client_id, redirect_uri, or response_type
+        post:
+            tags: [OAuth]
+            summary: Submit OAuth consent decision
+            description: |
+                The user approves or denies the authorization request. On approval, returns
+                a redirect URL containing the authorization code. On denial, returns a
+                redirect URL with an error parameter.
+            operationId: submitOAuthConsent
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [approve, client_id, redirect_uri]
+                            properties:
+                                approve: { type: boolean }
+                                client_id: { type: string }
+                                redirect_uri: { type: string, format: uri }
+                                scope: { type: string }
+                                state: { type: string }
+                                code_challenge: { type: string }
+                                code_challenge_method: { type: string, enum: [S256, plain] }
+                                nonce: { type: string }
+            responses:
+                "200":
+                    description: Redirect URL with authorization code or error
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [redirect_url]
+                                properties:
+                                    redirect_url:
+                                        type: string
+                                        format: uri
+                "400":
+                    description: Invalid request
+
+    /v1/oauth/token:
+        post:
+            tags: [OAuth]
+            summary: Exchange authorization code for tokens
+            description: |
+                Standard OAuth 2.0 token endpoint. Exchanges an authorization code for an
+                access token and optional OIDC ID token. Supports PKCE via `code_verifier`.
+            operationId: exchangeOAuthToken
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [grant_type, code, client_id, redirect_uri]
+                            properties:
+                                grant_type:
+                                    type: string
+                                    enum: [authorization_code]
+                                code: { type: string }
+                                client_id: { type: string }
+                                redirect_uri: { type: string, format: uri }
+                                code_verifier:
+                                    type: string
+                                    description: PKCE code verifier (required when code_challenge was used)
+            responses:
+                "200":
+                    description: Token response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OAuthTokenResponse"
+                "400":
+                    description: Invalid grant, code, or verifier
+                "401":
+                    description: Invalid client credentials
+
+    /v1/oauth/userinfo:
+        get:
+            tags: [OAuth]
+            summary: Get authenticated user info (OIDC UserInfo)
+            description: |
+                Standard OIDC UserInfo endpoint. Returns claims about the authenticated user
+                based on the granted scopes.
+            operationId: getOAuthUserInfo
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: User info
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OAuthUserInfoResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
 
 # =============================================================================
 # COMPONENTS
@@ -9455,6 +9854,164 @@ components:
                 expires_at:
                     type: string
                     format: date-time
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+
+        # --- Email OTP ---
+
+        EmailOtpVerifyResponse:
+            type: object
+            required: [token, user_id, org_id, is_new_user, email]
+            properties:
+                token:
+                    type: string
+                    description: JWT access token
+                user_id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                is_new_user:
+                    type: boolean
+                email:
+                    type: string
+                    format: email
+                wallet_address:
+                    type: string
+                    nullable: true
+                    description: Ethereum address if auto_provision_chains included an EVM chain
+
+        # --- OAuth ---
+
+        OAuthConsentResponse:
+            type: object
+            required: [app_name, app_slug, scopes, redirect_uri, already_consented]
+            properties:
+                app_name:
+                    type: string
+                app_slug:
+                    type: string
+                app_logo_url:
+                    type: string
+                    format: uri
+                    nullable: true
+                scopes:
+                    type: array
+                    items: { type: string }
+                redirect_uri:
+                    type: string
+                    format: uri
+                already_consented:
+                    type: boolean
+
+        OAuthTokenResponse:
+            type: object
+            required: [access_token, token_type, expires_in, scope]
+            properties:
+                access_token:
+                    type: string
+                token_type:
+                    type: string
+                    enum: [Bearer]
+                expires_in:
+                    type: integer
+                    description: Token lifetime in seconds
+                id_token:
+                    type: string
+                    nullable: true
+                    description: OIDC ID token (when openid scope was granted)
+                scope:
+                    type: string
+
+        OAuthUserInfoResponse:
+            type: object
+            required: [sub, email]
+            properties:
+                sub:
+                    type: string
+                    format: uuid
+                email:
+                    type: string
+                    format: email
+                name:
+                    type: string
+                    nullable: true
+                wallet_address:
+                    type: string
+                    nullable: true
+
+        # --- Spend Policies ---
+
+        CreateSpendPolicyRequest:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                    format: uuid
+                    description: Scope to a specific user (app-level policies only)
+                to_allowlist:
+                    type: array
+                    items: { type: string }
+                    description: Permitted destination addresses (empty = unrestricted)
+                to_denylist:
+                    type: array
+                    items: { type: string }
+                    description: Blocked destination addresses
+                max_value_per_tx_eth:
+                    type: string
+                    description: Maximum value per transaction in ETH (decimal string)
+                daily_limit_eth:
+                    type: string
+                    description: Rolling 24h spend cap in ETH (decimal string)
+                allowed_chains:
+                    type: array
+                    items: { type: string }
+                    description: Chains the user may transact on (empty = all enabled)
+                allowed_tokens:
+                    type: array
+                    items: { type: string }
+                    description: Permitted ERC-20 token contract addresses
+                max_transactions_per_day:
+                    type: integer
+                    description: Maximum number of transactions per 24h window
+
+        SpendPolicyResponse:
+            type: object
+            required: [id, platform_app_id, created_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                platform_app_id:
+                    type: string
+                    format: uuid
+                user_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                to_allowlist:
+                    type: array
+                    items: { type: string }
+                to_denylist:
+                    type: array
+                    items: { type: string }
+                max_value_per_tx_eth:
+                    type: string
+                    nullable: true
+                daily_limit_eth:
+                    type: string
+                    nullable: true
+                allowed_chains:
+                    type: array
+                    items: { type: string }
+                allowed_tokens:
+                    type: array
+                    items: { type: string }
+                max_transactions_per_day:
+                    type: integer
                     nullable: true
                 created_at:
                     type: string
