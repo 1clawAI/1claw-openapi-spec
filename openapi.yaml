@@ -2806,6 +2806,48 @@ paths:
                 "404":
                     description: Agent-keys vault not found
 
+    /v1/org/bankr-config:
+        get:
+            tags: [Organization]
+            summary: Get org Bankr partner configuration
+            description: Returns whether the org has configured Bankr BYOK (partner key prefix and default wallet only — never the secret). Users only.
+            operationId: getOrgBankrConfig
+            responses:
+                "200":
+                    description: Bankr configuration status
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OrgBankrConfigResponse"
+        put:
+            tags: [Organization]
+            summary: Set org Bankr partner configuration
+            description: Store or replace the org's Bankr partner key (`bk_ptr_...`) and optional default wallet (`wlt_...`). Owner/admin only. Partner key encrypted at rest.
+            operationId: upsertOrgBankrConfig
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpsertOrgBankrConfigRequest"
+            responses:
+                "200":
+                    description: Configuration saved
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OrgBankrConfigResponse"
+        delete:
+            tags: [Organization]
+            summary: Remove org Bankr partner configuration
+            description: Delete BYOK credentials for the org. Owner/admin only.
+            operationId: deleteOrgBankrConfig
+            responses:
+                "204":
+                    description: Configuration removed
+                "404":
+                    description: Configuration not found
+
     /v1/org/invite:
         post:
             tags: [Organization]
@@ -8042,6 +8084,32 @@ components:
                 vault_id:
                     type: string
                     format: uuid
+
+        OrgBankrConfigResponse:
+            type: object
+            properties:
+                configured:
+                    type: boolean
+                partner_key_prefix:
+                    type: string
+                default_wallet_id:
+                    type: string
+                updated_at:
+                    type: string
+                    format: date-time
+                using_platform_fallback:
+                    type: boolean
+
+        UpsertOrgBankrConfigRequest:
+            type: object
+            required: [partner_key]
+            properties:
+                partner_key:
+                    type: string
+                    description: Bankr partner API key (bk_ptr_...)
+                default_wallet_id:
+                    type: string
+                    description: Default provisioned wallet (wlt_...)
 
         # --- Billing ---
 
