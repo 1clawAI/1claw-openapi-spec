@@ -118,6 +118,10 @@
     {
       "name": "OAuth",
       "description": "OAuth 2.0 authorization server (PKCE, consent, token exchange, OIDC UserInfo)"
+    },
+    {
+      "name": "Risk Engine",
+      "description": "Risk events, verdicts, and honeytoken management"
     }
   ],
   "paths": {
@@ -8972,6 +8976,267 @@
           }
         }
       }
+    },
+    "/v1/risk/events": {
+      "get": {
+        "tags": [
+          "Risk Engine"
+        ],
+        "summary": "List risk events",
+        "description": "Returns risk events detected by the risk engine, ordered by most recent first.\nFilter by severity or principal type.\n",
+        "operationId": "listRiskEvents",
+        "parameters": [
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
+            },
+            "description": "Filter events by severity level"
+          },
+          {
+            "name": "principal_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "user",
+                "agent"
+              ]
+            },
+            "description": "Filter events by principal type"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Risk event list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/risk/verdicts": {
+      "get": {
+        "tags": [
+          "Risk Engine"
+        ],
+        "summary": "List risk verdicts",
+        "description": "Returns all active risk verdicts for the caller's organization.",
+        "operationId": "listRiskVerdicts",
+        "responses": {
+          "200": {
+            "description": "Verdict list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskVerdictListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/risk/verdicts/{principal_type}/{principal_id}": {
+      "get": {
+        "tags": [
+          "Risk Engine"
+        ],
+        "summary": "Get risk verdict for a principal",
+        "description": "Returns the current risk verdict for a specific user or agent.",
+        "operationId": "getRiskVerdict",
+        "parameters": [
+          {
+            "name": "principal_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "user",
+                "agent"
+              ]
+            }
+          },
+          {
+            "name": "principal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Risk verdict (null if no verdict exists)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verdict": {
+                      "$ref": "#/components/schemas/RiskVerdict",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/risk/honeytokens": {
+      "get": {
+        "tags": [
+          "Risk Engine"
+        ],
+        "summary": "List honeytokens",
+        "description": "Returns all honeytokens (canary secrets) configured for the caller's organization.",
+        "operationId": "listHoneytokens",
+        "responses": {
+          "200": {
+            "description": "Honeytoken list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoneytokenListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Risk Engine"
+        ],
+        "summary": "Create a honeytoken",
+        "description": "Register a secret path as a honeytoken (canary). Any access to this secret\ntriggers a risk event and increments the trigger counter.\n",
+        "operationId": "createHoneytoken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHoneytokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Honeytoken created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "honeytoken": {
+                      "$ref": "#/components/schemas/Honeytoken"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/risk/honeytokens/{id}": {
+      "delete": {
+        "tags": [
+          "Risk Engine"
+        ],
+        "summary": "Delete a honeytoken",
+        "description": "Remove a honeytoken registration. The underlying secret is not affected.",
+        "operationId": "deleteHoneytoken",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Honeytoken deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15272,6 +15537,285 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "RiskEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "occurred_at",
+          "principal_type",
+          "principal_id",
+          "org_id",
+          "event_type",
+          "payload",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "principal_type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent"
+            ]
+          },
+          "principal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "description": "Risk event type (e.g. first_seen, geo_velocity, honeytoken_access)"
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "asn": {
+            "type": "integer",
+            "nullable": true
+          },
+          "asn_org": {
+            "type": "string",
+            "nullable": true
+          },
+          "country_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "user_agent": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true,
+            "description": "Computed severity at event time (low, medium, high, critical)"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RiskEventListResponse": {
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskEvent"
+            }
+          }
+        }
+      },
+      "RiskVerdictReason": {
+        "type": "object",
+        "required": [
+          "detector",
+          "severity",
+          "description"
+        ],
+        "properties": {
+          "detector": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "RiskVerdict": {
+        "type": "object",
+        "required": [
+          "principal_type",
+          "principal_id",
+          "org_id",
+          "score",
+          "severity",
+          "reasons",
+          "computed_at",
+          "expires_at"
+        ],
+        "properties": {
+          "principal_type": {
+            "type": "string"
+          },
+          "principal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "score": {
+            "type": "number",
+            "description": "Composite risk score (0.0 – 100.0)"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskVerdictReason"
+            }
+          },
+          "computed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RiskVerdictListResponse": {
+        "type": "object",
+        "required": [
+          "verdicts"
+        ],
+        "properties": {
+          "verdicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskVerdict"
+            }
+          }
+        }
+      },
+      "Honeytoken": {
+        "type": "object",
+        "required": [
+          "id",
+          "vault_id",
+          "org_id",
+          "secret_path",
+          "created_by",
+          "created_at",
+          "triggered_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "secret_path": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "triggered_count": {
+            "type": "integer"
+          },
+          "last_triggered_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CreateHoneytokenRequest": {
+        "type": "object",
+        "required": [
+          "vault_id",
+          "secret_path"
+        ],
+        "properties": {
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "secret_path": {
+            "type": "string",
+            "description": "Vault secret path to monitor as a canary"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional human-readable notes about this honeytoken"
+          }
+        }
+      },
+      "HoneytokenListResponse": {
+        "type": "object",
+        "required": [
+          "honeytokens"
+        ],
+        "properties": {
+          "honeytokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Honeytoken"
+            }
           }
         }
       }

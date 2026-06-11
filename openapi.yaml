@@ -10305,6 +10305,10 @@ components:
                 user_agent:
                     type: string
                     nullable: true
+                severity:
+                    type: string
+                    nullable: true
+                    description: "Computed severity at event time (low, medium, high, critical)"
                 payload:
                     type: object
                     additionalProperties: true
