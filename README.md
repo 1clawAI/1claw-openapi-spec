@@ -40,7 +40,21 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.32.1 — API `info.version` 2.18.0)
+## What's in the spec (v0.34.1 — API `info.version` 2.19.0)
+
+### Risk Engine & DPoP (2.19)
+- **Risk events** — `GET /v1/risk/events` (list, filterable by severity/principal_type)
+- **Risk verdicts** — `GET /v1/risk/verdicts` (active verdicts), `GET /v1/risk/verdicts/{type}/{id}` (single principal verdict)
+- **Honeytokens** — `GET/POST/DELETE /v1/risk/honeytokens` (canary secret CRUD with trigger counts)
+- **DPoP** — RFC 9449 Demonstration of Proof-of-Possession token binding (planned spec addition)
+
+### Webhooks (2.19)
+- **Webhook CRUD** — `POST/GET /v1/webhooks`, `GET/PATCH/DELETE /v1/webhooks/{id}`. Events: `wallet.transfer.*`, `proposal.*`, `agent.transaction.*`, `signing_key.rotated`, `policy.*`
+
+### OAuth & Email OTP (2.19)
+- **OAuth2 authorization server** — `GET/POST /v1/oauth/authorize`, `POST /v1/oauth/token`, `GET /v1/oauth/userinfo` ("Sign in with 1Claw")
+- **Email OTP** — `POST /v1/auth/email-otp/send`, `POST /v1/auth/email-otp/verify` (passwordless login)
+- **Spend policies** — `POST/GET/DELETE /v1/platform/apps/{id}/spend-policies`, `PUT /v1/platform/connections/{id}/spend-policy`, `GET /v1/treasury/wallets/spend-policy`
 
 ### Bankr dynamic key vending (2.18)
 - **Bankr keys** — `POST /v1/agents/{id}/bankr-keys/lease`, `GET /v1/agents/{id}/bankr-keys`, `DELETE /v1/agents/{id}/bankr-keys/{lease_id}`. Partner key vending for scoped, TTL-bound `bk_usr_` wallet API keys.
