@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.19.0
+    version: 2.20.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -7059,6 +7059,12 @@ components:
                 message_signing_enabled:
                     type: boolean
                     description: Whether EIP-191 personal_sign is enabled.
+                raw_signing_enabled:
+                    type: boolean
+                    description: >
+                        Whether the raw/precomputed-digest signing intent (eip712_digest) is
+                        enabled. Blind signing — bypasses transaction guardrails; OFF by default
+                        and human-set. Required for ERC-1271/ERC-7739 flows (e.g. Polymarket).
                 api_key_expires_at:
                     type: string
                     format: date-time
@@ -7820,7 +7826,7 @@ components:
             properties:
                 intent_type:
                     type: string
-                    enum: [personal_sign, typed_data, transaction]
+                    enum: [personal_sign, typed_data, eip712_digest, transaction]
                 chain:
                     type: string
                 signing_key_path:
@@ -7832,6 +7838,13 @@ components:
                 typed_data:
                     type: object
                     description: EIP-712 typed data JSON (for typed_data)
+                hash:
+                    type: string
+                    description: >
+                        Client-computed 32-byte digest (0x-prefixed) for the eip712_digest
+                        intent. Signed directly (blind signing); requires the agent's
+                        raw_signing_enabled flag. Use for ERC-1271/ERC-7739 nested EIP-712
+                        flows (e.g. Polymarket) where the canonical hash is computed client-side.
                 tx_type:
                     type: integer
                     description: "EIP-2718 type: 0=legacy, 1=2930, 2=1559, 3=4844, 4=7702"
