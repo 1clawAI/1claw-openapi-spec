@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.20.0",
+    "version": "2.21.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -7367,6 +7367,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PlatformUserResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "User exists in a different organization. Contains a link_required payload with an OAuth authorize URL for cross-org consent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserLinkRequiredResponse"
                 }
               }
             }
@@ -14762,6 +14772,58 @@
             "format": "uuid"
           },
           "email": {
+            "type": "string"
+          },
+          "link_required": {
+            "$ref": "#/components/schemas/LinkRequiredInfo"
+          }
+        }
+      },
+      "PlatformUserLinkRequiredResponse": {
+        "type": "object",
+        "required": [
+          "is_new",
+          "email",
+          "link_required"
+        ],
+        "properties": {
+          "is_new": {
+            "type": "boolean",
+            "example": false
+          },
+          "email": {
+            "type": "string"
+          },
+          "link_required": {
+            "$ref": "#/components/schemas/LinkRequiredInfo"
+          }
+        }
+      },
+      "LinkRequiredInfo": {
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "authorize_url",
+          "app_slug"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "link_required"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "example": "user_exists_in_other_org"
+          },
+          "authorize_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "OAuth authorize URL the platform app should redirect the user to for consent."
+          },
+          "app_slug": {
             "type": "string"
           }
         }
