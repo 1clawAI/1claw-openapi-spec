@@ -40,13 +40,16 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.34.1 — API `info.version` 2.19.0)
+## What's in the spec (v0.36.0 — API `info.version` 2.23.0)
+
+### Non-EVM transaction signing (2.23)
+- **Intents API** — `SubmitTransactionRequest` / `SignTransactionRequest` extended with non-EVM fields: `destination_tag` (XRP), `memo`, `fee_rate_sat_per_vbyte` (Bitcoin), `fee_limit_sun` (Tron), `token_mint` / `token_decimals` (Solana SPL + Tron TRC-20), `ttl` (Cardano). Native sign + broadcast for Bitcoin, Solana, XRP, Cardano, Tron.
 
 ### Risk Engine & DPoP (2.19)
 - **Risk events** — `GET /v1/risk/events` (list, filterable by severity/principal_type)
 - **Risk verdicts** — `GET /v1/risk/verdicts` (active verdicts), `GET /v1/risk/verdicts/{type}/{id}` (single principal verdict)
 - **Honeytokens** — `GET/POST/DELETE /v1/risk/honeytokens` (canary secret CRUD with trigger counts)
-- **DPoP** — RFC 9449 Demonstration of Proof-of-Possession token binding (planned spec addition)
+- **DPoP** — RFC 9449 Demonstration of Proof-of-Possession token binding (shipped)
 
 ### Webhooks (2.19)
 - **Webhook CRUD** — `POST/GET /v1/webhooks`, `GET/PATCH/DELETE /v1/webhooks/{id}`. Events: `wallet.transfer.*`, `proposal.*`, `agent.transaction.*`, `signing_key.rotated`, `policy.*`

@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.22.0
+    version: 2.23.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -7701,6 +7701,27 @@ components:
                     type: boolean
                     description: Whether to submit as a gasless (sponsored) transaction
                     default: false
+                destination_tag:
+                    type: integer
+                    description: "Non-EVM (XRP): destination tag for exchange deposits"
+                memo:
+                    type: string
+                    description: "Non-EVM (XRP, Solana): optional memo"
+                fee_rate_sat_per_vbyte:
+                    type: integer
+                    description: "Non-EVM (Bitcoin): override the fetched fee rate (sat/vByte)"
+                fee_limit_sun:
+                    type: integer
+                    description: "Non-EVM (Tron): TRC-20 energy fee limit in sun"
+                token_mint:
+                    type: string
+                    description: "Non-EVM (Solana SPL / Tron TRC-20): token mint or contract address; omit for native transfer"
+                token_decimals:
+                    type: integer
+                    description: "Non-EVM (Solana, Tron): token decimals (default 6)"
+                ttl:
+                    type: integer
+                    description: "Non-EVM (Cardano): transaction time-to-live (absolute slot)"
 
         SignTransactionRequest:
             type: object
@@ -7734,6 +7755,27 @@ components:
                 simulate_first:
                     type: boolean
                     default: false
+                destination_tag:
+                    type: integer
+                    description: "Non-EVM (XRP): destination tag for exchange deposits"
+                memo:
+                    type: string
+                    description: "Non-EVM (XRP, Solana): optional memo"
+                fee_rate_sat_per_vbyte:
+                    type: integer
+                    description: "Non-EVM (Bitcoin): override the fetched fee rate (sat/vByte)"
+                fee_limit_sun:
+                    type: integer
+                    description: "Non-EVM (Tron): TRC-20 energy fee limit in sun"
+                token_mint:
+                    type: string
+                    description: "Non-EVM (Solana SPL / Tron TRC-20): token mint or contract address; omit for native transfer"
+                token_decimals:
+                    type: integer
+                    description: "Non-EVM (Solana, Tron): token decimals (default 6)"
+                ttl:
+                    type: integer
+                    description: "Non-EVM (Cardano): transaction time-to-live (absolute slot)"
 
         SignTransactionResponse:
             type: object
