@@ -43,7 +43,8 @@ import spec from "@1claw/openapi-spec/openapi.json";
 ## What's in the spec (v0.36.0 — API `info.version` 2.23.0)
 
 ### Non-EVM transaction signing (2.23)
-- **Intents API** — `SubmitTransactionRequest` / `SignTransactionRequest` extended with non-EVM fields: `destination_tag` (XRP), `memo`, `fee_rate_sat_per_vbyte` (Bitcoin), `fee_limit_sun` (Tron), `token_mint` / `token_decimals` (Solana SPL + Tron TRC-20), `ttl` (Cardano). Native sign + broadcast for Bitcoin, Solana, XRP, Cardano, Tron.
+- **Intents API** — `SubmitTransactionRequest` / `SignTransactionRequest` / `SignIntentRequest` extended with non-EVM fields: `destination_tag` (XRP), `memo`, `fee_rate_sat_per_vbyte` (Bitcoin), `fee_limit_sun` (Tron), `token_mint` / `token_decimals` (Solana SPL + Tron TRC-20), `ttl` (Cardano). Native sign + broadcast for Bitcoin, Solana, XRP, Cardano, Tron.
+- **`xrpl_tx_json`** — Optional raw XRPL transaction JSON for 30+ transaction types beyond simple Payment. Supported types include TrustSet, OfferCreate, OfferCancel, AccountSet, AccountDelete, EscrowCreate/Finish/Cancel, PaymentChannelCreate/Fund/Claim, NFTokenMint/Burn/CreateOffer/AcceptOffer/CancelOffer, AMMCreate/Deposit/Withdraw/Bid/Delete/Vote, SetRegularKey, SignerListSet, DepositPreauth, CheckCreate/Cash/Cancel, TicketCreate, Clawback. Server auto-fills `Account`, `Sequence`, `Fee`, `Flags`, `LastLedgerSequence`, `SigningPubKey`. Legacy `to`/`value`/`destination_tag` Payment path preserved for backward compatibility.
 
 ### Risk Engine & DPoP (2.19)
 - **Risk events** — `GET /v1/risk/events` (list, filterable by severity/principal_type)

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.23.0",
+    "version": "2.24.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -11841,6 +11841,11 @@
           "ttl": {
             "type": "integer",
             "description": "Non-EVM (Cardano): transaction time-to-live (absolute slot)"
+          },
+          "xrpl_tx_json": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw XRPL transaction JSON for full transaction type coverage. When present (and chain is XRP), the handler uses the xrpl-rust binary codec to encode and sign the transaction as-is. Supports all XRPL transaction types: Payment, TrustSet, OfferCreate, OfferCancel, AccountSet, EscrowCreate, NFTokenMint, AMMCreate, and 20+ more. Account, Sequence, Fee, LastLedgerSequence, and SigningPubKey are auto-filled when absent.\n"
           }
         }
       },
@@ -11918,6 +11923,11 @@
           "ttl": {
             "type": "integer",
             "description": "Non-EVM (Cardano): transaction time-to-live (absolute slot)"
+          },
+          "xrpl_tx_json": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw XRPL transaction JSON for full transaction type coverage. When present (and chain is XRP), the handler uses the xrpl-rust binary codec to encode and sign the transaction as-is. Supports all XRPL transaction types: Payment, TrustSet, OfferCreate, OfferCancel, AccountSet, EscrowCreate, NFTokenMint, AMMCreate, and 20+ more. Account, Sequence, Fee, LastLedgerSequence, and SigningPubKey are auto-filled when absent.\n"
           }
         }
       },
@@ -12259,6 +12269,43 @@
             "items": {
               "type": "object"
             }
+          },
+          "sign_only": {
+            "type": "boolean",
+            "description": "When true, sign only (do not broadcast). Non-EVM transaction intents only."
+          },
+          "destination_tag": {
+            "type": "integer",
+            "description": "Non-EVM (XRP): destination tag for exchange deposits"
+          },
+          "memo": {
+            "type": "string",
+            "description": "Non-EVM (XRP, Solana): optional memo"
+          },
+          "fee_rate_sat_per_vbyte": {
+            "type": "integer",
+            "description": "Non-EVM (Bitcoin): override the fetched fee rate (sat/vByte)"
+          },
+          "fee_limit_sun": {
+            "type": "integer",
+            "description": "Non-EVM (Tron): TRC-20 energy fee limit in sun"
+          },
+          "token_mint": {
+            "type": "string",
+            "description": "Non-EVM (Solana SPL / Tron TRC-20): token mint or contract address; omit for native transfer"
+          },
+          "token_decimals": {
+            "type": "integer",
+            "description": "Non-EVM (Solana, Tron): token decimals (default 6)"
+          },
+          "ttl": {
+            "type": "integer",
+            "description": "Non-EVM (Cardano): transaction time-to-live (absolute slot)"
+          },
+          "xrpl_tx_json": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw XRPL transaction JSON for full transaction type coverage. When present (and chain is XRP), the handler uses the xrpl-rust binary codec to encode and sign the transaction as-is. Supports all XRPL transaction types: Payment, TrustSet, OfferCreate, OfferCancel, AccountSet, EscrowCreate, NFTokenMint, AMMCreate, and 20+ more. Account, Sequence, Fee, LastLedgerSequence, and SigningPubKey are auto-filled when absent.\n"
           }
         }
       },
