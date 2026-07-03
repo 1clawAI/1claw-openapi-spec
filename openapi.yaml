@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.21.0
+    version: 2.22.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -4957,6 +4957,93 @@ paths:
                 "404":
                     description: Connection not found
 
+    /v1/platform/connections/{connectionId}/grant:
+        post:
+            tags: [Platform]
+            summary: Grant platform app access to vaults/agents
+            description: |
+                User-authenticated. Grant the platform app access to selected vaults and agents.
+                Validates user ownership of all requested resources. Creates platform_user_grants
+                entries and merges resource IDs into the connection record.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/GrantResourcesRequest"
+            responses:
+                "201":
+                    description: Grants created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GrantResourcesResponse"
+                "400":
+                    description: No vault_ids or agent_ids provided
+                "403":
+                    description: Resource not owned by caller
+                "404":
+                    description: Connection not found
+
+    /v1/platform/connections/{connectionId}/grants:
+        get:
+            tags: [Platform]
+            summary: List active resource grants for a connection
+            description: User-authenticated. Returns active (non-revoked) grants for the connection.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Grant list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GrantListResponse"
+                "404":
+                    description: Connection not found
+
+    /v1/platform/connections/{connectionId}/grants/{grantId}:
+        delete:
+            tags: [Platform]
+            summary: Revoke a resource grant
+            description: User-authenticated. Revoke a specific resource grant by ID.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: grantId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Grant revoked
+                "404":
+                    description: Grant not found or already revoked
+
     /v1/platform/claim/{token}:
         get:
             tags: [Platform]
@@ -9905,6 +9992,92 @@ components:
                 created_at:
                     type: string
                     format: date-time
+
+        GrantResourcesRequest:
+            type: object
+            properties:
+                vault_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                    description: Vault IDs to grant access to
+                agent_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                    description: Agent IDs to grant access to
+                allowed_paths:
+                    type: array
+                    items:
+                        type: string
+                    default: ["**"]
+                    description: Secret path patterns the app can access
+                permissions:
+                    type: array
+                    items:
+                        type: string
+                    default: ["read"]
+                    description: Permissions granted (read, write, rotate)
+                expires_at:
+                    type: string
+                    format: date-time
+                    description: Optional grant expiration
+
+        GrantResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                vault_id:
+                    type: string
+                    format: uuid
+                allowed_paths:
+                    type: array
+                    items:
+                        type: string
+                permissions:
+                    type: array
+                    items:
+                        type: string
+                expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+
+        GrantResourcesResponse:
+            type: object
+            properties:
+                connection_id:
+                    type: string
+                    format: uuid
+                grants:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/GrantResponse"
+                vault_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                agent_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+
+        GrantListResponse:
+            type: object
+            properties:
+                grants:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/GrantResponse"
 
         ClaimPreviewResponse:
             type: object
