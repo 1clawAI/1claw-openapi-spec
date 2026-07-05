@@ -74,6 +74,8 @@ tags:
       description: OAuth 2.0 authorization server (PKCE, consent, token exchange, OIDC UserInfo)
     - name: Risk Engine
       description: Risk events, verdicts, and honeytoken management
+    - name: Tokens
+      description: Known token registry for guardrail enforcement
 
 # =============================================================================
 # PATHS
@@ -5986,6 +5988,87 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/tokens:
+        get:
+            tags: [Tokens]
+            summary: List known tokens
+            operationId: listKnownTokens
+            parameters:
+                - name: chain
+                  in: query
+                  schema:
+                      type: string
+                  description: Filter by chain name
+            responses:
+                "200":
+                    description: Token list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/KnownTokenListResponse"
+
+    /v1/chains/{chain_name}/tokens:
+        get:
+            tags: [Tokens]
+            summary: List tokens for a specific chain
+            operationId: listTokensByChain
+            parameters:
+                - name: chain_name
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Token list for chain
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/KnownTokenListResponse"
+
+    /v1/admin/tokens:
+        post:
+            tags: [Admin, Tokens]
+            summary: Create a known token (admin only)
+            operationId: createKnownToken
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateKnownTokenRequest"
+            responses:
+                "201":
+                    description: Token created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/KnownToken"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/admin/tokens/{token_id}:
+        delete:
+            tags: [Admin, Tokens]
+            summary: Delete a known token (admin only)
+            operationId: deleteKnownToken
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: token_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Token deleted
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -6969,6 +7052,27 @@ components:
                     description: Enable Shroud LLM Proxy for this agent
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
+                tx_token_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Token contract/mint addresses this agent may interact with. Empty = unrestricted.
+                tx_known_tokens_only:
+                    type: boolean
+                    default: false
+                    description: When true, only tokens in the known_tokens registry may be used.
+                xrpl_allowed_tx_types:
+                    type: array
+                    items:
+                        type: string
+                    description: Allowed XRP Ledger transaction types (Payment, TrustSet, etc.). Empty = all allowed.
+                per_chain_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: |
+                        Per-chain guardrail overrides. Keys are chain family names (ethereum, bitcoin, solana, etc.).
+                        Each value can contain: max_value, daily_limit, to_allowlist, token_allowlist.
+                        Example: { "ethereum": { "max_value": "0.5", "to_allowlist": ["0x..."] } }
                 api_key_expires_at:
                     type: string
                     format: date-time
@@ -7040,6 +7144,27 @@ components:
                         Per-agent TTL override for federation tokens (seconds). NULL falls
                         back to the global default (`ONECLAW_JWT_FEDERATED_TOKEN_EXPIRY_SECS`).
                         Hard-capped at 3600 seconds.
+                tx_token_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Token contract/mint addresses this agent may interact with. Empty = unrestricted.
+                tx_known_tokens_only:
+                    type: boolean
+                    default: false
+                    description: When true, only tokens in the known_tokens registry may be used.
+                xrpl_allowed_tx_types:
+                    type: array
+                    items:
+                        type: string
+                    description: Allowed XRP Ledger transaction types (Payment, TrustSet, etc.). Empty = all allowed.
+                per_chain_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: |
+                        Per-chain guardrail overrides. Keys are chain family names (ethereum, bitcoin, solana, etc.).
+                        Each value can contain: max_value, daily_limit, to_allowlist, token_allowlist.
+                        Example: { "ethereum": { "max_value": "0.5", "to_allowlist": ["0x..."] } }
                 api_key_expires_at:
                     type: string
                     format: date-time
@@ -7158,6 +7283,28 @@ components:
                         Whether the raw/precomputed-digest signing intent (eip712_digest) is
                         enabled. Blind signing — bypasses transaction guardrails; OFF by default
                         and human-set. Required for ERC-1271/ERC-7739 flows (e.g. Polymarket).
+                tx_token_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Token contract/mint addresses this agent may interact with.
+                tx_known_tokens_only:
+                    type: boolean
+                    description: When true, only tokens in the known_tokens registry may be used.
+                xrpl_allowed_tx_types:
+                    type: array
+                    items:
+                        type: string
+                    description: Allowed XRP Ledger transaction types.
+                per_chain_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: Per-chain guardrail overrides.
+                tx_spent_today_by_chain:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: 'Per-chain-family daily spend in major units (e.g. {"ethereum": "0.5", "solana": "2.1"}).'
                 api_key_expires_at:
                     type: string
                     format: date-time
@@ -7181,6 +7328,70 @@ components:
                     description: Multi-chain; one Safe per chain
                     items:
                         $ref: "#/components/schemas/AgentSmartAccountResponse"
+
+        KnownToken:
+            type: object
+            required: [id, chain, symbol, name, contract_address, decimals, is_testnet, is_verified]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                symbol:
+                    type: string
+                name:
+                    type: string
+                contract_address:
+                    type: string
+                decimals:
+                    type: integer
+                is_testnet:
+                    type: boolean
+                is_verified:
+                    type: boolean
+                logo_url:
+                    type: string
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        KnownTokenListResponse:
+            type: object
+            required: [tokens]
+            properties:
+                tokens:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/KnownToken"
+
+        CreateKnownTokenRequest:
+            type: object
+            required: [chain, symbol, name, contract_address, decimals]
+            properties:
+                chain:
+                    type: string
+                symbol:
+                    type: string
+                name:
+                    type: string
+                contract_address:
+                    type: string
+                decimals:
+                    type: integer
+                is_testnet:
+                    type: boolean
+                    default: false
+                is_verified:
+                    type: boolean
+                    default: true
+                logo_url:
+                    type: string
+                    nullable: true
 
         AgentSmartAccountResponse:
             type: object
@@ -9473,6 +9684,22 @@ components:
                     type: string
                 balance_display:
                     type: string
+                tokens:
+                    type: array
+                    description: Token balances when ?tokens= query param is provided
+                    items:
+                        type: object
+                        properties:
+                            contract_address:
+                                type: string
+                            symbol:
+                                type: string
+                                nullable: true
+                            balance:
+                                type: string
+                            decimals:
+                                type: integer
+                                nullable: true
 
         # --- x402 ---
 
