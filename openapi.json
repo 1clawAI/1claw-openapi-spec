@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.24.0",
+    "version": "2.25.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -10874,11 +10874,23 @@
               "type": "string"
             }
           },
+          "tx_max_value": {
+            "type": "string",
+            "description": "Maximum value per transaction in native major units for the transacting chain family (ETH on EVM, BTC on Bitcoin, SOL on Solana, XRP, ADA, TRX)."
+          },
+          "tx_daily_limit": {
+            "type": "string",
+            "description": "Rolling daily spend cap in native major units, enforced per chain family at signing time."
+          },
           "tx_max_value_eth": {
-            "type": "string"
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated alias for tx_max_value. Same unit semantics (native major units, not ETH-only)."
           },
           "tx_daily_limit_eth": {
-            "type": "string"
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated alias for tx_daily_limit."
           },
           "tx_allowed_chains": {
             "type": "array",
@@ -10941,7 +10953,7 @@
           "per_chain_guardrails": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Per-chain guardrail overrides. Keys are chain family names (ethereum, bitcoin, solana, etc.).\nEach value can contain: max_value, daily_limit, to_allowlist, token_allowlist.\nExample: { \"ethereum\": { \"max_value\": \"0.5\", \"to_allowlist\": [\"0x...\"] } }\n"
+            "description": "Per-chain guardrail overrides. Keys are signing chains (ethereum, bitcoin, solana, xrp, cardano, tron).\nEach value may include max_value, daily_limit, to_allowlist, token_allowlist (legacy *_eth keys accepted).\nStrictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.\n"
           },
           "api_key_expires_at": {
             "type": "string",
@@ -10979,11 +10991,23 @@
               "type": "string"
             }
           },
+          "tx_max_value": {
+            "type": "string",
+            "description": "Maximum value per transaction in native major units for the transacting chain family (ETH on EVM, BTC on Bitcoin, SOL on Solana, XRP, ADA, TRX)."
+          },
+          "tx_daily_limit": {
+            "type": "string",
+            "description": "Rolling daily spend cap in native major units, enforced per chain family at signing time."
+          },
           "tx_max_value_eth": {
-            "type": "string"
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated alias for tx_max_value. Same unit semantics (native major units, not ETH-only)."
           },
           "tx_daily_limit_eth": {
-            "type": "string"
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated alias for tx_daily_limit."
           },
           "tx_allowed_chains": {
             "type": "array",
@@ -11050,7 +11074,7 @@
           "per_chain_guardrails": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Per-chain guardrail overrides. Keys are chain family names (ethereum, bitcoin, solana, etc.).\nEach value can contain: max_value, daily_limit, to_allowlist, token_allowlist.\nExample: { \"ethereum\": { \"max_value\": \"0.5\", \"to_allowlist\": [\"0x...\"] } }\n"
+            "description": "Per-chain guardrail overrides. Keys are signing chains (ethereum, bitcoin, solana, xrp, cardano, tron).\nEach value may include max_value, daily_limit, to_allowlist, token_allowlist (legacy *_eth keys accepted).\nStrictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.\n"
           },
           "api_key_expires_at": {
             "type": "string",
@@ -11108,15 +11132,32 @@
               "type": "string"
             }
           },
+          "tx_max_value": {
+            "type": "string",
+            "description": "Maximum value per transaction in native major units for the transacting chain family (ETH on EVM, BTC on Bitcoin, SOL on Solana, XRP, ADA, TRX)."
+          },
+          "tx_daily_limit": {
+            "type": "string",
+            "description": "Rolling daily spend cap in native major units, enforced per chain family at signing time."
+          },
           "tx_max_value_eth": {
-            "type": "string"
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated alias for tx_max_value. Same unit semantics (native major units, not ETH-only)."
           },
           "tx_daily_limit_eth": {
-            "type": "string"
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated alias for tx_daily_limit."
+          },
+          "tx_spent_today": {
+            "type": "string",
+            "description": "Sum of today's spend across all chain families in major units. Prefer tx_spent_today_by_chain."
           },
           "tx_spent_today_eth": {
             "type": "string",
-            "description": "ETH value already spent today (UTC) from recorded transactions; used with daily limit guardrails"
+            "deprecated": true,
+            "description": "Deprecated alias for tx_spent_today."
           },
           "tx_allowed_chains": {
             "type": "array",
@@ -11237,7 +11278,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Per-chain-family daily spend in major units (e.g. {\"ethereum\": \"0.5\", \"solana\": \"2.1\"})."
+            "description": "Per-chain-family daily spend in native major units (keys: evm, bitcoin, solana, xrp, cardano, tron)."
           },
           "api_key_expires_at": {
             "type": "string",
