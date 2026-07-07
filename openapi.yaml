@@ -779,6 +779,12 @@ paths:
             responses:
                 "202":
                     description: Approval request created
+                    headers:
+                        Location:
+                            description: URL to poll for approval status
+                            schema:
+                                type: string
+                                example: /v1/approvals/{id}
                     content:
                         application/json:
                             schema:
@@ -1508,6 +1514,12 @@ paths:
             responses:
                 "202":
                     description: Rotation job started
+                    headers:
+                        Location:
+                            description: URL to poll for rotation job status
+                            schema:
+                                type: string
+                                example: /v1/vaults/{vault_id}/cmek-rotate/{job_id}
                     content:
                         application/json:
                             schema:
