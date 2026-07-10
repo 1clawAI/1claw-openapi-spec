@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.25.0
+    version: 2.26.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -76,6 +76,8 @@ tags:
       description: Risk events, verdicts, and honeytoken management
     - name: Tokens
       description: Known token registry for guardrail enforcement
+    - name: Execution Intents
+      description: Execute HTTP calls, queries, and more through pre-configured bindings
 
 # =============================================================================
 # PATHS
@@ -2532,6 +2534,218 @@ paths:
                                 $ref: "#/components/schemas/SignIntentResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    # ---------------------------------------------------------------------------
+    # Execution Intents
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/bindings:
+        post:
+            tags: [Execution Intents]
+            summary: Create a binding
+            operationId: createBinding
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateBindingRequest"
+            responses:
+                "201":
+                    description: Binding created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/BindingResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        get:
+            tags: [Execution Intents]
+            summary: List bindings
+            operationId: listBindings
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Binding list
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [bindings]
+                                properties:
+                                    bindings:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/BindingResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/agents/{agent_id}/bindings/{binding_id}:
+        get:
+            tags: [Execution Intents]
+            summary: Get binding
+            operationId: getBinding
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: binding_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Binding details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/BindingResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        patch:
+            tags: [Execution Intents]
+            summary: Update binding
+            operationId: updateBinding
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: binding_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdateBindingRequest"
+            responses:
+                "200":
+                    description: Binding updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/BindingResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Execution Intents]
+            summary: Delete binding
+            operationId: deleteBinding
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: binding_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Binding deleted
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/bindings/{binding_id}/test:
+        post:
+            tags: [Execution Intents]
+            summary: Test binding connectivity
+            operationId: testBinding
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: binding_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                timeout_ms:
+                                    type: integer
+                                    description: Connection test timeout in milliseconds
+            responses:
+                "200":
+                    description: Test result
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TestBindingResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/execute:
+        post:
+            tags: [Execution Intents]
+            summary: Execute an intent
+            operationId: executeIntent
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ExecuteRequest"
+            responses:
+                "200":
+                    description: Execution result
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ExecuteResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/agents/{agent_id}/executions:
+        get:
+            tags: [Execution Intents]
+            summary: List execution events
+            operationId: listExecutions
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: limit
+                  in: query
+                  required: false
+                  schema:
+                      type: integer
+                      default: 50
+                - name: offset
+                  in: query
+                  required: false
+                  schema:
+                      type: integer
+                      default: 0
+            responses:
+                "200":
+                    description: Execution event list
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [events]
+                                properties:
+                                    events:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/ExecutionEventResponse"
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
@@ -7074,6 +7288,14 @@ components:
                     description: Enable Shroud LLM Proxy for this agent
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
+                execution_intents_enabled:
+                    type: boolean
+                    default: false
+                    description: Enable Execution Intents (bindings and execute endpoint) for this agent
+                execution_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: Guardrails applied to all execution intents for this agent
                 tx_token_allowlist:
                     type: array
                     items:
@@ -7152,6 +7374,13 @@ components:
                     description: Enable/disable Shroud LLM Proxy
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
+                execution_intents_enabled:
+                    type: boolean
+                    description: Enable/disable Execution Intents for this agent
+                execution_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: Guardrails applied to all execution intents for this agent
                 federation_enabled:
                     type: boolean
                     description: |
@@ -7291,6 +7520,13 @@ components:
                     description: Whether this agent routes LLM traffic through the Shroud TEE proxy
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
+                execution_intents_enabled:
+                    type: boolean
+                    description: Whether Execution Intents (bindings and execute endpoint) are enabled for this agent
+                execution_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: Guardrails applied to all execution intents for this agent
                 federation_enabled:
                     type: boolean
                     description: |
@@ -11025,3 +11261,163 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/Honeytoken"
+
+        # --- Execution Intents ---
+
+        CreateBindingRequest:
+            type: object
+            required: [name, binding_type]
+            properties:
+                name:
+                    type: string
+                binding_type:
+                    type: string
+                    enum: [http, graphql, postgres, mysql, redis, grpc, smtp, cloud_sdk, s3, custom]
+                config:
+                    type: object
+                    additionalProperties: true
+                guardrails:
+                    type: object
+                    additionalProperties: true
+                credential:
+                    type: object
+                    additionalProperties: true
+
+        UpdateBindingRequest:
+            type: object
+            properties:
+                config:
+                    type: object
+                    additionalProperties: true
+                guardrails:
+                    type: object
+                    additionalProperties: true
+                is_active:
+                    type: boolean
+                credential:
+                    type: object
+                    additionalProperties: true
+
+        BindingResponse:
+            type: object
+            required: [id, agent_id, binding_type, name, is_active, created_at, updated_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
+                binding_type:
+                    type: string
+                    enum: [http, graphql, postgres, mysql, redis, grpc, smtp, cloud_sdk, s3, custom]
+                name:
+                    type: string
+                config:
+                    type: object
+                    additionalProperties: true
+                guardrails:
+                    type: object
+                    additionalProperties: true
+                is_active:
+                    type: boolean
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        TestBindingResponse:
+            type: object
+            required: [success, latency_ms]
+            properties:
+                success:
+                    type: boolean
+                latency_ms:
+                    type: integer
+                error:
+                    type: string
+                    nullable: true
+
+        ExecuteRequest:
+            type: object
+            required: [binding, intent_type, params]
+            properties:
+                binding:
+                    type: string
+                    description: Binding name or ID to execute against
+                intent_type:
+                    type: string
+                    description: Type of execution intent (e.g. http_request, graphql_query)
+                execution_mode:
+                    type: string
+                    enum: [vault, tee]
+                    default: vault
+                    description: Where execution runs (vault = server-side, tee = Shroud TEE)
+                params:
+                    type: object
+                    additionalProperties: true
+                    description: Intent-specific parameters
+
+        ExecuteResponse:
+            type: object
+            required: [execution_id, status, duration_ms, redactions_applied]
+            properties:
+                execution_id:
+                    type: string
+                    format: uuid
+                status:
+                    type: string
+                result:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                error:
+                    type: string
+                    nullable: true
+                duration_ms:
+                    type: integer
+                redactions_applied:
+                    type: integer
+
+        ExecutionEventResponse:
+            type: object
+            required: [id, agent_id, binding_id, intent_type, execution_mode, status, duration_ms, redactions_applied, created_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
+                binding_id:
+                    type: string
+                    format: uuid
+                intent_type:
+                    type: string
+                execution_mode:
+                    type: string
+                status:
+                    type: string
+                request_summary:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                result_summary:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                error_message:
+                    type: string
+                    nullable: true
+                duration_ms:
+                    type: integer
+                cost_cents:
+                    type: integer
+                    nullable: true
+                redactions_applied:
+                    type: integer
+                created_at:
+                    type: string
+                    format: date-time
