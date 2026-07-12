@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.26.0
+    version: 2.27.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2686,6 +2686,42 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/TestBindingResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/bindings/{binding_id}/rotate-credential:
+        post:
+            tags: [Execution Intents]
+            summary: Rotate a binding credential
+            description: Overwrite the stored credential for a binding without touching its config or guardrails. Human-only. The credential value is never returned.
+            operationId: rotateBindingCredential
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: binding_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [credential]
+                            properties:
+                                credential:
+                                    description: New credential material (object or string). Stored server-side.
+            responses:
+                "200":
+                    description: Updated binding
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/BindingResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -11321,6 +11357,9 @@ components:
                     additionalProperties: true
                 is_active:
                     type: boolean
+                credential_set:
+                    type: boolean
+                    description: Whether a credential is stored for this binding. The value itself is never returned.
                 created_at:
                     type: string
                     format: date-time
@@ -11380,6 +11419,10 @@ components:
                     type: integer
                 redactions_applied:
                     type: integer
+                execution_surface:
+                    type: string
+                    enum: [vault, tee]
+                    description: Where the intent actually ran. Reported truthfully — never claims TEE when it ran in the Vault.
 
         ExecutionEventResponse:
             type: object
