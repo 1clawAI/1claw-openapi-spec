@@ -7359,8 +7359,23 @@ components:
                     additionalProperties: true
                     description: |
                         Per-chain guardrail overrides. Keys are signing chains (ethereum, bitcoin, solana, xrp, cardano, tron).
-                        Each value may include max_value, daily_limit, to_allowlist, token_allowlist (legacy *_eth keys accepted).
+                        Each value may include max_value, daily_limit, to_allowlist, token_allowlist, max_per_day, overhead_budget, max_ata_creates_per_day.
                         Strictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.
+                tx_max_per_day:
+                    type: integer
+                    nullable: true
+                    description: Max transactions per UTC calendar day. Null = unlimited.
+                tx_overhead_budget:
+                    type: object
+                    nullable: true
+                    additionalProperties:
+                        type: string
+                    description: Per-chain daily overhead budget in native units (e.g. {"solana":"0.5","xrp":"100"}).
+                solana_ata_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Solana wallet addresses whose ATAs may be created. Empty = unrestricted.
                 api_key_expires_at:
                     type: string
                     format: date-time
@@ -7431,6 +7446,21 @@ components:
                 execution_require_tee:
                     type: boolean
                     description: When true, execute requests must arrive via TEE and all direct secret reads are blocked (Pro+ only)
+                tx_max_per_day:
+                    type: integer
+                    nullable: true
+                    description: Max transactions per UTC calendar day. Null = unlimited.
+                tx_overhead_budget:
+                    type: object
+                    nullable: true
+                    additionalProperties:
+                        type: string
+                    description: Per-chain daily overhead budget in native units.
+                solana_ata_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Solana wallet addresses whose ATAs may be created.
                 federation_enabled:
                     type: boolean
                     description: |
@@ -7583,6 +7613,29 @@ components:
                 execution_require_tee:
                     type: boolean
                     description: When true, execute requests must arrive via TEE and all direct secret reads are blocked (Pro+ only)
+                tx_max_per_day:
+                    type: integer
+                    nullable: true
+                    description: Max transactions per UTC calendar day. Null = unlimited.
+                tx_overhead_budget:
+                    type: object
+                    nullable: true
+                    additionalProperties:
+                        type: string
+                    description: Per-chain daily overhead budget in native units.
+                solana_ata_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Solana wallet addresses whose ATAs may be created.
+                tx_count_today:
+                    type: integer
+                    description: Today's transaction count (UTC calendar day). Present when intents_api_enabled.
+                tx_overhead_today_by_chain:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: Today's overhead spend by chain in native units.
                 federation_enabled:
                     type: boolean
                     description: |
