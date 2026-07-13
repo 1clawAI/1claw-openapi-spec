@@ -11300,6 +11300,28 @@ components:
 
         # --- Execution Intents ---
 
+        CredentialSource:
+            type: object
+            required: [type]
+            description: Credential source — inline value (stored in __agent-keys) or live pointer to a vault secret (resolved at execution time).
+            discriminator:
+                propertyName: type
+            properties:
+                type:
+                    type: string
+                    enum: [inline, vault_ref]
+                value:
+                    type: object
+                    additionalProperties: true
+                    description: For inline — the credential value object.
+                vault_id:
+                    type: string
+                    format: uuid
+                    description: For vault_ref — the vault containing the referenced secret.
+                path:
+                    type: string
+                    description: For vault_ref — the secret path in the vault.
+
         CreateBindingRequest:
             type: object
             required: [name, binding_type]
@@ -11318,6 +11340,9 @@ components:
                 credential:
                     type: object
                     additionalProperties: true
+                    description: "Legacy: inline credential value. Use credential_source for new integrations."
+                credential_source:
+                    $ref: "#/components/schemas/CredentialSource"
 
         UpdateBindingRequest:
             type: object
@@ -11333,6 +11358,9 @@ components:
                 credential:
                     type: object
                     additionalProperties: true
+                    description: "Legacy: inline credential value."
+                credential_source:
+                    $ref: "#/components/schemas/CredentialSource"
 
         BindingResponse:
             type: object
@@ -11360,6 +11388,20 @@ components:
                 credential_set:
                     type: boolean
                     description: Whether a credential is stored for this binding. The value itself is never returned.
+                credential_source_type:
+                    type: string
+                    enum: [inline, vault_ref]
+                    nullable: true
+                    description: How the credential is sourced — inline (HSM-encrypted copy) or vault_ref (live pointer).
+                credential_vault_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: For vault_ref credentials — the vault containing the referenced secret.
+                credential_path:
+                    type: string
+                    nullable: true
+                    description: For vault_ref credentials — the secret path in the referenced vault.
                 created_at:
                     type: string
                     format: date-time
