@@ -7332,6 +7332,14 @@ components:
                     type: object
                     additionalProperties: true
                     description: Guardrails applied to all execution intents for this agent
+                intents_require_tee:
+                    type: boolean
+                    default: false
+                    description: When true, transaction/sign requests must arrive via a TEE host (Business+ only)
+                execution_require_tee:
+                    type: boolean
+                    default: false
+                    description: When true, execute requests must arrive via TEE and all direct secret reads are blocked (Business+ only)
                 tx_token_allowlist:
                     type: array
                     items:
@@ -7417,6 +7425,12 @@ components:
                     type: object
                     additionalProperties: true
                     description: Guardrails applied to all execution intents for this agent
+                intents_require_tee:
+                    type: boolean
+                    description: When true, transaction/sign requests must arrive via a TEE host (Business+ only)
+                execution_require_tee:
+                    type: boolean
+                    description: When true, execute requests must arrive via TEE and all direct secret reads are blocked (Business+ only)
                 federation_enabled:
                     type: boolean
                     description: |
@@ -7563,6 +7577,12 @@ components:
                     type: object
                     additionalProperties: true
                     description: Guardrails applied to all execution intents for this agent
+                intents_require_tee:
+                    type: boolean
+                    description: When true, transaction/sign requests must arrive via a TEE host (Business+ only)
+                execution_require_tee:
+                    type: boolean
+                    description: When true, execute requests must arrive via TEE and all direct secret reads are blocked (Business+ only)
                 federation_enabled:
                     type: boolean
                     description: |
