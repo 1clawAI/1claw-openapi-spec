@@ -130,6 +130,10 @@
     {
       "name": "Execution Intents",
       "description": "Execute HTTP calls, queries, and more through pre-configured bindings"
+    },
+    {
+      "name": "Payment Cards",
+      "description": "Order prepaid/gift cards via x402, then reveal, refresh, and void them"
     }
   ],
   "paths": {
@@ -9957,6 +9961,328 @@
           }
         }
       }
+    },
+    "/v1/agents/{agent_id}/cards/order": {
+      "post": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Order a payment card (x402)",
+        "description": "Order a prepaid or gift card for an agent. Drives the x402 payment flow server-side using the agent's Ethereum signing key (funded with USDC on Base). Requires `cards_enabled` on the agent and a Pro or higher plan. An `Idempotency-Key` header is required.\n",
+        "operationId": "orderCard",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Card order accepted (status pending)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/cards": {
+      "get": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "List payment cards",
+        "description": "List cards for the caller (agents see only their own). Always masked (last4 only).",
+        "operationId": "listCards",
+        "responses": {
+          "200": {
+            "description": "Card list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cards/import": {
+      "post": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Import a card (human-only)",
+        "description": "Manually import an existing card. Full storage mode — PAN stored encrypted, CVV as a one-time-read secret. Human-only.",
+        "operationId": "importCard",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportCardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Card imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/cards/gift-cards/search": {
+      "post": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Search gift-card brands",
+        "description": "Search available Laso gift-card brands/servers for the org's Laso account.",
+        "operationId": "searchGiftCards",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchGiftCardsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Available gift-card brands (provider-shaped payload)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cards/{card_id}": {
+      "get": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Get a payment card",
+        "description": "Get a single card (masked — last4 only).",
+        "operationId": "getCard",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CardId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Card details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Update a card's reveal policy (human-only)",
+        "operationId": "updateCard",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CardId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Card updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/cards/{card_id}/reveal": {
+      "post": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Reveal card details",
+        "description": "Reveal full card details (PAN/CVV or gift-card redemption). Humans must re-authenticate with their account password via the `X-Auth-Confirm` header. Agents may reveal only when a human has enabled a per-card reveal policy. Once revealed, the card can be used anywhere up to its balance — 1Claw has no further control.\n",
+        "operationId": "revealCard",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CardId"
+          },
+          {
+            "name": "X-Auth-Confirm",
+            "in": "header",
+            "required": false,
+            "description": "Account password (humans) for re-authentication.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revealed card details (sensitive)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardRevealResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/cards/{card_id}/void": {
+      "post": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Void a card",
+        "description": "1Claw-level lock that blocks all further reveals/refreshes. Forward-looking only — a card revealed before void remains live.",
+        "operationId": "voidCard",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CardId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Card voided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/cards/{card_id}/refresh": {
+      "post": {
+        "tags": [
+          "Payment Cards"
+        ],
+        "summary": "Refresh a card's balance",
+        "description": "Proxy Laso refresh to update balance/status. Rate-limited to once per 5 minutes per card (429 on exceed).",
+        "operationId": "refreshCard",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CardId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Card refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "description": "Refreshed too recently"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10002,6 +10328,15 @@
       },
       "PolicyId": {
         "name": "policy_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CardId": {
+        "name": "card_id",
         "in": "path",
         "required": true,
         "schema": {
@@ -10084,6 +10419,251 @@
       }
     },
     "schemas": {
+      "OrderCardRequest": {
+        "type": "object",
+        "required": [
+          "kind",
+          "amount_usd"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "prepaid",
+              "gift_card"
+            ]
+          },
+          "amount_usd": {
+            "type": "string",
+            "description": "USD amount to load onto the card.",
+            "example": "25.00"
+          },
+          "laso_server_id": {
+            "type": "string",
+            "description": "Optional Laso gift-card server/brand id (gift cards only)."
+          },
+          "country": {
+            "type": "string",
+            "description": "Optional country (prepaid cards; defaults to US)."
+          }
+        }
+      },
+      "CardResponse": {
+        "type": "object",
+        "description": "Masked card view — never contains PAN/CVV.",
+        "required": [
+          "id",
+          "issuer",
+          "kind",
+          "currency",
+          "status",
+          "storage_mode",
+          "reveal_policy",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "issuer": {
+            "type": "string",
+            "enum": [
+              "laso",
+              "manual"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "prepaid",
+              "gift_card"
+            ]
+          },
+          "brand": {
+            "type": "string"
+          },
+          "last4": {
+            "type": "string"
+          },
+          "exp_month": {
+            "type": "integer"
+          },
+          "exp_year": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "order_amount_usd": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ordering",
+              "pending",
+              "ready",
+              "depleted",
+              "expired",
+              "voided",
+              "orphaned_payment"
+            ]
+          },
+          "storage_mode": {
+            "type": "string",
+            "enum": [
+              "reference",
+              "full"
+            ]
+          },
+          "reveal_policy": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "void_after": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CardListResponse": {
+        "type": "object",
+        "required": [
+          "cards"
+        ],
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CardResponse"
+            }
+          }
+        }
+      },
+      "CardRevealResponse": {
+        "type": "object",
+        "description": "Revealed card details — sensitive. Returned only by the reveal endpoint.",
+        "required": [
+          "id",
+          "disclaimer"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pan": {
+            "type": "string"
+          },
+          "cvv": {
+            "type": "string"
+          },
+          "exp_month": {
+            "type": "integer"
+          },
+          "exp_year": {
+            "type": "integer"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "redemption": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Gift-card redemption payload (URL/code/PIN) when applicable."
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateCardRequest": {
+        "type": "object",
+        "description": "Human-settable per-card reveal policy + lifecycle controls.",
+        "properties": {
+          "agent_reveal": {
+            "type": "boolean"
+          },
+          "max_reveals": {
+            "type": "integer"
+          },
+          "reveal_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "void_after": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ImportCardRequest": {
+        "type": "object",
+        "required": [
+          "pan",
+          "cvv",
+          "exp_month",
+          "exp_year"
+        ],
+        "properties": {
+          "pan": {
+            "type": "string"
+          },
+          "cvv": {
+            "type": "string"
+          },
+          "exp_month": {
+            "type": "integer"
+          },
+          "exp_year": {
+            "type": "integer"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchGiftCardsRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "description": "RFC 7807 error envelope",
@@ -11427,6 +12007,29 @@
             },
             "description": "Solana wallet addresses whose ATAs may be created. Empty = unrestricted."
           },
+          "cards_enabled": {
+            "type": "boolean",
+            "description": "Whether this agent may order payment cards (x402 card ordering). Pro+ tier."
+          },
+          "card_max_order_usd": {
+            "type": "string",
+            "description": "Maximum USD amount for a single card order."
+          },
+          "card_daily_limit_usd": {
+            "type": "string",
+            "description": "Maximum cumulative USD spent ordering cards per rolling 24h window."
+          },
+          "card_payto_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Allowed x402 payTo recipients for card orders (empty = built-in Laso recipients)."
+          },
+          "card_reveal_enabled": {
+            "type": "boolean",
+            "description": "Whether agents may reveal card details subject to per-card reveal policy."
+          },
           "api_key_expires_at": {
             "type": "string",
             "format": "date-time",
@@ -11541,6 +12144,31 @@
               "type": "string"
             },
             "description": "Solana wallet addresses whose ATAs may be created."
+          },
+          "cards_enabled": {
+            "type": "boolean",
+            "description": "Whether this agent may order payment cards (x402 card ordering). Pro+ tier."
+          },
+          "card_max_order_usd": {
+            "type": "string",
+            "nullable": true,
+            "description": "Maximum USD amount for a single card order. null clears."
+          },
+          "card_daily_limit_usd": {
+            "type": "string",
+            "nullable": true,
+            "description": "Maximum cumulative USD spent ordering cards per rolling 24h window. null clears."
+          },
+          "card_payto_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Allowed x402 payTo recipients for card orders (empty = built-in Laso recipients)."
+          },
+          "card_reveal_enabled": {
+            "type": "boolean",
+            "description": "Whether agents may reveal card details subject to per-card reveal policy."
           },
           "federation_enabled": {
             "type": "boolean",
@@ -11748,6 +12376,29 @@
               "type": "string"
             },
             "description": "Solana wallet addresses whose ATAs may be created."
+          },
+          "cards_enabled": {
+            "type": "boolean",
+            "description": "Whether this agent may order payment cards (x402 card ordering)."
+          },
+          "card_max_order_usd": {
+            "type": "string",
+            "description": "Maximum USD amount for a single card order."
+          },
+          "card_daily_limit_usd": {
+            "type": "string",
+            "description": "Maximum cumulative USD spent ordering cards per rolling 24h window."
+          },
+          "card_payto_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Allowed x402 payTo recipients for card orders (empty = built-in Laso recipients)."
+          },
+          "card_reveal_enabled": {
+            "type": "boolean",
+            "description": "Whether agents may reveal card details subject to per-card reveal policy."
           },
           "tx_count_today": {
             "type": "integer",
