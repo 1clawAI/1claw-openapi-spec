@@ -8630,7 +8630,7 @@
           "Approvals"
         ],
         "summary": "Approve or reject",
-        "description": "Submit a decision (approve or reject) for a pending approval.\nHuman-only. The approval must be in `pending` status.\n",
+        "description": "Submit a decision (approve or reject) for a pending approval.\nHuman-only. The approval must be in `pending` status.\nFor `card_order` approvals, approving auto-executes the x402 payment;\nrejecting marks the card as `rejected`.\nRisk tier 2+ approvals require step-up authentication via\n`X-Auth-Confirm` (account password or `rat_` re-auth token from\n`POST /v1/auth/reauth/begin` + `complete`). Risk tier 3 requires\npasskey or TOTP re-auth token.\n",
         "operationId": "decideApproval",
         "parameters": [
           {
@@ -8663,6 +8663,52 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/approvals/quick-decide": {
+      "get": {
+        "tags": [
+          "Approvals"
+        ],
+        "summary": "One-click approve or deny (email link)",
+        "description": "Public endpoint (no Bearer auth). The `token` query param is the\nauthenticator — SHA-256 hashed, single-use, 7-day TTL. On success\nredirects to `{public_url}/approvals/{id}?decided=true`.\nAuto-executes approved `card_order` and `policy_change` actions.\n",
+        "operationId": "quickDecideApproval",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "approved",
+                "rejected"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to dashboard confirmation page"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -9968,7 +10014,7 @@
           "Payment Cards"
         ],
         "summary": "Order a payment card (x402)",
-        "description": "Order a prepaid or gift card for an agent. Drives the x402 payment flow server-side using the agent's Ethereum signing key (funded with USDC on Base). Requires `cards_enabled` on the agent and a Pro or higher plan. An `Idempotency-Key` header is required.\n",
+        "description": "Order a prepaid or gift card for an agent. Drives the x402 payment flow server-side using the agent's Ethereum signing key (funded with USDC on Base). Requires `cards_enabled` on the agent and a Pro or higher plan. An `Idempotency-Key` header is required. When `card_require_approval` is true (default), the order is held in `awaiting_approval` until a human approves via the dashboard, mobile app, or email one-click link; payment runs only after approval.\n",
         "operationId": "orderCard",
         "parameters": [
           {
@@ -9994,8 +10040,28 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Idempotent replay of a prior order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
           "201": {
-            "description": "Card order accepted (status pending)",
+            "description": "Card order accepted and payment submitted (status pending)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Card order queued for human approval (status awaiting_approval)",
             "content": {
               "application/json": {
                 "schema": {
@@ -10516,7 +10582,9 @@
               "depleted",
               "expired",
               "voided",
-              "orphaned_payment"
+              "orphaned_payment",
+              "awaiting_approval",
+              "rejected"
             ]
           },
           "storage_mode": {
@@ -10529,6 +10597,11 @@
           "reveal_policy": {
             "type": "object",
             "additionalProperties": true
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Linked approval when status is awaiting_approval"
           },
           "void_after": {
             "type": "string",
@@ -12030,6 +12103,11 @@
             "type": "boolean",
             "description": "Whether agents may reveal card details subject to per-card reveal policy."
           },
+          "card_require_approval": {
+            "type": "boolean",
+            "default": true,
+            "description": "When true, card orders route through the human approval queue before x402 payment."
+          },
           "api_key_expires_at": {
             "type": "string",
             "format": "date-time",
@@ -12169,6 +12247,10 @@
           "card_reveal_enabled": {
             "type": "boolean",
             "description": "Whether agents may reveal card details subject to per-card reveal policy."
+          },
+          "card_require_approval": {
+            "type": "boolean",
+            "description": "When true, card orders route through the human approval queue before x402 payment."
           },
           "federation_enabled": {
             "type": "boolean",
@@ -12399,6 +12481,10 @@
           "card_reveal_enabled": {
             "type": "boolean",
             "description": "Whether agents may reveal card details subject to per-card reveal policy."
+          },
+          "card_require_approval": {
+            "type": "boolean",
+            "description": "When true, card orders route through the human approval queue before x402 payment."
           },
           "tx_count_today": {
             "type": "integer",

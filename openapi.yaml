@@ -5560,6 +5560,12 @@ paths:
             description: |
                 Submit a decision (approve or reject) for a pending approval.
                 Human-only. The approval must be in `pending` status.
+                For `card_order` approvals, approving auto-executes the x402 payment;
+                rejecting marks the card as `rejected`.
+                Risk tier 2+ approvals require step-up authentication via
+                `X-Auth-Confirm` (account password or `rat_` re-auth token from
+                `POST /v1/auth/reauth/begin` + `complete`). Risk tier 3 requires
+                passkey or TOTP re-auth token.
             operationId: decideApproval
             parameters:
                 - name: approval_id
@@ -5581,6 +5587,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/ApprovalResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/approvals/quick-decide:
+        get:
+            tags: [Approvals]
+            summary: One-click approve or deny (email link)
+            description: |
+                Public endpoint (no Bearer auth). The `token` query param is the
+                authenticator — SHA-256 hashed, single-use, 7-day TTL. On success
+                redirects to `{public_url}/approvals/{id}?decided=true`.
+                Auto-executes approved `card_order` and `policy_change` actions.
+            operationId: quickDecideApproval
+            parameters:
+                - name: token
+                  in: query
+                  required: true
+                  schema:
+                      type: string
+                - name: decision
+                  in: query
+                  required: true
+                  schema:
+                      type: string
+                      enum: [approved, rejected]
+            responses:
+                "302":
+                    description: Redirect to dashboard confirmation page
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "404":
@@ -6342,6 +6380,9 @@ paths:
                 payment flow server-side using the agent's Ethereum signing key
                 (funded with USDC on Base). Requires `cards_enabled` on the agent
                 and a Pro or higher plan. An `Idempotency-Key` header is required.
+                When `card_require_approval` is true (default), the order is held
+                in `awaiting_approval` until a human approves via the dashboard,
+                mobile app, or email one-click link; payment runs only after approval.
             operationId: orderCard
             parameters:
                 - $ref: "#/components/parameters/AgentId"
@@ -6357,8 +6398,20 @@ paths:
                         schema:
                             $ref: "#/components/schemas/OrderCardRequest"
             responses:
+                "202":
+                    description: Card order queued for human approval (status awaiting_approval)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CardResponse"
                 "201":
-                    description: Card order accepted (status pending)
+                    description: Card order accepted and payment submitted (status pending)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CardResponse"
+                "200":
+                    description: Idempotent replay of a prior order
                     content:
                         application/json:
                             schema:
@@ -6693,13 +6746,17 @@ components:
                     type: string
                 status:
                     type: string
-                    enum: [ordering, pending, ready, depleted, expired, voided, orphaned_payment]
+                    enum: [ordering, pending, ready, depleted, expired, voided, orphaned_payment, awaiting_approval, rejected]
                 storage_mode:
                     type: string
                     enum: [reference, full]
                 reveal_policy:
                     type: object
                     additionalProperties: true
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: Linked approval when status is awaiting_approval
                 void_after:
                     type: string
                     format: date-time
@@ -7751,6 +7808,10 @@ components:
                 card_reveal_enabled:
                     type: boolean
                     description: Whether agents may reveal card details subject to per-card reveal policy.
+                card_require_approval:
+                    type: boolean
+                    default: true
+                    description: When true, card orders route through the human approval queue before x402 payment.
                 api_key_expires_at:
                     type: string
                     format: date-time
@@ -7855,6 +7916,9 @@ components:
                 card_reveal_enabled:
                     type: boolean
                     description: Whether agents may reveal card details subject to per-card reveal policy.
+                card_require_approval:
+                    type: boolean
+                    description: When true, card orders route through the human approval queue before x402 payment.
                 federation_enabled:
                     type: boolean
                     description: |
@@ -8039,6 +8103,9 @@ components:
                 card_reveal_enabled:
                     type: boolean
                     description: Whether agents may reveal card details subject to per-card reveal policy.
+                card_require_approval:
+                    type: boolean
+                    description: When true, card orders route through the human approval queue before x402 payment.
                 tx_count_today:
                     type: integer
                     description: Today's transaction count (UTC calendar day). Present when intents_api_enabled.
