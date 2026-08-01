@@ -2,11 +2,12 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.27.0
+    version: 2.28.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
-        sharing, billing, and audit logging.
+        sharing, billing, and audit logging. Automations, cloud runtimes,
+        agent memory, and discovery.
 
         All endpoints require JWT Bearer authentication unless marked with
         `security: []`.
@@ -80,6 +81,14 @@ tags:
       description: Execute HTTP calls, queries, and more through pre-configured bindings
     - name: Payment Cards
       description: Order prepaid/gift cards via x402, then reveal, refresh, and void them
+    - name: Automations
+      description: Scheduled, webhook-triggered, and on-demand automation workflows
+    - name: Runtimes
+      description: Cloud runtime containers for hosting AI agents
+    - name: Agent Memory
+      description: Agent memory storage (scratch, durable, semantic)
+    - name: Discovery
+      description: Agent directory and platform marketplace
 
 # =============================================================================
 # PATHS
@@ -6597,6 +6606,683 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    # ---------------------------------------------------------------------------
+    # Automations
+    # ---------------------------------------------------------------------------
+
+    /v1/automations:
+        post:
+            tags: [Automations]
+            summary: Create automation
+            operationId: createAutomation
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateAutomationRequest"
+            responses:
+                "201":
+                    description: Automation created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+        get:
+            tags: [Automations]
+            summary: List automations
+            operationId: listAutomations
+            responses:
+                "200":
+                    description: Automation list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/automations/{automationId}:
+        get:
+            tags: [Automations]
+            summary: Get automation
+            operationId: getAutomation
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Automation details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        patch:
+            tags: [Automations]
+            summary: Update automation
+            operationId: updateAutomation
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdateAutomationRequest"
+            responses:
+                "200":
+                    description: Automation updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Automations]
+            summary: Delete automation
+            operationId: deleteAutomation
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Automation deleted
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/automations/{automationId}/trigger:
+        post:
+            tags: [Automations]
+            summary: Trigger automation
+            operationId: triggerAutomation
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Automation triggered
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationRunResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/automations/{automationId}/runs:
+        get:
+            tags: [Automations]
+            summary: List automation runs
+            operationId: listAutomationRuns
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: limit
+                  in: query
+                  schema:
+                      type: integer
+                      default: 50
+                - name: offset
+                  in: query
+                  schema:
+                      type: integer
+                      default: 0
+            responses:
+                "200":
+                    description: Automation run list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationRunListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
+    # Runtimes
+    # ---------------------------------------------------------------------------
+
+    /v1/runtimes:
+        post:
+            tags: [Runtimes]
+            summary: Create runtime
+            operationId: createRuntime
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateRuntimeRequest"
+            responses:
+                "201":
+                    description: Runtime created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+        get:
+            tags: [Runtimes]
+            summary: List runtimes
+            operationId: listRuntimes
+            responses:
+                "200":
+                    description: Runtime list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/runtimes/{runtimeId}:
+        get:
+            tags: [Runtimes]
+            summary: Get runtime
+            operationId: getRuntime
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Runtime details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        patch:
+            tags: [Runtimes]
+            summary: Update runtime
+            operationId: updateRuntime
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdateRuntimeRequest"
+            responses:
+                "200":
+                    description: Runtime updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Runtimes]
+            summary: Delete runtime
+            operationId: deleteRuntime
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Runtime deleted
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/runtimes/{runtimeId}/start:
+        post:
+            tags: [Runtimes]
+            summary: Start runtime
+            operationId: startRuntime
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Runtime started
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/runtimes/{runtimeId}/stop:
+        post:
+            tags: [Runtimes]
+            summary: Stop runtime
+            operationId: stopRuntime
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Runtime stopped
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/runtimes/{runtimeId}/logs:
+        get:
+            tags: [Runtimes]
+            summary: Get runtime logs
+            operationId: getRuntimeLogs
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: since
+                  in: query
+                  schema:
+                      type: string
+                      format: date-time
+                  description: Only return logs after this timestamp
+                - name: limit
+                  in: query
+                  schema:
+                      type: integer
+                      default: 100
+            responses:
+                "200":
+                    description: Runtime logs
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    lines:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                timestamp:
+                                                    type: string
+                                                    format: date-time
+                                                message:
+                                                    type: string
+                                                level:
+                                                    type: string
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/runtimes/slug-check/{slug}:
+        get:
+            tags: [Runtimes]
+            summary: Check slug availability
+            operationId: checkSlugAvailability
+            parameters:
+                - name: slug
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Slug availability result
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SlugCheckResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    # ---------------------------------------------------------------------------
+    # Agent Memory
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/memory:
+        get:
+            tags: [Agent Memory]
+            summary: List memory namespaces
+            operationId: listMemoryNamespaces
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Namespace list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MemoryNamespaceListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/memory/{namespace}:
+        get:
+            tags: [Agent Memory]
+            summary: List entries in namespace
+            operationId: listMemoryEntries
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: namespace
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Memory entries
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MemoryEntryListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/memory/{namespace}/{key}:
+        put:
+            tags: [Agent Memory]
+            summary: Put memory entry
+            operationId: putMemoryEntry
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: namespace
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: key
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/PutMemoryRequest"
+            responses:
+                "200":
+                    description: Memory entry stored
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MemoryEntry"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        get:
+            tags: [Agent Memory]
+            summary: Get memory entry
+            operationId: getMemoryEntry
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: namespace
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: key
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Memory entry
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MemoryEntry"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Agent Memory]
+            summary: Delete memory entry
+            operationId: deleteMemoryEntry
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: namespace
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: key
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "204":
+                    description: Memory entry deleted
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/memory/search:
+        post:
+            tags: [Agent Memory]
+            summary: Semantic search
+            operationId: searchMemory
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/MemorySearchRequest"
+            responses:
+                "200":
+                    description: Search results
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MemorySearchResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
+    # Discovery
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/card:
+        get:
+            tags: [Discovery]
+            summary: Get agent card
+            description: Public endpoint returning the agent's discovery card metadata.
+            operationId: getAgentCard
+            security: []
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Agent card
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentCardResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/directory:
+        get:
+            tags: [Discovery]
+            summary: Public agent directory
+            description: Browse the public directory of discoverable agents.
+            operationId: listDirectory
+            security: []
+            parameters:
+                - name: page
+                  in: query
+                  schema:
+                      type: integer
+                      default: 1
+                - name: per_page
+                  in: query
+                  schema:
+                      type: integer
+                      default: 20
+                - name: tags
+                  in: query
+                  schema:
+                      type: string
+                  description: Comma-separated tag filter
+                - name: q
+                  in: query
+                  schema:
+                      type: string
+                  description: Search query
+            responses:
+                "200":
+                    description: Directory listing
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/DirectoryResponse"
+
+    /v1/agents/{agent_id}/discovery:
+        patch:
+            tags: [Discovery]
+            summary: Update discovery settings
+            operationId: updateDiscoverySettings
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdateDiscoveryRequest"
+            responses:
+                "200":
+                    description: Discovery settings updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentCardResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/marketplace:
+        get:
+            tags: [Discovery]
+            summary: Public marketplace
+            description: Browse the public platform marketplace of agents and apps.
+            operationId: listMarketplace
+            security: []
+            parameters:
+                - name: page
+                  in: query
+                  schema:
+                      type: integer
+                      default: 1
+                - name: per_page
+                  in: query
+                  schema:
+                      type: integer
+                      default: 20
+                - name: q
+                  in: query
+                  schema:
+                      type: string
+                  description: Search query
+            responses:
+                "200":
+                    description: Marketplace listing
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/DirectoryResponse"
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -12062,3 +12748,470 @@ components:
                 created_at:
                     type: string
                     format: date-time
+
+        # --- Automations ---
+
+        CreateAutomationRequest:
+            type: object
+            required: [name]
+            properties:
+                name:
+                    type: string
+                description:
+                    type: string
+                agent_id:
+                    type: string
+                    format: uuid
+                trigger_type:
+                    type: string
+                    enum: [schedule, webhook, event, manual]
+                trigger_config:
+                    type: object
+                    additionalProperties: true
+                action_type:
+                    type: string
+                action_config:
+                    type: object
+                    additionalProperties: true
+                is_active:
+                    type: boolean
+                    default: true
+
+        UpdateAutomationRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                description:
+                    type: string
+                agent_id:
+                    type: string
+                    format: uuid
+                trigger_type:
+                    type: string
+                    enum: [schedule, webhook, event, manual]
+                trigger_config:
+                    type: object
+                    additionalProperties: true
+                action_type:
+                    type: string
+                action_config:
+                    type: object
+                    additionalProperties: true
+                is_active:
+                    type: boolean
+
+        AutomationResponse:
+            type: object
+            required: [id, name, trigger_type, is_active, created_at, updated_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                description:
+                    type: string
+                    nullable: true
+                agent_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                trigger_type:
+                    type: string
+                    enum: [schedule, webhook, event, manual]
+                trigger_config:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                action_type:
+                    type: string
+                    nullable: true
+                action_config:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                is_active:
+                    type: boolean
+                webhook_url:
+                    type: string
+                    nullable: true
+                schedule_expression:
+                    type: string
+                    nullable: true
+                next_run_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                last_run_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        AutomationListResponse:
+            type: object
+            required: [automations]
+            properties:
+                automations:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/AutomationResponse"
+
+        AutomationRunResponse:
+            type: object
+            required: [id, automation_id, status, started_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                automation_id:
+                    type: string
+                    format: uuid
+                status:
+                    type: string
+                    enum: [pending, running, completed, failed]
+                started_at:
+                    type: string
+                    format: date-time
+                completed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                result:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                error:
+                    type: string
+                    nullable: true
+
+        AutomationRunListResponse:
+            type: object
+            required: [runs]
+            properties:
+                runs:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/AutomationRunResponse"
+
+        # --- Runtimes ---
+
+        CreateRuntimeRequest:
+            type: object
+            required: [name, agent_id]
+            properties:
+                name:
+                    type: string
+                agent_id:
+                    type: string
+                    format: uuid
+                template:
+                    type: string
+                preset:
+                    type: string
+                image:
+                    type: string
+                env_public:
+                    type: object
+                    additionalProperties:
+                        type: string
+                idle_timeout_secs:
+                    type: integer
+                expose_http:
+                    type: boolean
+                    default: false
+                http_port:
+                    type: integer
+                slug:
+                    type: string
+                inbound_auth:
+                    type: string
+                    enum: [api_key, jwt, public]
+
+        UpdateRuntimeRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                template:
+                    type: string
+                preset:
+                    type: string
+                image:
+                    type: string
+                env_public:
+                    type: object
+                    additionalProperties:
+                        type: string
+                idle_timeout_secs:
+                    type: integer
+                expose_http:
+                    type: boolean
+                http_port:
+                    type: integer
+                slug:
+                    type: string
+                inbound_auth:
+                    type: string
+                    enum: [api_key, jwt, public]
+
+        RuntimeResponse:
+            type: object
+            required: [id, name, agent_id, status, created_at, updated_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                agent_id:
+                    type: string
+                    format: uuid
+                template:
+                    type: string
+                    nullable: true
+                preset:
+                    type: string
+                    nullable: true
+                provider:
+                    type: string
+                    nullable: true
+                status:
+                    type: string
+                    enum: [creating, running, stopping, stopped, failed, deleting]
+                image:
+                    type: string
+                    nullable: true
+                env_public:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    nullable: true
+                idle_timeout_secs:
+                    type: integer
+                    nullable: true
+                expose_http:
+                    type: boolean
+                    nullable: true
+                slug:
+                    type: string
+                    nullable: true
+                public_url:
+                    type: string
+                    nullable: true
+                http_port:
+                    type: integer
+                    nullable: true
+                inbound_auth:
+                    type: string
+                    enum: [api_key, jwt, public]
+                    nullable: true
+                monthly_hours_used:
+                    type: number
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        RuntimeListResponse:
+            type: object
+            required: [runtimes]
+            properties:
+                runtimes:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/RuntimeResponse"
+
+        SlugCheckResponse:
+            type: object
+            required: [available, slug]
+            properties:
+                available:
+                    type: boolean
+                slug:
+                    type: string
+                reason:
+                    type: string
+                    nullable: true
+
+        # --- Agent Memory ---
+
+        MemoryEntry:
+            type: object
+            required: [id, agent_id, namespace, key, value, created_at, updated_at]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
+                namespace:
+                    type: string
+                key:
+                    type: string
+                value:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+                ttl_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+        PutMemoryRequest:
+            type: object
+            required: [value]
+            properties:
+                value:
+                    type: string
+                ttl_seconds:
+                    type: integer
+                    nullable: true
+
+        MemorySearchRequest:
+            type: object
+            required: [namespace, query]
+            properties:
+                namespace:
+                    type: string
+                query:
+                    type: string
+                top_k:
+                    type: integer
+                    default: 5
+
+        MemorySearchResponse:
+            type: object
+            required: [results]
+            properties:
+                results:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            key:
+                                type: string
+                            value:
+                                type: string
+                            score:
+                                type: number
+                            namespace:
+                                type: string
+
+        MemoryNamespaceListResponse:
+            type: object
+            required: [namespaces]
+            properties:
+                namespaces:
+                    type: array
+                    items:
+                        type: string
+
+        MemoryEntryListResponse:
+            type: object
+            required: [entries]
+            properties:
+                entries:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/MemoryEntry"
+
+        # --- Discovery ---
+
+        AgentCardResponse:
+            type: object
+            required: [id, name]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                description:
+                    type: string
+                    nullable: true
+                capabilities:
+                    type: array
+                    items:
+                        type: string
+                a2a_url:
+                    type: string
+                    nullable: true
+                mcp_url:
+                    type: string
+                    nullable: true
+                tags:
+                    type: array
+                    items:
+                        type: string
+
+        DirectoryEntry:
+            type: object
+            required: [id, name]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                description:
+                    type: string
+                    nullable: true
+                tags:
+                    type: array
+                    items:
+                        type: string
+                capabilities:
+                    type: array
+                    items:
+                        type: string
+                a2a_url:
+                    type: string
+                    nullable: true
+                mcp_url:
+                    type: string
+                    nullable: true
+                org_name:
+                    type: string
+                    nullable: true
+
+        DirectoryResponse:
+            type: object
+            required: [agents, total, page, per_page]
+            properties:
+                agents:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/DirectoryEntry"
+                total:
+                    type: integer
+                page:
+                    type: integer
+                per_page:
+                    type: integer
+
+        UpdateDiscoveryRequest:
+            type: object
+            properties:
+                discoverable:
+                    type: boolean
+                public_description:
+                    type: string
+                public_tags:
+                    type: array
+                    items:
+                        type: string
