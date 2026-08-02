@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.28.0
+    version: 2.29.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -89,6 +89,10 @@ tags:
       description: Agent memory storage (scratch, durable, semantic)
     - name: Discovery
       description: Agent directory and platform marketplace
+    - name: Agent Chat
+      description: Chat with agents via Shroud LLM proxy
+    - name: Agent Channels
+      description: External messaging channels (Telegram, WhatsApp, Discord)
 
 # =============================================================================
 # PATHS
@@ -7283,6 +7287,373 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/DirectoryResponse"
 
+    # ---------------------------------------------------------------------------
+    # Agent Chat
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/chat:
+        post:
+            tags: [Agent Chat]
+            summary: Send chat message
+            description: |
+                Send a message to an agent and receive a response via Shroud LLM.
+                Supports SSE streaming when Accept: text/event-stream is set.
+            operationId: sendChatMessage
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SendChatMessageRequest"
+            responses:
+                "200":
+                    description: Chat response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SendChatMessageResponse"
+                        text/event-stream:
+                            schema:
+                                type: string
+                                description: SSE stream of response chunks
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/agents/{agent_id}/chat/conversations:
+        get:
+            tags: [Agent Chat]
+            summary: List conversations
+            description: List all chat conversations for an agent.
+            operationId: listChatConversations
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Conversation list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ChatConversationListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/agents/{agent_id}/chat/conversations/{conversation_id}:
+        get:
+            tags: [Agent Chat]
+            summary: Get conversation
+            description: Get a conversation with its full message history.
+            operationId: getChatConversation
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: conversation_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Conversation detail
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ConversationDetailResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Agent Chat]
+            summary: Archive conversation
+            description: Archive (soft-delete) a chat conversation.
+            operationId: deleteChatConversation
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: conversation_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Conversation archived
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
+    # Agent Channels
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/channels:
+        post:
+            tags: [Agent Channels]
+            summary: Register channel
+            description: |
+                Register a new external messaging channel (Telegram, WhatsApp, Discord)
+                for an agent. Human-only. Returns the channel with its webhook URL.
+            operationId: createChannel
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateChannelRequest"
+            responses:
+                "201":
+                    description: Channel created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ChannelResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        get:
+            tags: [Agent Channels]
+            summary: List channels
+            description: List all messaging channels for an agent.
+            operationId: listChannels
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Channel list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ChannelListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/agents/{agent_id}/channels/{channel_id}:
+        patch:
+            tags: [Agent Channels]
+            summary: Update channel
+            description: Update a channel's name, active status, or config. Human-only.
+            operationId: updateChannel
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: channel_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdateChannelRequest"
+            responses:
+                "200":
+                    description: Channel updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ChannelResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Agent Channels]
+            summary: Delete channel
+            description: Delete a messaging channel. Human-only.
+            operationId: deleteChannel
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: channel_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Channel deleted
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/channels/{channel_id}/send:
+        post:
+            tags: [Agent Channels]
+            summary: Send outbound message
+            description: Send an outbound message via a registered channel.
+            operationId: sendChannelMessage
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: channel_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SendChannelMessageRequest"
+            responses:
+                "200":
+                    description: Message sent
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ChannelMessageResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/channels/{channel_id}/messages:
+        get:
+            tags: [Agent Channels]
+            summary: Channel message history
+            description: List inbound and outbound messages for a channel.
+            operationId: listChannelMessages
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: channel_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: limit
+                  in: query
+                  schema:
+                      type: integer
+                      default: 50
+            responses:
+                "200":
+                    description: Message list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ChannelMessageListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    # ---------------------------------------------------------------------------
+    # Channel Webhooks (Public)
+    # ---------------------------------------------------------------------------
+
+    /v1/webhooks/telegram/{webhook_path}:
+        post:
+            tags: [Agent Channels]
+            summary: Telegram webhook
+            description: Public webhook endpoint for receiving Telegram bot updates.
+            operationId: telegramWebhook
+            security: []
+            parameters:
+                - name: webhook_path
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+            responses:
+                "200":
+                    description: Webhook processed
+
+    /v1/webhooks/whatsapp/{webhook_path}:
+        get:
+            tags: [Agent Channels]
+            summary: WhatsApp webhook verification
+            description: Verification endpoint for WhatsApp Cloud API webhook setup.
+            operationId: whatsappWebhookVerify
+            security: []
+            parameters:
+                - name: webhook_path
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: hub.mode
+                  in: query
+                  schema:
+                      type: string
+                - name: hub.verify_token
+                  in: query
+                  schema:
+                      type: string
+                - name: hub.challenge
+                  in: query
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Challenge response
+        post:
+            tags: [Agent Channels]
+            summary: WhatsApp webhook
+            description: Public webhook endpoint for receiving WhatsApp Cloud API events.
+            operationId: whatsappWebhook
+            security: []
+            parameters:
+                - name: webhook_path
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+            responses:
+                "200":
+                    description: Webhook processed
+
+    /v1/webhooks/discord/{webhook_path}:
+        post:
+            tags: [Agent Channels]
+            summary: Discord webhook
+            description: Public webhook endpoint for receiving Discord bot interactions.
+            operationId: discordWebhook
+            security: []
+            parameters:
+                - name: webhook_path
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+            responses:
+                "200":
+                    description: Webhook processed
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -13215,3 +13586,217 @@ components:
                     type: array
                     items:
                         type: string
+
+        # ── Agent Chat ────────────────────────────────────────────────
+
+        SendChatMessageRequest:
+            type: object
+            required: [message]
+            properties:
+                message:
+                    type: string
+                conversation_id:
+                    type: string
+                    format: uuid
+                mode:
+                    type: string
+                model:
+                    type: string
+                provider:
+                    type: string
+                system_prompt:
+                    type: string
+
+        ChatMessageResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                conversation_id:
+                    type: string
+                    format: uuid
+                role:
+                    type: string
+                content:
+                    type: string
+                tool_calls: {}
+                tool_results: {}
+                tokens_prompt:
+                    type: integer
+                tokens_completion:
+                    type: integer
+                model:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+
+        ChatConversationResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
+                title:
+                    type: string
+                mode:
+                    type: string
+                model:
+                    type: string
+                provider:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        ChatConversationListResponse:
+            type: object
+            properties:
+                conversations:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ChatConversationResponse"
+
+        ConversationDetailResponse:
+            type: object
+            properties:
+                conversation:
+                    $ref: "#/components/schemas/ChatConversationResponse"
+                messages:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ChatMessageResponse"
+
+        SendChatMessageResponse:
+            type: object
+            properties:
+                conversation_id:
+                    type: string
+                    format: uuid
+                message:
+                    $ref: "#/components/schemas/ChatMessageResponse"
+
+        # ── Agent Channels ────────────────────────────────────────────
+
+        CreateChannelRequest:
+            type: object
+            required: [channel_type, config]
+            properties:
+                channel_type:
+                    type: string
+                    enum: [telegram, whatsapp, discord]
+                channel_name:
+                    type: string
+                config:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: |
+                        Platform-specific config.
+                        Telegram: { bot_token }.
+                        WhatsApp: { phone_number_id, access_token, verify_token }.
+                        Discord: { bot_token, application_id }.
+
+        UpdateChannelRequest:
+            type: object
+            properties:
+                channel_name:
+                    type: string
+                is_active:
+                    type: boolean
+                config:
+                    type: object
+                    additionalProperties:
+                        type: string
+
+        ChannelResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
+                channel_type:
+                    type: string
+                    enum: [telegram, whatsapp, discord]
+                channel_name:
+                    type: string
+                webhook_path:
+                    type: string
+                webhook_url:
+                    type: string
+                is_active:
+                    type: boolean
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        ChannelListResponse:
+            type: object
+            properties:
+                channels:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ChannelResponse"
+
+        SendChannelMessageRequest:
+            type: object
+            required: [external_chat_id, content]
+            properties:
+                external_chat_id:
+                    type: string
+                    description: External platform chat/user ID
+                content:
+                    type: string
+                reply_to:
+                    type: string
+                    description: External message ID to reply to
+
+        ChannelMessageResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                channel_id:
+                    type: string
+                    format: uuid
+                direction:
+                    type: string
+                    enum: [inbound, outbound]
+                external_chat_id:
+                    type: string
+                external_message_id:
+                    type: string
+                sender_name:
+                    type: string
+                content:
+                    type: string
+                media_url:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+
+        ChannelMessageListResponse:
+            type: object
+            properties:
+                messages:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ChannelMessageResponse"
