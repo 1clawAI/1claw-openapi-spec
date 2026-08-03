@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.29.0",
-    "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations, cloud runtimes,\nagent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
+    "version": "2.30.0",
+    "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec),\ncloud runtimes with interactive shell sessions, agent memory,\nand discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
     }
@@ -11008,6 +11008,104 @@
         }
       }
     },
+    "/v1/runtimes/{runtimeId}/shell/session": {
+      "post": {
+        "tags": [
+          "Runtimes"
+        ],
+        "summary": "Create interactive shell session",
+        "description": "Human-only. Creates a short-lived WebSocket session token for the\nruntime's PTY terminal. Requires step-up auth via `password`,\n`totp_code`, `passkey_credential`, or `reauth_token` (from\n`POST /v1/auth/reauth` with purpose `runtime_shell`).\nRuntime must have `shell_access_enabled` and be running.\nEnabling shell on a running runtime may require stop/start, or\nthe server may auto-reconcile the sidecar on connect.\n",
+        "operationId": "createShellSession",
+        "parameters": [
+          {
+            "name": "runtimeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShellSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shell session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/runtimes/{runtimeId}/shell/passkey/begin": {
+      "post": {
+        "tags": [
+          "Runtimes"
+        ],
+        "summary": "Begin shell passkey assertion",
+        "description": "Human-only. Starts a WebAuthn assertion ceremony for shell\nstep-up auth (social/Google users without a password).\n",
+        "operationId": "beginShellPasskey",
+        "parameters": [
+          {
+            "name": "runtimeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passkey challenge for shell session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/memory": {
       "get": {
         "tags": [
@@ -19949,13 +20047,14 @@
       "CreateAutomationRequest": {
         "type": "object",
         "required": [
-          "name"
+          "name",
+          "agent_id",
+          "trigger_type",
+          "workflow_spec"
         ],
+        "description": "Create an automation. `workflow_spec` is required and must be either\na JSON array of steps or `{ \"steps\": [...] }`. Dashboard `schedule`\ntrigger_type is accepted and normalized to `cron`. For cron triggers,\n`cron_expr` is required.\n",
         "properties": {
           "name": {
-            "type": "string"
-          },
-          "description": {
             "type": "string"
           },
           "agent_id": {
@@ -19964,27 +20063,45 @@
           },
           "trigger_type": {
             "type": "string",
+            "description": "cron | event | webhook | manual (alias schedule → cron)",
             "enum": [
-              "schedule",
-              "webhook",
+              "cron",
               "event",
-              "manual"
+              "webhook",
+              "manual",
+              "schedule"
             ]
           },
-          "trigger_config": {
+          "cron_expr": {
+            "type": "string",
+            "description": "Required when trigger_type is cron (or schedule)",
+            "example": "0 */6 * * *"
+          },
+          "timezone": {
+            "type": "string",
+            "default": "UTC",
+            "example": "UTC"
+          },
+          "event_filter": {
             "type": "object",
-            "additionalProperties": true
+            "additionalProperties": true,
+            "nullable": true
           },
-          "action_type": {
-            "type": "string"
-          },
-          "action_config": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "is_active": {
-            "type": "boolean",
-            "default": true
+          "workflow_spec": {
+            "description": "Workflow steps. Accepts a bare array `[...]` or\n`{ \"steps\": [...] }` (dashboard / preset shape).\n",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
           }
         }
       },
@@ -19994,32 +20111,32 @@
           "name": {
             "type": "string"
           },
-          "description": {
+          "cron_expr": {
+            "type": "string",
+            "nullable": true
+          },
+          "timezone": {
             "type": "string"
           },
-          "agent_id": {
-            "type": "string",
-            "format": "uuid"
+          "event_filter": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
           },
-          "trigger_type": {
-            "type": "string",
-            "enum": [
-              "schedule",
-              "webhook",
-              "event",
-              "manual"
+          "workflow_spec": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
             ]
-          },
-          "trigger_config": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "action_type": {
-            "type": "string"
-          },
-          "action_config": {
-            "type": "object",
-            "additionalProperties": true
           },
           "is_active": {
             "type": "boolean"
@@ -20030,8 +20147,11 @@
         "type": "object",
         "required": [
           "id",
+          "agent_id",
           "name",
           "trigger_type",
+          "timezone",
+          "workflow_spec",
           "is_active",
           "created_at",
           "updated_at"
@@ -20041,58 +20161,58 @@
             "type": "string",
             "format": "uuid"
           },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
           "agent_id": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
           },
           "trigger_type": {
             "type": "string",
             "enum": [
-              "schedule",
-              "webhook",
+              "cron",
               "event",
+              "webhook",
               "manual"
             ]
           },
-          "trigger_config": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
-          },
-          "action_type": {
+          "cron_expr": {
             "type": "string",
             "nullable": true
           },
-          "action_config": {
+          "timezone": {
+            "type": "string"
+          },
+          "event_filter": {
             "type": "object",
             "additionalProperties": true,
             "nullable": true
+          },
+          "workflow_spec": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
           },
           "is_active": {
             "type": "boolean"
           },
-          "webhook_url": {
-            "type": "string",
-            "nullable": true
-          },
-          "schedule_expression": {
-            "type": "string",
-            "nullable": true
-          },
-          "next_run_at": {
+          "last_run_at": {
             "type": "string",
             "format": "date-time",
             "nullable": true
           },
-          "last_run_at": {
+          "next_run_at": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -20126,8 +20246,11 @@
         "required": [
           "id",
           "automation_id",
+          "agent_id",
           "status",
-          "started_at"
+          "started_at",
+          "tokens_used",
+          "cost_cents"
         ],
         "properties": {
           "id": {
@@ -20138,32 +20261,45 @@
             "type": "string",
             "format": "uuid"
           },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "status": {
             "type": "string",
             "enum": [
               "pending",
               "running",
               "completed",
-              "failed"
+              "failed",
+              "denied"
             ]
           },
-          "started_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "completed_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "result": {
-            "type": "object",
-            "additionalProperties": true,
+          "step_results": {
             "nullable": true
           },
           "error": {
             "type": "string",
             "nullable": true
+          },
+          "trigger_source": {
+            "type": "string",
+            "nullable": true
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "tokens_used": {
+            "type": "integer"
+          },
+          "cost_cents": {
+            "type": "integer"
           }
         }
       },

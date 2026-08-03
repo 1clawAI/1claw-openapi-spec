@@ -2,12 +2,13 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.29.0
+    version: 2.30.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
-        sharing, billing, and audit logging. Automations, cloud runtimes,
-        agent memory, and discovery.
+        sharing, billing, and audit logging. Automations (workflow_spec),
+        cloud runtimes with interactive shell sessions, agent memory,
+        and discovery.
 
         All endpoints require JWT Bearer authentication unless marked with
         `security: []`.
@@ -7009,6 +7010,78 @@ paths:
                 "401":
                     $ref: "#/components/responses/Unauthorized"
 
+    /v1/runtimes/{runtimeId}/shell/session:
+        post:
+            tags: [Runtimes]
+            summary: Create interactive shell session
+            description: |
+                Human-only. Creates a short-lived WebSocket session token for the
+                runtime's PTY terminal. Requires step-up auth via `password`,
+                `totp_code`, `passkey_credential`, or `reauth_token` (from
+                `POST /v1/auth/reauth` with purpose `runtime_shell`).
+                Runtime must have `shell_access_enabled` and be running.
+                Enabling shell on a running runtime may require stop/start, or
+                the server may auto-reconcile the sidecar on connect.
+            operationId: createShellSession
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ShellSessionRequest"
+            responses:
+                "200":
+                    description: Shell session created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ShellSessionResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/runtimes/{runtimeId}/shell/passkey/begin:
+        post:
+            tags: [Runtimes]
+            summary: Begin shell passkey assertion
+            description: |
+                Human-only. Starts a WebAuthn assertion ceremony for shell
+                step-up auth (social/Google users without a password).
+            operationId: beginShellPasskey
+            parameters:
+                - name: runtimeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Passkey challenge for shell session
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                additionalProperties: true
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     # ---------------------------------------------------------------------------
     # Agent Memory
     # ---------------------------------------------------------------------------
@@ -13124,97 +13197,110 @@ components:
 
         CreateAutomationRequest:
             type: object
-            required: [name]
+            required: [name, agent_id, trigger_type, workflow_spec]
+            description: |
+                Create an automation. `workflow_spec` is required and must be either
+                a JSON array of steps or `{ "steps": [...] }`. Dashboard `schedule`
+                trigger_type is accepted and normalized to `cron`. For cron triggers,
+                `cron_expr` is required.
             properties:
                 name:
-                    type: string
-                description:
                     type: string
                 agent_id:
                     type: string
                     format: uuid
                 trigger_type:
                     type: string
-                    enum: [schedule, webhook, event, manual]
-                trigger_config:
-                    type: object
-                    additionalProperties: true
-                action_type:
+                    description: cron | event | webhook | manual (alias schedule → cron)
+                    enum: [cron, event, webhook, manual, schedule]
+                cron_expr:
                     type: string
-                action_config:
+                    description: Required when trigger_type is cron (or schedule)
+                    example: "0 */6 * * *"
+                timezone:
+                    type: string
+                    default: UTC
+                    example: UTC
+                event_filter:
                     type: object
                     additionalProperties: true
-                is_active:
-                    type: boolean
-                    default: true
+                    nullable: true
+                workflow_spec:
+                    description: |
+                        Workflow steps. Accepts a bare array `[...]` or
+                        `{ "steps": [...] }` (dashboard / preset shape).
+                    oneOf:
+                        - type: array
+                          items:
+                              type: object
+                              additionalProperties: true
+                        - type: object
+                          additionalProperties: true
 
         UpdateAutomationRequest:
             type: object
             properties:
                 name:
                     type: string
-                description:
+                cron_expr:
                     type: string
-                agent_id:
+                    nullable: true
+                timezone:
                     type: string
-                    format: uuid
-                trigger_type:
-                    type: string
-                    enum: [schedule, webhook, event, manual]
-                trigger_config:
+                event_filter:
                     type: object
                     additionalProperties: true
-                action_type:
-                    type: string
-                action_config:
-                    type: object
-                    additionalProperties: true
+                    nullable: true
+                workflow_spec:
+                    oneOf:
+                        - type: array
+                          items:
+                              type: object
+                              additionalProperties: true
+                        - type: object
+                          additionalProperties: true
                 is_active:
                     type: boolean
 
         AutomationResponse:
             type: object
-            required: [id, name, trigger_type, is_active, created_at, updated_at]
+            required: [id, agent_id, name, trigger_type, timezone, workflow_spec, is_active, created_at, updated_at]
             properties:
                 id:
                     type: string
                     format: uuid
-                name:
-                    type: string
-                description:
-                    type: string
-                    nullable: true
                 agent_id:
                     type: string
                     format: uuid
-                    nullable: true
+                name:
+                    type: string
                 trigger_type:
                     type: string
-                    enum: [schedule, webhook, event, manual]
-                trigger_config:
-                    type: object
-                    additionalProperties: true
-                    nullable: true
-                action_type:
+                    enum: [cron, event, webhook, manual]
+                cron_expr:
                     type: string
                     nullable: true
-                action_config:
+                timezone:
+                    type: string
+                event_filter:
                     type: object
                     additionalProperties: true
                     nullable: true
+                workflow_spec:
+                    oneOf:
+                        - type: array
+                          items:
+                              type: object
+                              additionalProperties: true
+                        - type: object
+                          additionalProperties: true
                 is_active:
                     type: boolean
-                webhook_url:
-                    type: string
-                    nullable: true
-                schedule_expression:
-                    type: string
-                    nullable: true
-                next_run_at:
+                last_run_at:
                     type: string
                     format: date-time
                     nullable: true
-                last_run_at:
+                next_run_at:
                     type: string
                     format: date-time
                     nullable: true
@@ -13236,7 +13322,7 @@ components:
 
         AutomationRunResponse:
             type: object
-            required: [id, automation_id, status, started_at]
+            required: [id, automation_id, agent_id, status, started_at, tokens_used, cost_cents]
             properties:
                 id:
                     type: string
@@ -13244,23 +13330,31 @@ components:
                 automation_id:
                     type: string
                     format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
                 status:
                     type: string
-                    enum: [pending, running, completed, failed]
-                started_at:
-                    type: string
-                    format: date-time
-                completed_at:
-                    type: string
-                    format: date-time
-                    nullable: true
-                result:
-                    type: object
-                    additionalProperties: true
+                    enum: [pending, running, completed, failed, denied]
+                step_results:
                     nullable: true
                 error:
                     type: string
                     nullable: true
+                trigger_source:
+                    type: string
+                    nullable: true
+                started_at:
+                    type: string
+                    format: date-time
+                finished_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                tokens_used:
+                    type: integer
+                cost_cents:
+                    type: integer
 
         AutomationRunListResponse:
             type: object
@@ -13304,6 +13398,14 @@ components:
                 inbound_auth:
                     type: string
                     enum: [api_key, jwt, public]
+                shell_access_enabled:
+                    type: boolean
+                    default: false
+                shell_auth_policy:
+                    type: string
+                    description: Step-up auth policy for shell (e.g. password, passkey, totp)
+                shell_max_session_minutes:
+                    type: integer
 
         UpdateRuntimeRequest:
             type: object
@@ -13331,6 +13433,12 @@ components:
                 inbound_auth:
                     type: string
                     enum: [api_key, jwt, public]
+                shell_access_enabled:
+                    type: boolean
+                shell_auth_policy:
+                    type: string
+                shell_max_session_minutes:
+                    type: integer
 
         RuntimeResponse:
             type: object
@@ -13383,6 +13491,12 @@ components:
                     type: string
                     enum: [api_key, jwt, public]
                     nullable: true
+                shell_access_enabled:
+                    type: boolean
+                shell_auth_policy:
+                    type: string
+                shell_max_session_minutes:
+                    type: integer
                 monthly_hours_used:
                     type: number
                     nullable: true
@@ -13413,6 +13527,41 @@ components:
                 reason:
                     type: string
                     nullable: true
+
+        ShellSessionRequest:
+            type: object
+            description: |
+                Step-up credentials for an interactive shell session.
+                Provide one of password, totp_code, passkey_credential, or reauth_token.
+            properties:
+                password:
+                    type: string
+                totp_code:
+                    type: string
+                passkey_credential:
+                    type: object
+                    additionalProperties: true
+                reauth_token:
+                    type: string
+                    description: Single-use `rat_` token from POST /v1/auth/reauth (purpose runtime_shell)
+
+        ShellSessionResponse:
+            type: object
+            required: [session_token, ws_url, expires_in, runtime_id, max_session_minutes]
+            properties:
+                session_token:
+                    type: string
+                ws_url:
+                    type: string
+                    description: WebSocket URL for the PTY terminal
+                expires_in:
+                    type: integer
+                    format: int64
+                runtime_id:
+                    type: string
+                    format: uuid
+                max_session_minutes:
+                    type: integer
 
         # --- Agent Memory ---
 
