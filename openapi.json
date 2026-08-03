@@ -20366,6 +20366,17 @@
               "jwt",
               "public"
             ]
+          },
+          "shell_access_enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "shell_auth_policy": {
+            "type": "string",
+            "description": "Step-up auth policy for shell (e.g. password, passkey, totp)"
+          },
+          "shell_max_session_minutes": {
+            "type": "integer"
           }
         }
       },
@@ -20409,6 +20420,15 @@
               "jwt",
               "public"
             ]
+          },
+          "shell_access_enabled": {
+            "type": "boolean"
+          },
+          "shell_auth_policy": {
+            "type": "string"
+          },
+          "shell_max_session_minutes": {
+            "type": "integer"
           }
         }
       },
@@ -20497,6 +20517,15 @@
             ],
             "nullable": true
           },
+          "shell_access_enabled": {
+            "type": "boolean"
+          },
+          "shell_auth_policy": {
+            "type": "string"
+          },
+          "shell_max_session_minutes": {
+            "type": "integer"
+          },
           "monthly_hours_used": {
             "type": "number",
             "nullable": true
@@ -20541,6 +20570,56 @@
           "reason": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "ShellSessionRequest": {
+        "type": "object",
+        "description": "Step-up credentials for an interactive shell session.\nProvide one of password, totp_code, passkey_credential, or reauth_token.\n",
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "totp_code": {
+            "type": "string"
+          },
+          "passkey_credential": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "reauth_token": {
+            "type": "string",
+            "description": "Single-use `rat_` token from POST /v1/auth/reauth (purpose runtime_shell)"
+          }
+        }
+      },
+      "ShellSessionResponse": {
+        "type": "object",
+        "required": [
+          "session_token",
+          "ws_url",
+          "expires_in",
+          "runtime_id",
+          "max_session_minutes"
+        ],
+        "properties": {
+          "session_token": {
+            "type": "string"
+          },
+          "ws_url": {
+            "type": "string",
+            "description": "WebSocket URL for the PTY terminal"
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "runtime_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "max_session_minutes": {
+            "type": "integer"
           }
         }
       },
