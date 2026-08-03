@@ -2,13 +2,13 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.30.0
+    version: 2.31.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
-        sharing, billing, and audit logging. Automations (workflow_spec),
-        cloud runtimes with interactive shell sessions, agent memory,
-        and discovery.
+        sharing, billing, and audit logging. Automations (workflow_spec,
+        webhook tokens, event triggers, Assist), cloud runtimes with
+        interactive shell sessions, agent memory, and discovery.
 
         All endpoints require JWT Bearer authentication unless marked with
         `security: []`.
@@ -6628,11 +6628,11 @@ paths:
                             $ref: "#/components/schemas/CreateAutomationRequest"
             responses:
                 "201":
-                    description: Automation created
+                    description: Automation created (includes one-time webhook credentials when trigger_type is webhook)
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/AutomationResponse"
+                                $ref: "#/components/schemas/AutomationCreatedResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -6776,6 +6776,117 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/AutomationRunListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/automations/assist/draft:
+        post:
+            tags: [Automations]
+            summary: Draft automation from natural language
+            operationId: assistDraftAutomation
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [message]
+                            properties:
+                                message:
+                                    type: string
+                                agent_id:
+                                    type: string
+                                    format: uuid
+                                timezone:
+                                    type: string
+            responses:
+                "200":
+                    description: Reviewable automation draft
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AssistDraftResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/automations/assist/session:
+        post:
+            tags: [Automations]
+            summary: Mint short-lived Assist session token
+            operationId: assistAutomationSession
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                runtime_id:
+                                    type: string
+                                    format: uuid
+            responses:
+                "200":
+                    description: Assist session token
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AssistSessionResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/automations/webhook/{automationId}/{token}:
+        post:
+            tags: [Automations]
+            summary: Public webhook trigger
+            operationId: webhookTriggerAutomation
+            security: []
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: token
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      description: whk_ prefixed webhook token (SHA-256 verified server-side)
+            responses:
+                "201":
+                    description: Automation run queued
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationRunResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/automations/{automationId}/rotate-webhook-token:
+        post:
+            tags: [Automations]
+            summary: Rotate webhook token
+            operationId: rotateAutomationWebhookToken
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: New one-time webhook URL and token
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/WebhookTokenRotatedResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "404":
@@ -6953,17 +7064,12 @@ paths:
                   schema:
                       type: string
                       format: uuid
-                - name: since
-                  in: query
-                  schema:
-                      type: string
-                      format: date-time
-                  description: Only return logs after this timestamp
-                - name: limit
+                - name: tail
                   in: query
                   schema:
                       type: integer
                       default: 100
+                  description: Number of recent log lines to return
             responses:
                 "200":
                     description: Runtime logs
@@ -6971,11 +7077,13 @@ paths:
                         application/json:
                             schema:
                                 type: object
+                                required: [entries]
                                 properties:
-                                    lines:
+                                    entries:
                                         type: array
                                         items:
                                             type: object
+                                            required: [message]
                                             properties:
                                                 timestamp:
                                                     type: string
@@ -13310,6 +13418,59 @@ components:
                 updated_at:
                     type: string
                     format: date-time
+
+        AutomationCreatedResponse:
+            allOf:
+                - $ref: "#/components/schemas/AutomationResponse"
+                - type: object
+                  properties:
+                      webhook_url:
+                          type: string
+                          description: Full POST URL including token (one-time on create)
+                      webhook_token:
+                          type: string
+                          description: whk_ token segment (one-time on create)
+
+        WebhookTokenRotatedResponse:
+            type: object
+            required: [webhook_url, webhook_token]
+            properties:
+                webhook_url:
+                    type: string
+                webhook_token:
+                    type: string
+
+        AssistDraftResponse:
+            type: object
+            required: [draft, reply]
+            properties:
+                draft:
+                    type: object
+                    additionalProperties: true
+                reply:
+                    type: string
+
+        AssistSessionResponse:
+            type: object
+            required: [access_token, expires_in, scopes, cli_hint]
+            properties:
+                access_token:
+                    type: string
+                expires_in:
+                    type: integer
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                runtime_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                runtime_status:
+                    type: string
+                    nullable: true
+                cli_hint:
+                    type: string
 
         AutomationListResponse:
             type: object
