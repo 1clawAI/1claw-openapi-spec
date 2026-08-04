@@ -11281,6 +11281,67 @@
         }
       }
     },
+    "/v1/runtimes/{runtimeId}/chat": {
+      "post": {
+        "tags": [
+          "Runtimes"
+        ],
+        "summary": "Chat with a running runtime agent",
+        "description": "Human-only. Proxies to the runtime container's OpenAI-compatible\n`POST /v1/chat/completions` (hermes / openclaw / openclaude chat bridge).\nStarts the runtime if stopped. Streams SSE when `Accept: text/event-stream`\nor `stream: true`. Conversation history is ephemeral (pass `messages`).\nRequires a public URL (shell access, Shroud sidecar, or HTTP hosting).\n",
+        "operationId": "runtimeChat",
+        "parameters": [
+          {
+            "name": "runtimeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat completion (JSON) or SSE stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/memory": {
       "get": {
         "tags": [
@@ -20881,6 +20942,34 @@
           },
           "max_session_minutes": {
             "type": "integer"
+          }
+        }
+      },
+      "RuntimeChatRequest": {
+        "type": "object",
+        "description": "Chat with the agent inside a runtime. Provide `message` and/or\na full OpenAI-style `messages` array (ephemeral history).\n",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Latest user message"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "OpenAI chat messages (optional history)"
+          },
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Request SSE streaming (default true when Accept is text/event-stream)"
           }
         }
       },
