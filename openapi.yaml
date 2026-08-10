@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.31.0
+    version: 2.32.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6892,6 +6892,56 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/automations/{automationId}/runs/{runId}/cancel:
+        post:
+            tags: [Automations]
+            summary: Cancel a running automation run
+            operationId: cancelAutomationRun
+            description: |
+                Cancel a run that is currently in `running` or `awaiting_approval` status.
+                Returns the updated run with status `cancelled`.
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: runId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Run cancelled
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationRunResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/automations/presets:
+        get:
+            tags: [Automations]
+            summary: List automation presets
+            operationId: listAutomationPresets
+            security: []
+            description: Public preset gallery of ready-to-use automation templates.
+            responses:
+                "200":
+                    description: Automation preset list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationPresetsResponse"
+
     # ---------------------------------------------------------------------------
     # Runtimes
     # ---------------------------------------------------------------------------
@@ -13381,6 +13431,10 @@ components:
                     description: |
                         Workflow steps. Accepts a bare array `[...]` or
                         `{ "steps": [...] }` (dashboard / preset shape).
+                        Supported step types: get_secret, put_secret, http_request,
+                        rotate_secret, notify_human, ai_generate, memory_get,
+                        memory_put, memory_search, notify, approval_request,
+                        condition, execute_binding.
                     oneOf:
                         - type: array
                           items:
@@ -13540,7 +13594,7 @@ components:
                     format: uuid
                 status:
                     type: string
-                    enum: [pending, running, completed, failed, denied]
+                    enum: [pending, running, completed, failed, denied, cancelled, awaiting_approval]
                 step_results:
                     nullable: true
                 error:
@@ -13569,6 +13623,30 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/AutomationRunResponse"
+
+        AutomationPresetsResponse:
+            type: object
+            required: [presets]
+            properties:
+                presets:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            id:
+                                type: string
+                            name:
+                                type: string
+                            description:
+                                type: string
+                            trigger_type:
+                                type: string
+                            cron_expr:
+                                type: string
+                                nullable: true
+                            workflow_spec:
+                                type: object
+                                additionalProperties: true
 
         # --- Runtimes ---
 

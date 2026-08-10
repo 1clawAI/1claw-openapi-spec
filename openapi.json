@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.31.0",
+    "version": "2.32.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -10825,6 +10825,80 @@
         }
       }
     },
+    "/v1/automations/{automationId}/runs/{runId}/cancel": {
+      "post": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Cancel a running automation run",
+        "operationId": "cancelAutomationRun",
+        "description": "Cancel a run that is currently in `running` or `awaiting_approval` status.\nReturns the updated run with status `cancelled`.\n",
+        "parameters": [
+          {
+            "name": "automationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/automations/presets": {
+      "get": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "List automation presets",
+        "operationId": "listAutomationPresets",
+        "security": [],
+        "description": "Public preset gallery of ready-to-use automation templates.",
+        "responses": {
+          "200": {
+            "description": "Automation preset list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationPresetsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runtimes": {
       "post": {
         "tags": [
@@ -20324,7 +20398,7 @@
             "nullable": true
           },
           "workflow_spec": {
-            "description": "Workflow steps. Accepts a bare array `[...]` or\n`{ \"steps\": [...] }` (dashboard / preset shape).\n",
+            "description": "Workflow steps. Accepts a bare array `[...]` or\n`{ \"steps\": [...] }` (dashboard / preset shape).\nSupported step types: get_secret, put_secret, http_request,\nrotate_secret, notify_human, ai_generate, memory_get,\nmemory_put, memory_search, notify, approval_request,\ncondition, execute_binding.\n",
             "oneOf": [
               {
                 "type": "array",
@@ -20594,7 +20668,9 @@
               "running",
               "completed",
               "failed",
-              "denied"
+              "denied",
+              "cancelled",
+              "awaiting_approval"
             ]
           },
           "step_results": {
@@ -20635,6 +20711,42 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AutomationRunResponse"
+            }
+          }
+        }
+      },
+      "AutomationPresetsResponse": {
+        "type": "object",
+        "required": [
+          "presets"
+        ],
+        "properties": {
+          "presets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "trigger_type": {
+                  "type": "string"
+                },
+                "cron_expr": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "workflow_spec": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
             }
           }
         }
