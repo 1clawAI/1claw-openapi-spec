@@ -40,11 +40,19 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.36.0 — API `info.version` 2.23.0)
+## What's in the spec (v0.44.0 — API `info.version` 2.33.0)
+
+### Automations v2 & Channels (2.33)
+- **Automations v2** — Workflow engine with multi-step pipelines, 14 step types, `{{...}}` template variables, conditional logic (`skip_if`/`run_if`), 10 marketing presets, webhook/event/cron/manual triggers. Enriched list API with `last_run_status`, `total_runs`, `success_rate`, `agent_name`. Run detail with `context` JSONB. Assist NL→workflow drafting.
+- **Agent Channels** — Telegram, WhatsApp, Discord messaging channels for agents. CRUD, send, message history, test connectivity.
+- **Agent Memory** — Three-tier memory (scratch, durable, semantic) with encryption at rest. CRUD, semantic search, namespace management.
+- **Cloud Runtimes** — Managed containers with lifecycle management, hosting, interactive shell. Presets from small to large-cc (confidential compute).
+- **Platform delegation** — Platform apps can perform delegated CRUD on connected user resources via `X-Platform-Connection` header. Delegation log for audit.
+- **Discovery** — Public agent directory and platform marketplace.
 
 ### Non-EVM transaction signing (2.23)
 - **Intents API** — `SubmitTransactionRequest` / `SignTransactionRequest` / `SignIntentRequest` extended with non-EVM fields: `destination_tag` (XRP), `memo`, `fee_rate_sat_per_vbyte` (Bitcoin), `fee_limit_sun` (Tron), `token_mint` / `token_decimals` (Solana SPL + Tron TRC-20), `ttl` (Cardano). Native sign + broadcast for Bitcoin, Solana, XRP, Cardano, Tron.
-- **`xrpl_tx_json`** — Optional raw XRPL transaction JSON for 30+ transaction types beyond simple Payment. Supported types include TrustSet, OfferCreate, OfferCancel, AccountSet, AccountDelete, EscrowCreate/Finish/Cancel, PaymentChannelCreate/Fund/Claim, NFTokenMint/Burn/CreateOffer/AcceptOffer/CancelOffer, AMMCreate/Deposit/Withdraw/Bid/Delete/Vote, SetRegularKey, SignerListSet, DepositPreauth, CheckCreate/Cash/Cancel, TicketCreate, Clawback. Server auto-fills `Account`, `Sequence`, `Fee`, `Flags`, `LastLedgerSequence`, `SigningPubKey`. Legacy `to`/`value`/`destination_tag` Payment path preserved for backward compatibility.
+- **`xrpl_tx_json`** — Optional raw XRPL transaction JSON for 30+ transaction types beyond simple Payment.
 
 ### Risk Engine & DPoP (2.19)
 - **Risk events** — `GET /v1/risk/events` (list, filterable by severity/principal_type)

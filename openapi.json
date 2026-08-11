@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.32.0",
+    "version": "2.33.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -7792,6 +7792,122 @@
         }
       }
     },
+    "/v1/platform/apps/{appId}/templates/{template_id}": {
+      "patch": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Update a bootstrap template",
+        "description": "Update an existing template's name, description, spec, or active status.",
+        "operationId": "updatePlatformTemplate",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "spec": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Template updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformTemplateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Delete a bootstrap template",
+        "operationId": "deletePlatformTemplate",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Template deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/platform/users/upsert": {
       "post": {
         "tags": [
@@ -8106,6 +8222,82 @@
       }
     },
     "/v1/platform/connected-apps/{connectionId}": {
+      "patch": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Update connection delegation",
+        "description": "Toggle delegation and update delegation scopes for a connected platform app. User-only.",
+        "operationId": "updateConnectionDelegation",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "delegation_enabled": {
+                    "type": "boolean"
+                  },
+                  "delegation_scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Scopes: vaults:read, vaults:write, agents:read, agents:write, secrets:read, secrets:write, automations:*, runtimes:*"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delegation settings updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "delegation_enabled": {
+                      "type": "boolean"
+                    },
+                    "delegation_scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
       "delete": {
         "tags": [
           "Platform"
@@ -8134,6 +8326,79 @@
           },
           "404": {
             "description": "Connection not found"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/delegation-log": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Delegation audit log",
+        "description": "List delegated actions performed by a platform app on behalf of this user.",
+        "operationId": "getDelegationLog",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delegation log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "action": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string"
+                          },
+                          "resource_type": {
+                            "type": "string"
+                          },
+                          "resource_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "details": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -10648,6 +10913,54 @@
         }
       }
     },
+    "/v1/automations/{automationId}/runs/{runId}": {
+      "get": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Get automation run",
+        "operationId": "getAutomationRun",
+        "description": "Get details of a single automation run including step results and context.",
+        "parameters": [
+          {
+            "name": "automationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Automation run detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/automations/assist/draft": {
       "post": {
         "tags": [
@@ -12275,6 +12588,80 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/channels/{channel_id}/test": {
+      "post": {
+        "tags": [
+          "Agent Channels"
+        ],
+        "summary": "Test channel connectivity",
+        "description": "Send a test message through the channel to verify connectivity and credentials.",
+        "operationId": "testChannel",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "external_chat_id": {
+                    "type": "string",
+                    "description": "Optional chat ID to send the test message to"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Optional custom test message content"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -18939,6 +19326,11 @@
                 "nullable": true,
                 "description": "One-time agent API key (ocv_ prefix). Store securely — not retrievable later."
               },
+              "agent_evm_address": {
+                "type": "string",
+                "nullable": true,
+                "description": "EOA address when provision_eoa is true in the template"
+              },
               "signing_keys": {
                 "type": "array",
                 "description": "Provisioned signing key details (chain, address, public key)",
@@ -18959,6 +19351,22 @@
                     }
                   }
                 }
+              },
+              "runtime_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "IDs of runtimes provisioned by the template"
+              },
+              "automation_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "IDs of automations provisioned by the template"
               }
             }
           }
@@ -20527,6 +20935,26 @@
             "format": "date-time",
             "nullable": true
           },
+          "last_run_status": {
+            "type": "string",
+            "nullable": true,
+            "description": "Status of the most recent run (enriched list field)"
+          },
+          "total_runs": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Total runs in the last 30 days (enriched list field)"
+          },
+          "success_rate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Success rate percentage (enriched list field)"
+          },
+          "agent_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved agent display name (enriched list field)"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -20664,11 +21092,10 @@
           "status": {
             "type": "string",
             "enum": [
-              "pending",
               "running",
-              "completed",
+              "success",
               "failed",
-              "denied",
+              "timed_out",
               "cancelled",
               "awaiting_approval"
             ]
@@ -20683,6 +21110,12 @@
           "trigger_source": {
             "type": "string",
             "nullable": true
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "JSONB context passed between workflow steps"
           },
           "started_at": {
             "type": "string",
@@ -21555,6 +21988,12 @@
           },
           "is_active": {
             "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Channel-specific configuration JSON. May include:\n- sender_allowlist (array of strings): restrict which external senders can trigger the agent\n- auto_respond_enabled (boolean): whether the agent auto-responds to inbound messages\n"
           },
           "created_at": {
             "type": "string",
