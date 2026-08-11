@@ -7703,6 +7703,46 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/DirectoryResponse"
 
+    /v1/agents/org-directory:
+        get:
+            tags: [agents, discovery]
+            summary: List org agents
+            description: |
+                List agents within the caller's organization for sub-agent discovery.
+                Returns agents with their capabilities, enabling agent-to-agent
+                coordination and discovery within an org. Requires authentication.
+            operationId: listOrgDirectory
+            parameters:
+                - name: q
+                  in: query
+                  schema:
+                      type: string
+                  description: Search query to filter agents by name or description
+                - name: tags
+                  in: query
+                  schema:
+                      type: string
+                  description: Comma-separated tag filter
+                - name: page
+                  in: query
+                  schema:
+                      type: integer
+                      default: 1
+                - name: page_size
+                  in: query
+                  schema:
+                      type: integer
+                      default: 20
+            responses:
+                "200":
+                    description: Org agent directory listing
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OrgDirectoryResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
     /v1/agents/{agent_id}/discovery:
         patch:
             tags: [Discovery]
@@ -7772,6 +7812,11 @@ paths:
             description: |
                 Send a message to an agent and receive a response via Shroud LLM.
                 Supports SSE streaming when Accept: text/event-stream is set.
+
+                Agents can call this endpoint on other agents within the same
+                organization for inter-agent communication (agent-to-agent chat).
+                The caller must be authenticated and belong to the same org as
+                the target agent.
             operationId: sendChatMessage
             parameters:
                 - $ref: "#/components/parameters/AgentId"
@@ -14505,6 +14550,52 @@ components:
                 page:
                     type: integer
                 per_page:
+                    type: integer
+
+        OrgDirectoryAgent:
+            type: object
+            required: [id, name, intents_api_enabled, execution_intents_enabled, memory_enabled, shroud_enabled]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                public_description:
+                    type: string
+                    nullable: true
+                public_tags:
+                    type: array
+                    items:
+                        type: string
+                a2a_url:
+                    type: string
+                    nullable: true
+                mcp_url:
+                    type: string
+                    nullable: true
+                intents_api_enabled:
+                    type: boolean
+                execution_intents_enabled:
+                    type: boolean
+                memory_enabled:
+                    type: boolean
+                shroud_enabled:
+                    type: boolean
+
+        OrgDirectoryResponse:
+            type: object
+            required: [agents, total, page, page_size]
+            properties:
+                agents:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/OrgDirectoryAgent"
+                total:
+                    type: integer
+                page:
+                    type: integer
+                page_size:
                     type: integer
 
         UpdateDiscoveryRequest:
