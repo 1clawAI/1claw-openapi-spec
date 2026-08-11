@@ -94,6 +94,8 @@ tags:
       description: Chat with agents via Shroud LLM proxy
     - name: Agent Channels
       description: External messaging channels (Telegram, WhatsApp, Discord)
+    - name: OAuth Connect
+      description: OAuth connected accounts for agents (provider registry, connect flows, app credentials)
 
 # =============================================================================
 # PATHS
@@ -8173,6 +8175,200 @@ paths:
                 "200":
                     description: Webhook processed
 
+    # ---------------------------------------------------------------------------
+    # OAuth Connect
+    # ---------------------------------------------------------------------------
+
+    /v1/oauth/providers:
+        get:
+            tags: [OAuth Connect]
+            summary: List OAuth providers
+            description: |
+                Returns the list of supported OAuth providers with their metadata,
+                available scopes, and authorization URLs. No authentication required.
+            operationId: listOAuthProviders
+            security: []
+            responses:
+                "200":
+                    description: Provider list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OAuthProviderListResponse"
+
+    /v1/agents/{agent_id}/oauth/connect:
+        post:
+            tags: [OAuth Connect]
+            summary: Initiate OAuth connection
+            description: |
+                Start an OAuth authorization flow for the specified agent and provider.
+                Returns the authorization URL to redirect the user to. Human-only.
+            operationId: connectOAuth
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ConnectOAuthRequest"
+            responses:
+                "200":
+                    description: Authorization URL generated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ConnectOAuthResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/oauth/connections:
+        get:
+            tags: [OAuth Connect]
+            summary: List OAuth connections
+            description: List all active OAuth connections for the specified agent.
+            operationId: listOAuthConnections
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Connection list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OAuthConnectionListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/oauth/disconnect/{binding_id}:
+        post:
+            tags: [OAuth Connect]
+            summary: Disconnect OAuth connection
+            description: |
+                Disconnect an OAuth connection by revoking tokens and removing the binding.
+                Human-only.
+            operationId: disconnectOAuth
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: binding_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Connection disconnected
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/oauth/app-credentials:
+        post:
+            tags: [OAuth Connect]
+            summary: Save OAuth app credentials
+            description: |
+                Store custom OAuth app credentials (client ID/secret) for a provider.
+                Allows the agent to use a BYOA (Bring Your Own App) OAuth application
+                instead of 1Claw's shared credentials. Human-only.
+            operationId: saveOAuthAppCredentials
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SaveOAuthAppCredentialsRequest"
+            responses:
+                "201":
+                    description: Credentials saved
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OAuthAppCredentialResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        get:
+            tags: [OAuth Connect]
+            summary: List OAuth app credentials
+            description: |
+                List stored OAuth app credentials for the agent. Client secrets
+                are never returned in the response.
+            operationId: listOAuthAppCredentials
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Credential list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OAuthAppCredentialListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/oauth/app-credentials/{provider_slug}:
+        delete:
+            tags: [OAuth Connect]
+            summary: Delete OAuth app credentials
+            description: |
+                Remove stored OAuth app credentials for a specific provider. Human-only.
+            operationId: deleteOAuthAppCredentials
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: provider_slug
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                  description: Provider identifier (e.g. "github", "google", "slack")
+            responses:
+                "204":
+                    description: Credentials deleted
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/oauth/callback:
+        get:
+            tags: [OAuth Connect]
+            summary: OAuth callback
+            description: |
+                Public callback URL that OAuth providers redirect to after user authorization.
+                Exchanges the authorization code for tokens and redirects to the dashboard.
+            operationId: oauthConnectCallback
+            security: []
+            parameters:
+                - name: code
+                  in: query
+                  schema:
+                      type: string
+                  description: Authorization code from the OAuth provider
+                - name: state
+                  in: query
+                  schema:
+                      type: string
+                  description: Opaque state parameter for CSRF protection and session binding
+                - name: error
+                  in: query
+                  schema:
+                      type: string
+                  description: Error code if the authorization was denied or failed
+            responses:
+                "302":
+                    description: Redirect to dashboard with success or error status
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -14544,3 +14740,164 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/ChannelMessageResponse"
+
+        # ── OAuth Connect ──────────────────────────────────────────────
+
+        OAuthProviderScope:
+            type: object
+            properties:
+                scope:
+                    type: string
+                label:
+                    type: string
+                description:
+                    type: string
+                default:
+                    type: boolean
+
+        OAuthProvider:
+            type: object
+            properties:
+                slug:
+                    type: string
+                    description: Unique provider identifier (e.g. "github", "google", "slack")
+                display_name:
+                    type: string
+                icon_url:
+                    type: string
+                    format: uri
+                authorization_url:
+                    type: string
+                    format: uri
+                token_url:
+                    type: string
+                    format: uri
+                scopes_available:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/OAuthProviderScope"
+                default_scopes:
+                    type: array
+                    items:
+                        type: string
+                extra_auth_params:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    nullable: true
+                requires_app_credentials:
+                    type: boolean
+                    description: Whether custom app credentials are required (vs. shared 1Claw app)
+                documentation_url:
+                    type: string
+                    format: uri
+                    nullable: true
+
+        OAuthProviderListResponse:
+            type: object
+            properties:
+                providers:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/OAuthProvider"
+
+        ConnectOAuthRequest:
+            type: object
+            required: [provider_slug]
+            properties:
+                provider_slug:
+                    type: string
+                    description: Provider to connect (e.g. "github", "google", "slack")
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                    description: Override default scopes for this connection
+                redirect_after:
+                    type: string
+                    description: URL to redirect to after the OAuth flow completes
+
+        ConnectOAuthResponse:
+            type: object
+            properties:
+                authorization_url:
+                    type: string
+                    format: uri
+                    description: Redirect the user to this URL to authorize the connection
+
+        OAuthConnectionResponse:
+            type: object
+            properties:
+                binding_id:
+                    type: string
+                    format: uuid
+                provider_slug:
+                    type: string
+                provider_name:
+                    type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                status:
+                    type: string
+                    enum: [active, expired, revoked]
+                needs_reauth:
+                    type: boolean
+                created_at:
+                    type: string
+                    format: date-time
+
+        OAuthConnectionListResponse:
+            type: object
+            properties:
+                connections:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/OAuthConnectionResponse"
+
+        SaveOAuthAppCredentialsRequest:
+            type: object
+            required: [provider_slug, client_id, client_secret]
+            properties:
+                provider_slug:
+                    type: string
+                    description: Provider this credential is for
+                client_id:
+                    type: string
+                client_secret:
+                    type: string
+                    description: Write-only; never returned in responses
+                redirect_uri:
+                    type: string
+                    format: uri
+                    description: Custom redirect URI override
+
+        OAuthAppCredentialResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                provider_slug:
+                    type: string
+                client_id:
+                    type: string
+                redirect_uri:
+                    type: string
+                    format: uri
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        OAuthAppCredentialListResponse:
+            type: object
+            properties:
+                credentials:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/OAuthAppCredentialResponse"
