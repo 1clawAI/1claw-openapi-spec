@@ -4981,6 +4981,67 @@ paths:
                 "403":
                     description: Only human users can rotate platform keys
 
+    /v1/platform/apps/{appId}/stats:
+        get:
+            tags: [Platform]
+            summary: Get platform app statistics
+            description: Returns aggregate statistics about a platform app's connected users, bootstraps, and grants.
+            operationId: getPlatformAppStats
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: appId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: App statistics
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformAppStatsResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/apps/{appId}/rotate-webhook-secret:
+        post:
+            tags: [Platform]
+            summary: Rotate webhook secret
+            description: Generate a new webhook signing secret for the platform app. The old secret is immediately invalidated. Returns the new secret (one-time).
+            operationId: rotatePlatformWebhookSecret
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: appId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: New webhook secret generated
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [webhook_secret]
+                                properties:
+                                    webhook_secret:
+                                        type: string
+                                        description: The new webhook signing secret (shown once)
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    description: Only human users can rotate webhook secrets
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/platform/apps/{appId}/templates:
         post:
             tags: [Platform]
@@ -6309,6 +6370,79 @@ paths:
                                 $ref: "#/components/schemas/OAuthUserInfoResponse"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
+
+    /v1/oauth/revoke:
+        post:
+            tags: [OAuth]
+            summary: Revoke an OAuth token (RFC 7009)
+            description: |
+                Revokes an access token or refresh token. The authorization server
+                invalidates the token so it can no longer be used. Follows RFC 7009.
+            operationId: revokeOAuthToken
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [token]
+                            properties:
+                                token:
+                                    type: string
+                                    description: The token to revoke (access_token or refresh_token)
+                                token_type_hint:
+                                    type: string
+                                    enum: [access_token, refresh_token]
+                                    description: Hint about the type of token being revoked
+            responses:
+                "200":
+                    description: Token revoked successfully (or was already invalid)
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    revoked:
+                                        type: boolean
+                                        example: true
+
+    /v1/oauth/consents/{app_id}:
+        delete:
+            tags: [OAuth]
+            summary: Revoke consent for a platform app
+            description: |
+                Revokes the user's previously granted OAuth consent for a specific platform app.
+                All active tokens issued to the app are invalidated and the consent record is deleted.
+            operationId: revokeOAuthConsent
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: app_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                  description: The platform app ID whose consent to revoke
+            responses:
+                "200":
+                    description: Consent revoked
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    revoked:
+                                        type: boolean
+                                        example: true
+                                    app_id:
+                                        type: string
+                                        format: uuid
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
 
     # ---------------------------------------------------------------------------
     # Risk Engine
@@ -7772,9 +7906,9 @@ paths:
 
     /v1/platform/marketplace:
         get:
-            tags: [Discovery]
+            tags: [Platform, Discovery]
             summary: Public marketplace
-            description: Browse the public platform marketplace of agents and apps.
+            description: Browse the public platform marketplace of listed apps and agents. Returns approved platform apps with category, tags, pricing summaries, and screenshots.
             operationId: listMarketplace
             security: []
             parameters:
@@ -7793,13 +7927,18 @@ paths:
                   schema:
                       type: string
                   description: Search query
+                - name: category
+                  in: query
+                  schema:
+                      type: string
+                  description: Filter by app category
             responses:
                 "200":
                     description: Marketplace listing
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/DirectoryResponse"
+                                $ref: "#/components/schemas/MarketplaceResponse"
 
     # ---------------------------------------------------------------------------
     # Agent Chat
@@ -12955,6 +13094,12 @@ components:
                             type: string
                             format: uuid
                             nullable: true
+                        agent_ids:
+                            type: array
+                            items:
+                                type: string
+                                format: uuid
+                            description: All agent IDs provisioned by the template (when multiple agents are defined)
                         policy_ids:
                             type: array
                             items:
@@ -12999,6 +13144,61 @@ components:
                                 type: string
                                 format: uuid
                             description: IDs of automations provisioned by the template
+
+        PlatformAppStatsResponse:
+            type: object
+            required: [total_connections, active_connections, claimed_connections, total_bootstraps, total_grants]
+            properties:
+                total_connections:
+                    type: integer
+                    description: Total number of user connections (all statuses)
+                active_connections:
+                    type: integer
+                    description: Number of active connections
+                claimed_connections:
+                    type: integer
+                    description: Number of claimed connections
+                total_bootstraps:
+                    type: integer
+                    description: Total bootstrap operations performed
+                total_grants:
+                    type: integer
+                    description: Total resource grants issued
+
+        MarketplaceResponse:
+            type: object
+            properties:
+                apps:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            id:
+                                type: string
+                                format: uuid
+                            name:
+                                type: string
+                            slug:
+                                type: string
+                            description:
+                                type: string
+                            logo_url:
+                                type: string
+                                nullable: true
+                            category:
+                                type: string
+                                nullable: true
+                            listing_tags:
+                                type: array
+                                items:
+                                    type: string
+                            listing_screenshots:
+                                type: array
+                                items:
+                                    type: string
+                            pricing_summary:
+                                type: string
+                                nullable: true
 
         ConnectedAppResponse:
             type: object
@@ -13412,6 +13612,10 @@ components:
                 expires_in:
                     type: integer
                     description: Token lifetime in seconds
+                refresh_token:
+                    type: string
+                    nullable: true
+                    description: Refresh token for obtaining new access tokens (when offline_access scope was granted)
                 id_token:
                     type: string
                     nullable: true

@@ -40,7 +40,14 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.44.0 — API `info.version` 2.33.0)
+## What's in the spec (v0.44.4 — API `info.version` 2.33.0)
+
+### OAuth & Platform enhancements (0.44.4)
+- **OAuth token revocation** — `POST /v1/oauth/revoke` (RFC 7009 token revocation)
+- **Consent revocation** — `DELETE /v1/oauth/consents/{app_id}` (user revokes consent for a specific app)
+- **Platform marketplace** — `GET /v1/platform/marketplace` (public listing of approved platform apps)
+- **App statistics** — `GET /v1/platform/apps/{id}/stats` (usage and connection statistics for a platform app)
+- **Webhook secret rotation** — `POST /v1/platform/apps/{id}/rotate-webhook-secret` (rotate a platform app's webhook signing secret)
 
 ### Automations v2 & Channels (2.33)
 - **Automations v2** — Workflow engine with multi-step pipelines, 14 step types, `{{...}}` template variables, conditional logic (`skip_if`/`run_if`), 10 marketing presets, webhook/event/cron/manual triggers. Enriched list API with `last_run_status`, `total_runs`, `success_rate`, `agent_name`. Run detail with `context` JSONB. Assist NL→workflow drafting.
