@@ -3533,6 +3533,23 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/LlmDisableResponse"
 
+    /v1/billing/llm-token-billing/cancel-duplicates:
+        post:
+            tags: [Billing]
+            summary: Cancel duplicate LLM billing subscriptions
+            operationId: cancelLlmDuplicateSubscriptions
+            description: >
+                Cancels extra Stripe LLM billing subscriptions for the org,
+                keeping a single primary subscription (active preferred over trialing).
+                Does not change the org LLM billing enabled setting.
+            responses:
+                "200":
+                    description: Duplicate subscriptions cancelled
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/LlmCancelDuplicatesResponse"
+
     /v1/billing/overage-method:
         patch:
             tags: [Billing]
@@ -12013,6 +12030,14 @@ components:
                     $ref: "#/components/schemas/LlmCreditBalance"
                 billing_cycle_usage:
                     $ref: "#/components/schemas/LlmBillingCycleUsage"
+                active_subscription_count:
+                    type: integer
+                subscription_ids:
+                    type: array
+                    items:
+                        type: string
+                warning:
+                    type: string
 
         LlmCheckoutResponse:
             type: object
@@ -12020,6 +12045,25 @@ components:
                 checkout_url:
                     type: string
                     format: uri
+                already_subscribed:
+                    type: boolean
+                subscription_id:
+                    type: string
+
+        LlmCancelDuplicatesResponse:
+            type: object
+            required: [cancelled_count, cancelled_subscription_ids, remaining_subscription_ids]
+            properties:
+                cancelled_count:
+                    type: integer
+                cancelled_subscription_ids:
+                    type: array
+                    items:
+                        type: string
+                remaining_subscription_ids:
+                    type: array
+                    items:
+                        type: string
 
         LlmDisableResponse:
             type: object
