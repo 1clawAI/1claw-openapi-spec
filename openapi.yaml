@@ -14932,7 +14932,11 @@ components:
                         Discord: { bot_token, application_id }.
                 slash_commands_enabled:
                     type: boolean
-                    description: Enable slash commands on this channel
+                    description: |
+                        Enable Hermes-compatible slash commands on this channel. When true,
+                        messages starting with `/` are handled before the LLM. Commands:
+                        /help, /new, /reset, /clear, /model, /mode, /personality, /retry,
+                        /undo, /compress, /summarize, /stop, /status, /skills, /usage, /sethome.
                 voice_transcription_enabled:
                     type: boolean
                     description: Enable voice message transcription
@@ -15000,7 +15004,10 @@ components:
                         - auto_respond_enabled (boolean): whether the agent auto-responds to inbound messages
                 slash_commands_enabled:
                     type: boolean
-                    description: Whether slash commands are enabled for this channel
+                    description: |
+                        Whether Hermes-compatible slash commands are enabled for this channel.
+                        Commands: /help, /new, /reset, /clear, /model, /mode, /personality, /retry,
+                        /undo, /compress, /summarize, /stop, /status, /skills, /usage, /sethome.
                 voice_transcription_enabled:
                     type: boolean
                     description: Whether voice message transcription is enabled

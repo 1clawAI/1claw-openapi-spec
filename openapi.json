@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.33.0",
+    "version": "2.34.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -22674,6 +22674,25 @@
               "type": "string"
             },
             "description": "Platform-specific config.\nTelegram: { bot_token }.\nWhatsApp: { phone_number_id, access_token, verify_token }.\nDiscord: { bot_token, application_id }.\n"
+          },
+          "slash_commands_enabled": {
+            "type": "boolean",
+            "description": "Enable Hermes-compatible slash commands on this channel. When true,\nmessages starting with `/` are handled before the LLM. Commands:\n/help, /new, /reset, /clear, /model, /mode, /personality, /retry,\n/undo, /compress, /summarize, /stop, /status, /skills, /usage, /sethome.\n"
+          },
+          "voice_transcription_enabled": {
+            "type": "boolean",
+            "description": "Enable voice message transcription"
+          },
+          "sender_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of allowed sender IDs"
+          },
+          "auto_respond_enabled": {
+            "type": "boolean",
+            "description": "Enable auto-respond"
           }
         }
       },
@@ -22691,6 +22710,21 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "slash_commands_enabled": {
+            "type": "boolean"
+          },
+          "voice_transcription_enabled": {
+            "type": "boolean"
+          },
+          "sender_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "auto_respond_enabled": {
+            "type": "boolean"
           }
         }
       },
@@ -22734,6 +22768,36 @@
             "additionalProperties": true,
             "nullable": true,
             "description": "Channel-specific configuration JSON. May include:\n- sender_allowlist (array of strings): restrict which external senders can trigger the agent\n- auto_respond_enabled (boolean): whether the agent auto-responds to inbound messages\n"
+          },
+          "slash_commands_enabled": {
+            "type": "boolean",
+            "description": "Whether slash commands are enabled for this channel"
+          },
+          "voice_transcription_enabled": {
+            "type": "boolean",
+            "description": "Whether voice message transcription is enabled"
+          },
+          "unified_conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID linking this channel to a unified cross-platform conversation"
+          },
+          "is_home_platform": {
+            "type": "boolean",
+            "description": "Whether this is the agent's home platform channel"
+          },
+          "sender_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "List of allowed sender IDs for auto-respond"
+          },
+          "auto_respond_enabled": {
+            "type": "boolean",
+            "description": "Whether auto-respond is enabled for this channel"
           },
           "created_at": {
             "type": "string",
@@ -22808,6 +22872,30 @@
           },
           "media_url": {
             "type": "string"
+          },
+          "is_voice_message": {
+            "type": "boolean",
+            "description": "Whether this message was a voice message"
+          },
+          "voice_file_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Telegram voice file ID"
+          },
+          "voice_duration_secs": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Duration of voice message in seconds"
+          },
+          "transcription_status": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "pending",
+              "completed",
+              "failed"
+            ],
+            "description": "Status of voice transcription"
           },
           "created_at": {
             "type": "string",
