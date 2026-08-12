@@ -2527,6 +2527,154 @@ paths:
                     $ref: "#/components/responses/NotFound"
 
     # ---------------------------------------------------------------------------
+    # Agent Delegations
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/delegations:
+        post:
+            tags: [Delegations]
+            summary: Create a delegation
+            description: |
+                Grant an agent (delegator) permission to delegate tasks to another agent (delegate).
+                Human-only — agents cannot create their own delegations.
+            operationId: createDelegation
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateDelegationRequest"
+            responses:
+                "201":
+                    description: Delegation created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/DelegationResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "409":
+                    description: Delegation already exists for this delegator/delegate pair
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorResponse"
+        get:
+            tags: [Delegations]
+            summary: List delegations for an agent
+            description: |
+                List all delegations where this agent is the delegator.
+            operationId: listDelegations
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: List of delegations
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/DelegationListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/delegations/effective:
+        get:
+            tags: [Delegations]
+            summary: Get effective delegations
+            description: |
+                Get the effective delegations for an agent, including daily usage statistics.
+                Agents can call this on their own ID to discover what they are authorized to delegate to.
+            operationId: getEffectiveDelegations
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Effective delegations with usage stats
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/DelegationListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/delegations/{delegation_id}:
+        get:
+            tags: [Delegations]
+            summary: Get a specific delegation
+            operationId: getDelegation
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: delegation_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Delegation details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/DelegationResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        patch:
+            tags: [Delegations]
+            summary: Update a delegation
+            description: |
+                Update delegation tools, limits, mode, or active status. Human-only.
+            operationId: updateDelegation
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: delegation_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdateDelegationRequest"
+            responses:
+                "200":
+                    description: Delegation updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/DelegationResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Delegations]
+            summary: Revoke a delegation
+            operationId: revokeDelegation
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: delegation_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Delegation revoked
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
     # Unified Signing Intent
     # ---------------------------------------------------------------------------
 
@@ -11016,6 +11164,136 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/BankrKeyLeaseResponse"
+
+        # Agent Delegations
+        CreateDelegationRequest:
+            type: object
+            required: [delegate_id]
+            properties:
+                delegate_id:
+                    type: string
+                    format: uuid
+                    description: The agent ID to delegate to.
+                allowed_tools:
+                    type: array
+                    items:
+                        type: string
+                    description: Tool names the delegate may use. Empty means all tools allowed.
+                blocked_tools:
+                    type: array
+                    items:
+                        type: string
+                    description: Tool names the delegate may NOT use.
+                max_daily_delegations:
+                    type: integer
+                    description: Maximum delegation calls per UTC day. NULL means unlimited.
+                max_depth:
+                    type: integer
+                    description: Maximum delegation chain depth (default 3).
+                    default: 3
+                guardrails:
+                    type: object
+                    description: Additional guardrail constraints for this delegation.
+                delegation_mode:
+                    type: string
+                    enum: [caller, target, both]
+                    description: "Execution mode: caller (use delegator's creds), target (use delegate's config), or both."
+                    default: caller
+                expires_at:
+                    type: string
+                    format: date-time
+                    description: Optional expiration timestamp.
+
+        UpdateDelegationRequest:
+            type: object
+            properties:
+                allowed_tools:
+                    type: array
+                    items:
+                        type: string
+                blocked_tools:
+                    type: array
+                    items:
+                        type: string
+                max_daily_delegations:
+                    type: integer
+                max_depth:
+                    type: integer
+                guardrails:
+                    type: object
+                delegation_mode:
+                    type: string
+                    enum: [caller, target, both]
+                is_active:
+                    type: boolean
+                expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+        DelegationResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                delegator_id:
+                    type: string
+                    format: uuid
+                delegate_id:
+                    type: string
+                    format: uuid
+                delegator_name:
+                    type: string
+                delegate_name:
+                    type: string
+                allowed_tools:
+                    type: array
+                    items:
+                        type: string
+                blocked_tools:
+                    type: array
+                    items:
+                        type: string
+                max_daily_delegations:
+                    type: integer
+                    nullable: true
+                max_depth:
+                    type: integer
+                guardrails:
+                    type: object
+                delegation_mode:
+                    type: string
+                    enum: [caller, target, both]
+                is_active:
+                    type: boolean
+                created_by:
+                    type: string
+                    format: uuid
+                expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+                delegations_today:
+                    type: integer
+                    description: Number of delegations used today (present in effective endpoint).
+
+        DelegationListResponse:
+            type: object
+            properties:
+                delegations:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/DelegationResponse"
 
         # Unified Signing Intent
         SignIntentRequest:
