@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.33.0
+    version: 2.34.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -14930,6 +14930,20 @@ components:
                         Telegram: { bot_token }.
                         WhatsApp: { phone_number_id, access_token, verify_token }.
                         Discord: { bot_token, application_id }.
+                slash_commands_enabled:
+                    type: boolean
+                    description: Enable slash commands on this channel
+                voice_transcription_enabled:
+                    type: boolean
+                    description: Enable voice message transcription
+                sender_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: List of allowed sender IDs
+                auto_respond_enabled:
+                    type: boolean
+                    description: Enable auto-respond
 
         UpdateChannelRequest:
             type: object
@@ -14942,6 +14956,16 @@ components:
                     type: object
                     additionalProperties:
                         type: string
+                slash_commands_enabled:
+                    type: boolean
+                voice_transcription_enabled:
+                    type: boolean
+                sender_allowlist:
+                    type: array
+                    items:
+                        type: string
+                auto_respond_enabled:
+                    type: boolean
 
         ChannelResponse:
             type: object
@@ -14974,6 +14998,29 @@ components:
                         Channel-specific configuration JSON. May include:
                         - sender_allowlist (array of strings): restrict which external senders can trigger the agent
                         - auto_respond_enabled (boolean): whether the agent auto-responds to inbound messages
+                slash_commands_enabled:
+                    type: boolean
+                    description: Whether slash commands are enabled for this channel
+                voice_transcription_enabled:
+                    type: boolean
+                    description: Whether voice message transcription is enabled
+                unified_conversation_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: ID linking this channel to a unified cross-platform conversation
+                is_home_platform:
+                    type: boolean
+                    description: Whether this is the agent's home platform channel
+                sender_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    nullable: true
+                    description: List of allowed sender IDs for auto-respond
+                auto_respond_enabled:
+                    type: boolean
+                    description: Whether auto-respond is enabled for this channel
                 created_at:
                     type: string
                     format: date-time
@@ -15024,6 +15071,22 @@ components:
                     type: string
                 media_url:
                     type: string
+                is_voice_message:
+                    type: boolean
+                    description: Whether this message was a voice message
+                voice_file_id:
+                    type: string
+                    nullable: true
+                    description: Telegram voice file ID
+                voice_duration_secs:
+                    type: integer
+                    nullable: true
+                    description: Duration of voice message in seconds
+                transcription_status:
+                    type: string
+                    nullable: true
+                    enum: [pending, completed, failed]
+                    description: Status of voice transcription
                 created_at:
                     type: string
                     format: date-time
