@@ -4229,8 +4229,8 @@ paths:
             description: |
                 Generates keypairs for the requested chains (or all supported chains if omitted).
                 Private keys are stored in a per-org `__treasury-keys` vault with tier-appropriate
-                MPC custody. Skips chains where the user already has an active wallet. Requires
-                Pro or higher billing tier. Human users only — agents get 403.
+                MPC custody. Skips chains where the user already has an active wallet. Available
+                on all tiers (counts toward wallet quota). Human users only — agents get 403.
             operationId: generateTreasuryWallets
             security:
                 - BearerAuth: []
@@ -4366,7 +4366,7 @@ paths:
             description: |
                 Generates a new keypair, deactivates the old wallet, and creates a
                 new active wallet. The old private key version is retained in the
-                vault for audit. Requires Pro or higher.
+                vault for audit. Counts toward wallet quota (does not require a paid plan).
             operationId: rotateTreasuryWallet
             security:
                 - BearerAuth: []
@@ -12627,6 +12627,8 @@ components:
                         team_members:
                             $ref: "#/components/schemas/UsageMeter"
                         intent_transactions:
+                            $ref: "#/components/schemas/UsageMeter"
+                        wallets:
                             $ref: "#/components/schemas/UsageMeter"
                         shares:
                             $ref: "#/components/schemas/UsageMeter"

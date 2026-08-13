@@ -6527,7 +6527,7 @@
           "Treasury Wallets"
         ],
         "summary": "Generate multi-chain wallets for the authenticated user",
-        "description": "Generates keypairs for the requested chains (or all supported chains if omitted).\nPrivate keys are stored in a per-org `__treasury-keys` vault with tier-appropriate\nMPC custody. Skips chains where the user already has an active wallet. Requires\nPro or higher billing tier. Human users only — agents get 403.\n",
+        "description": "Generates keypairs for the requested chains (or all supported chains if omitted).\nPrivate keys are stored in a per-org `__treasury-keys` vault with tier-appropriate\nMPC custody. Skips chains where the user already has an active wallet. Available\non all tiers (counts toward wallet quota). Human users only — agents get 403.\n",
         "operationId": "generateTreasuryWallets",
         "security": [
           {
@@ -6740,7 +6740,7 @@
           "Treasury Wallets"
         ],
         "summary": "Rotate the user's wallet key for a chain",
-        "description": "Generates a new keypair, deactivates the old wallet, and creates a\nnew active wallet. The old private key version is retained in the\nvault for audit. Requires Pro or higher.\n",
+        "description": "Generates a new keypair, deactivates the old wallet, and creates a\nnew active wallet. The old private key version is retained in the\nvault for audit. Counts toward wallet quota (does not require a paid plan).\n",
         "operationId": "rotateTreasuryWallet",
         "security": [
           {
@@ -19304,6 +19304,9 @@
                 "$ref": "#/components/schemas/UsageMeter"
               },
               "intent_transactions": {
+                "$ref": "#/components/schemas/UsageMeter"
+              },
+              "wallets": {
                 "$ref": "#/components/schemas/UsageMeter"
               },
               "shares": {
