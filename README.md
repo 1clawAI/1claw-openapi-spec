@@ -40,7 +40,16 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.44.4 — API `info.version` 2.33.0)
+## What's in the spec (v0.47.1)
+
+### Turnkey parity (v0.47)
+- **Portfolio** — `GET /v1/portfolio` (unified balance aggregator)
+- **Cedar policies** — `POST/GET/DELETE /v1/org/cedar-policies`, dry-run `POST .../test` (Team+ tier)
+- **OPA policies** — `POST/GET/DELETE /v1/org/opa-policies`, dry-run `POST .../test` (Business+ tier)
+- **Sub-organizations** — `POST/GET/DELETE /v1/org/sub-orgs`, permissions, users, wallet generation
+- **Smart account import** — `POST /v1/agents/{id}/smart-accounts/import`
+- **Signing key BYOK** — `POST /v1/agents/{id}/signing-keys/{chain}/import` (human-only, `X-Auth-Confirm`)
+- **Treasury wallet import** — `POST /v1/treasury/wallets/{chain}/import` (human-only, multi-chain send)
 
 ### OAuth & Platform enhancements (0.44.4)
 - **OAuth token revocation** — `POST /v1/oauth/revoke` (RFC 7009 token revocation)
