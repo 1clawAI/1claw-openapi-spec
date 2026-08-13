@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 2.35.0
+    version: 2.36.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -98,6 +98,14 @@ tags:
       description: OAuth connected accounts for agents (provider registry, connect flows, app credentials)
     - name: Delegations
       description: Agent-to-agent delegation management (human-controlled authorization)
+    - name: Cedar Policies
+      description: Cedar policy engine (Team+ tier)
+    - name: OPA Policies
+      description: OPA policy engine (Business+ tier)
+    - name: Sub-Organizations
+      description: Sub-organization management
+    - name: Portfolio
+      description: Unified balance aggregator
 
 # =============================================================================
 # PATHS
@@ -2453,6 +2461,41 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/agents/{agent_id}/signing-keys/{chain}/import:
+        post:
+            tags: [Signing Keys]
+            summary: Import a signing key for a chain
+            description: |
+                Import an existing private key for a specific chain. Human-only,
+                requires password re-authentication.
+            operationId: importSigningKey
+            security:
+                - BearerAuth: []
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ImportKeyRequest"
+            responses:
+                "201":
+                    description: Signing key imported
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SigningKeyResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     # ---------------------------------------------------------------------------
     # Bankr Dynamic Key Vending
     # ---------------------------------------------------------------------------
@@ -4478,6 +4521,40 @@ paths:
                     $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/wallets/{chain}/import:
+        post:
+            tags: [Treasury Wallets]
+            summary: Import a treasury wallet
+            description: |
+                Import an existing private key as a treasury wallet. Human-only,
+                requires password re-authentication via X-Auth-Confirm header.
+            operationId: importTreasuryWallet
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ImportKeyRequest"
+            responses:
+                "201":
+                    description: Treasury wallet imported
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     /v1/treasury/wallets/spend-policy:
         get:
@@ -8720,6 +8797,526 @@ paths:
                 "302":
                     description: Redirect to dashboard with success or error status
 
+    # ---------------------------------------------------------------------------
+    # Cedar Policies
+    # ---------------------------------------------------------------------------
+
+    /v1/org/cedar-policies:
+        post:
+            tags: [Cedar Policies]
+            summary: Create a Cedar policy
+            description: Create a new Cedar policy for the organization. Team+ tier required.
+            operationId: createCedarPolicy
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateCedarPolicyRequest"
+            responses:
+                "201":
+                    description: Cedar policy created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CedarPolicyResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        get:
+            tags: [Cedar Policies]
+            summary: List Cedar policies
+            description: List all Cedar policies for the organization.
+            operationId: listCedarPolicies
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Cedar policies list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CedarPolicyListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/org/cedar-policies/{id}:
+        get:
+            tags: [Cedar Policies]
+            summary: Get a Cedar policy
+            description: Retrieve a specific Cedar policy by ID.
+            operationId: getCedarPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Cedar policy details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CedarPolicyResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Cedar Policies]
+            summary: Delete a Cedar policy
+            description: Delete a Cedar policy by ID.
+            operationId: deleteCedarPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Cedar policy deleted
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/org/cedar-policies/test:
+        post:
+            tags: [Cedar Policies]
+            summary: Test Cedar policy evaluation
+            description: Evaluate the organization's Cedar policies against a test request.
+            operationId: testCedarPolicy
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CedarPolicyTestRequest"
+            responses:
+                "200":
+                    description: Policy evaluation result
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CedarPolicyTestResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    # ---------------------------------------------------------------------------
+    # OPA Policies
+    # ---------------------------------------------------------------------------
+
+    /v1/org/opa-policies:
+        post:
+            tags: [OPA Policies]
+            summary: Create an OPA policy
+            description: Create a new OPA Rego policy for the organization. Business+ tier required.
+            operationId: createOpaPolicy
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateOpaPolicyRequest"
+            responses:
+                "201":
+                    description: OPA policy created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OpaPolicyResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        get:
+            tags: [OPA Policies]
+            summary: List OPA policies
+            description: List all OPA policies for the organization.
+            operationId: listOpaPolicies
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: OPA policies list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OpaPolicyListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/org/opa-policies/{id}:
+        get:
+            tags: [OPA Policies]
+            summary: Get an OPA policy
+            description: Retrieve a specific OPA policy by ID.
+            operationId: getOpaPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: OPA policy details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OpaPolicyResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [OPA Policies]
+            summary: Delete an OPA policy
+            description: Delete an OPA policy by ID.
+            operationId: deleteOpaPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: OPA policy deleted
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/org/opa-policies/test:
+        post:
+            tags: [OPA Policies]
+            summary: Test OPA policy evaluation
+            description: Evaluate the organization's OPA policies against a test input.
+            operationId: testOpaPolicy
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/OpaPolicyTestRequest"
+            responses:
+                "200":
+                    description: Policy evaluation result
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OpaPolicyTestResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    # ---------------------------------------------------------------------------
+    # Sub-Organizations
+    # ---------------------------------------------------------------------------
+
+    /v1/org/sub-orgs:
+        post:
+            tags: [Sub-Organizations]
+            summary: Create a sub-organization
+            description: Create a new sub-organization under the current org.
+            operationId: createSubOrg
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateSubOrgRequest"
+            responses:
+                "201":
+                    description: Sub-organization created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubOrgResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        get:
+            tags: [Sub-Organizations]
+            summary: List sub-organizations
+            description: List all sub-organizations under the current org.
+            operationId: listSubOrgs
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Sub-organizations list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubOrgListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/org/sub-orgs/{sub_org_id}:
+        get:
+            tags: [Sub-Organizations]
+            summary: Get a sub-organization
+            description: Retrieve a specific sub-organization by ID.
+            operationId: getSubOrg
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: sub_org_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Sub-organization details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubOrgResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        patch:
+            tags: [Sub-Organizations]
+            summary: Update a sub-organization
+            description: Update sub-organization name, description, or billing model.
+            operationId: updateSubOrg
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: sub_org_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateSubOrgRequest"
+            responses:
+                "200":
+                    description: Sub-organization updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubOrgResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Sub-Organizations]
+            summary: Archive a sub-organization
+            description: Archive (soft-delete) a sub-organization.
+            operationId: deleteSubOrg
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: sub_org_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Sub-organization archived
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/org/sub-orgs/{sub_org_id}/users:
+        post:
+            tags: [Sub-Organizations]
+            summary: Add a user to a sub-organization
+            description: Add a user to a sub-organization with a specified role.
+            operationId: addSubOrgUser
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: sub_org_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SubOrgAddUserRequest"
+            responses:
+                "201":
+                    description: User added to sub-organization
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/org/sub-orgs/{sub_org_id}/permissions:
+        post:
+            tags: [Sub-Organizations]
+            summary: Grant permissions to a sub-organization
+            description: Grant a permission scope to the sub-organization.
+            operationId: grantSubOrgPermission
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: sub_org_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SubOrgPermissionRequest"
+            responses:
+                "201":
+                    description: Permission granted
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/org/sub-orgs/{sub_org_id}/wallets/generate:
+        post:
+            tags: [Sub-Organizations]
+            summary: Generate wallets for a sub-organization
+            description: Generate treasury wallets for specified chains within the sub-org.
+            operationId: generateSubOrgWallets
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: sub_org_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SubOrgGenerateWalletsRequest"
+            responses:
+                "201":
+                    description: Wallets generated
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
+    # Portfolio
+    # ---------------------------------------------------------------------------
+
+    /v1/portfolio:
+        get:
+            tags: [Portfolio]
+            summary: Get unified portfolio
+            description: |
+                Returns an aggregated view of all wallet balances (treasury wallets,
+                signing keys, smart accounts) with USD estimates.
+            operationId: getPortfolio
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Portfolio summary
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PortfolioResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    # ---------------------------------------------------------------------------
+    # Smart Account Import
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/smart-accounts/import:
+        post:
+            tags: [Agents]
+            summary: Import an existing Safe smart account
+            description: |
+                Import an existing Safe smart account for an agent. Optionally verifies
+                on-chain that the agent's EOA is a signer on the Safe.
+            operationId: importSmartAccount
+            security:
+                - BearerAuth: []
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ImportSmartAccountRequest"
+            responses:
+                "201":
+                    description: Smart account imported
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
 # =============================================================================
 # COMPONENTS
 # =============================================================================
@@ -9692,6 +10289,17 @@ components:
                 expires_at:
                     type: string
                     format: date-time
+                effect:
+                    type: string
+                    enum: [allow, deny]
+                    default: allow
+                priority:
+                    type: integer
+                    minimum: 0
+                    default: 0
+                attribute_conditions:
+                    type: object
+                    additionalProperties: true
 
         UpdatePolicyRequest:
             type: object
@@ -9706,6 +10314,17 @@ components:
                 expires_at:
                     type: string
                     format: date-time
+                effect:
+                    type: string
+                    enum: [allow, deny]
+                    default: allow
+                priority:
+                    type: integer
+                    minimum: 0
+                    default: 0
+                attribute_conditions:
+                    type: object
+                    additionalProperties: true
 
         PolicyResponse:
             type: object
@@ -9749,6 +10368,17 @@ components:
                 created_at:
                     type: string
                     format: date-time
+                effect:
+                    type: string
+                    enum: [allow, deny]
+                    default: allow
+                priority:
+                    type: integer
+                    minimum: 0
+                    default: 0
+                attribute_conditions:
+                    type: object
+                    additionalProperties: true
 
         PolicyListResponse:
             type: object
@@ -12674,7 +13304,7 @@ components:
                     description: Destination address (0x-prefixed)
                 value_wei:
                     type: string
-                    description: Value in wei
+                    description: Value in wei (or major-unit decimal string for non-EVM)
                 data:
                     type: string
                     description: Hex-encoded calldata (optional)
@@ -12685,6 +13315,30 @@ components:
                     type: boolean
                     description: When true, submits as a gasless (ERC-4337) transaction via Pimlico paymaster. The paymaster sponsors the gas cost.
                     default: false
+                token_mint:
+                    type: string
+                    description: Token contract address / mint (ERC-20, SPL, TRC-20, Cardano policy_id.asset_name)
+                memo:
+                    type: string
+                    description: Transaction memo (Solana Memo Program, XRP Memos, Tron extra_data)
+                destination_tag:
+                    type: integer
+                    description: XRP destination tag
+                fee_rate_sat_per_vbyte:
+                    type: integer
+                    description: Bitcoin fee rate in sat/vbyte
+                xrpl_tx_json:
+                    type: object
+                    description: Raw XRPL transaction JSON for advanced XRP transaction types
+                fee_limit_sun:
+                    type: integer
+                    description: Tron fee limit in sun
+                token_decimals:
+                    type: integer
+                    description: Token decimals (required for non-EVM token transfers when not in known_tokens)
+                ttl:
+                    type: integer
+                    description: Cardano transaction TTL (slot number)
 
         TreasuryWalletSendResponse:
             type: object
@@ -15590,3 +16244,296 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/OAuthAppCredentialResponse"
+
+        # -------------------------------------------------------------------
+        # Key Import
+        # -------------------------------------------------------------------
+
+        ImportKeyRequest:
+            type: object
+            required: [private_key]
+            properties:
+                private_key:
+                    type: string
+                    description: The private key to import
+                format:
+                    type: string
+                    enum: [hex, base64, wif]
+                    description: Key format (default hex)
+
+        # -------------------------------------------------------------------
+        # Cedar Policies
+        # -------------------------------------------------------------------
+
+        CreateCedarPolicyRequest:
+            type: object
+            required: [policy_text]
+            properties:
+                policy_text:
+                    type: string
+                    description: Cedar policy text
+                description:
+                    type: string
+
+        CedarPolicyResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                policy_text:
+                    type: string
+                description:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                created_by:
+                    type: string
+                    format: uuid
+
+        CedarPolicyListResponse:
+            type: object
+            properties:
+                policies:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/CedarPolicyResponse"
+
+        CedarPolicyTestRequest:
+            type: object
+            required: [principal, action, resource]
+            properties:
+                principal:
+                    type: string
+                action:
+                    type: string
+                resource:
+                    type: string
+                context:
+                    type: object
+
+        CedarPolicyTestResponse:
+            type: object
+            properties:
+                decision:
+                    type: string
+                    enum: [allow, deny]
+                reasons:
+                    type: array
+                    items:
+                        type: string
+
+        # -------------------------------------------------------------------
+        # OPA Policies
+        # -------------------------------------------------------------------
+
+        CreateOpaPolicyRequest:
+            type: object
+            required: [rego_module]
+            properties:
+                rego_module:
+                    type: string
+                    description: OPA Rego module source
+                description:
+                    type: string
+                data:
+                    type: object
+                    description: Static data document for the policy
+
+        OpaPolicyResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                rego_module:
+                    type: string
+                description:
+                    type: string
+                data:
+                    type: object
+                created_at:
+                    type: string
+                    format: date-time
+                created_by:
+                    type: string
+                    format: uuid
+
+        OpaPolicyListResponse:
+            type: object
+            properties:
+                policies:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/OpaPolicyResponse"
+
+        OpaPolicyTestRequest:
+            type: object
+            required: [input]
+            properties:
+                input:
+                    type: object
+                    description: Input document for policy evaluation
+                data:
+                    type: object
+                    description: Optional data override
+
+        OpaPolicyTestResponse:
+            type: object
+            properties:
+                result:
+                    type: object
+                decision:
+                    type: string
+                    enum: [allow, deny]
+
+        # -------------------------------------------------------------------
+        # Sub-Organizations
+        # -------------------------------------------------------------------
+
+        CreateSubOrgRequest:
+            type: object
+            required: [name]
+            properties:
+                name:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+                description:
+                    type: string
+                billing_model:
+                    type: string
+                    enum: [inherit, independent]
+                    default: inherit
+
+        SubOrgResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                parent_org_id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                description:
+                    type: string
+                billing_model:
+                    type: string
+                status:
+                    type: string
+                    enum: [active, archived]
+                created_at:
+                    type: string
+                    format: date-time
+
+        SubOrgListResponse:
+            type: object
+            properties:
+                sub_orgs:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/SubOrgResponse"
+
+        SubOrgPermissionRequest:
+            type: object
+            required: [permission]
+            properties:
+                permission:
+                    type: string
+                    description: "Permission to grant (e.g. vaults:read, agents:write)"
+                resource_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+
+        SubOrgAddUserRequest:
+            type: object
+            required: [user_id]
+            properties:
+                user_id:
+                    type: string
+                    format: uuid
+                role:
+                    type: string
+                    enum: [admin, member, viewer]
+                    default: member
+
+        SubOrgGenerateWalletsRequest:
+            type: object
+            properties:
+                chains:
+                    type: array
+                    items:
+                        type: string
+
+        # -------------------------------------------------------------------
+        # Portfolio
+        # -------------------------------------------------------------------
+
+        PortfolioResponse:
+            type: object
+            properties:
+                wallets:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/PortfolioWalletEntry"
+                total_usd_estimate:
+                    type: string
+
+        PortfolioWalletEntry:
+            type: object
+            properties:
+                wallet_type:
+                    type: string
+                    enum: [treasury, signing_key, smart_account]
+                chain:
+                    type: string
+                address:
+                    type: string
+                native_balance:
+                    type: string
+                native_balance_usd:
+                    type: string
+                tokens:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/PortfolioTokenBalance"
+
+        PortfolioTokenBalance:
+            type: object
+            properties:
+                contract_address:
+                    type: string
+                symbol:
+                    type: string
+                name:
+                    type: string
+                balance:
+                    type: string
+                balance_usd:
+                    type: string
+                decimals:
+                    type: integer
+
+        # -------------------------------------------------------------------
+        # Smart Account Import
+        # -------------------------------------------------------------------
+
+        ImportSmartAccountRequest:
+            type: object
+            required: [chain, chain_id, safe_address]
+            properties:
+                chain:
+                    type: string
+                chain_id:
+                    type: integer
+                safe_address:
+                    type: string
+                verify:
+                    type: boolean
+                    default: true
+                    description: Verify on-chain Safe ownership
