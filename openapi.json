@@ -14467,6 +14467,52 @@
         }
       }
     },
+    "/v1/org/sub-orgs/{sub_org_id}/permissions/{permission}": {
+      "delete": {
+        "tags": [
+          "Sub-Organizations"
+        ],
+        "summary": "Revoke a sub-organization permission",
+        "description": "Revoke a specific permission scope from the sub-organization.",
+        "operationId": "revokeSubOrgPermission",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sub_org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "permission",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The permission scope to revoke"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Permission revoked"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/org/sub-orgs/{sub_org_id}/wallets/generate": {
       "post": {
         "tags": [
@@ -14530,6 +14576,27 @@
             "BearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "chains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated list of chain names to filter by (e.g. \"ethereum,solana\")"
+          },
+          {
+            "name": "include_tokens",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Whether to include token balances alongside native balances"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Portfolio summary",
@@ -14577,7 +14644,14 @@
         },
         "responses": {
           "201": {
-            "description": "Smart account imported"
+            "description": "Smart account imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportSmartAccountResponse"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -25062,6 +25136,36 @@
             "type": "boolean",
             "default": true,
             "description": "Verify on-chain Safe ownership"
+          }
+        }
+      },
+      "ImportSmartAccountResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "chain_id": {
+            "type": "integer"
+          },
+          "safe_address": {
+            "type": "string"
+          },
+          "nonce": {
+            "type": "integer",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
