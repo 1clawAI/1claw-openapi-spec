@@ -40,7 +40,14 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.47.1)
+## What's in the spec (v0.48.0)
+
+### Cedar/OPA Enforcement v2 (v0.48)
+- **Policy backend** — `GET/PATCH /v1/org/settings/policy-backend`, `GET /v1/org/policy-shadow-report`
+- **Contract ABIs** — `POST/GET/DELETE /v1/org/contract-abis`, `GET /v1/org/contract-abis/{id}`
+- **Pending approvals** — `POST/GET /v1/pending-approvals`, approve/execute/cancel sub-routes
+- **Consensus triggers** — `consensus_trigger` on access policy schemas
+- **Dynamic enforcement_status** — Cedar/OPA policy and test responses
 
 ### Turnkey parity (v0.47)
 - **Portfolio** — `GET /v1/portfolio` (unified balance aggregator)

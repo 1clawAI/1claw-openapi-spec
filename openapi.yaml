@@ -102,6 +102,10 @@ tags:
       description: Cedar policy engine (Team+ tier)
     - name: OPA Policies
       description: OPA policy engine (Business+ tier)
+    - name: Contract ABIs
+      description: Org-scoped contract ABI registry for transaction decoding
+    - name: Pending Approvals
+      description: Consensus-based multi-party approval workflow for signing
     - name: Sub-Organizations
       description: Sub-organization management
     - name: Portfolio
@@ -9042,6 +9046,383 @@ paths:
                     $ref: "#/components/responses/Unauthorized"
 
     # ---------------------------------------------------------------------------
+    # Policy Backend Settings (Cedar/OPA enforcement)
+    # ---------------------------------------------------------------------------
+
+    /v1/org/settings/policy-backend:
+        get:
+            tags: [Organization]
+            summary: Get policy backend settings
+            description: |
+                Returns the org's Cedar/OPA enforcement configuration. Default mode is shadow.
+                Owner/admin only.
+            operationId: getPolicyBackendSettings
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Policy backend settings
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PolicyBackendSettingsResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        patch:
+            tags: [Organization]
+            summary: Update policy backend settings
+            description: |
+                Configure backend (builtin, cedar, opa, builtin+cedar, builtin+opa), mode (shadow/enforce),
+                scope actions, and circuit breaker behavior. Owner/admin only.
+            operationId: updatePolicyBackendSettings
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdatePolicyBackendSettingsRequest"
+            responses:
+                "200":
+                    description: Updated settings
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PolicyBackendSettingsResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/org/policy-shadow-report:
+        get:
+            tags: [Organization]
+            summary: Get policy shadow divergence report
+            description: |
+                Returns divergence statistics when running Cedar/OPA in shadow mode.
+                Owner/admin only.
+            operationId: getPolicyShadowReport
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Shadow divergence report
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PolicyShadowReportResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    # ---------------------------------------------------------------------------
+    # Contract ABI Registry
+    # ---------------------------------------------------------------------------
+
+    /v1/org/contract-abis:
+        post:
+            tags: [Contract ABIs]
+            summary: Register a contract ABI
+            description: Upload an org-scoped ABI for transaction decoding. Owner/admin only.
+            operationId: createContractAbi
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateContractAbiRequest"
+            responses:
+                "201":
+                    description: ABI registered
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ContractAbiResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+        get:
+            tags: [Contract ABIs]
+            summary: List contract ABIs
+            description: List org contract ABIs, optionally filtered by chain. Owner/admin only.
+            operationId: listContractAbis
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: chain
+                  in: query
+                  schema:
+                      type: string
+                  description: Filter by chain name
+            responses:
+                "200":
+                    description: ABI list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ContractAbiListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/org/contract-abis/{id}:
+        get:
+            tags: [Contract ABIs]
+            summary: Get a contract ABI
+            operationId: getContractAbi
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: ABI details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ContractAbiResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Contract ABIs]
+            summary: Delete a contract ABI
+            operationId: deleteContractAbi
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: ABI deleted
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
+    # Pending Approvals (consensus policies)
+    # ---------------------------------------------------------------------------
+
+    /v1/pending-approvals:
+        post:
+            tags: [Pending Approvals]
+            summary: Submit action for approval
+            description: Submit a signing or transaction action that matches a consensus policy trigger.
+            operationId: submitPendingApproval
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SubmitPendingApprovalRequest"
+            responses:
+                "202":
+                    description: Approval required
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        get:
+            tags: [Pending Approvals]
+            summary: List pending approvals
+            operationId: listPendingApprovals
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: status
+                  in: query
+                  schema:
+                      type: string
+                - name: agent_id
+                  in: query
+                  schema:
+                      type: string
+                      format: uuid
+                - name: limit
+                  in: query
+                  schema:
+                      type: integer
+                      maximum: 100
+                - name: offset
+                  in: query
+                  schema:
+                      type: integer
+            responses:
+                "200":
+                    description: Pending approvals list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PendingApprovalListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/pending-approvals/{id}:
+        get:
+            tags: [Pending Approvals]
+            summary: Get pending approval details
+            operationId: getPendingApproval
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Pending approval with signatures
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PendingApprovalResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/pending-approvals/{id}/approve:
+        post:
+            tags: [Pending Approvals]
+            summary: Approve or reject a pending approval
+            operationId: approvePendingApproval
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ApprovePendingApprovalRequest"
+            responses:
+                "200":
+                    description: Updated pending approval
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PendingApprovalResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/pending-approvals/{id}/execute:
+        post:
+            tags: [Pending Approvals]
+            summary: Execute an approved action
+            description: Human-only. Marks the approval as executed after verifying signatures.
+            operationId: executePendingApproval
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Action executed
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ExecutePendingApprovalResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/pending-approvals/{id}/cancel:
+        post:
+            tags: [Pending Approvals]
+            summary: Cancel a pending approval
+            operationId: cancelPendingApproval
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Cancelled pending approval
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PendingApprovalResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    # ---------------------------------------------------------------------------
     # Sub-Organizations
     # ---------------------------------------------------------------------------
 
@@ -10347,6 +10728,8 @@ components:
                 attribute_conditions:
                     type: object
                     additionalProperties: true
+                consensus_trigger:
+                    $ref: "#/components/schemas/ConsensusTrigger"
 
         UpdatePolicyRequest:
             type: object
@@ -10372,6 +10755,8 @@ components:
                 attribute_conditions:
                     type: object
                     additionalProperties: true
+                consensus_trigger:
+                    $ref: "#/components/schemas/ConsensusTrigger"
 
         PolicyResponse:
             type: object
@@ -10426,6 +10811,8 @@ components:
                 attribute_conditions:
                     type: object
                     additionalProperties: true
+                consensus_trigger:
+                    $ref: "#/components/schemas/ConsensusTrigger"
 
         PolicyListResponse:
             type: object
@@ -16316,13 +16703,13 @@ components:
 
         CreateCedarPolicyRequest:
             type: object
-            required: [policy_text]
+            required: [name, cedar_text]
             properties:
-                policy_text:
+                name:
+                    type: string
+                cedar_text:
                     type: string
                     description: Cedar policy text
-                description:
-                    type: string
 
         CedarPolicyResponse:
             type: object
@@ -16330,16 +16717,28 @@ components:
                 id:
                     type: string
                     format: uuid
-                policy_text:
+                org_id:
                     type: string
-                description:
+                    format: uuid
+                name:
                     type: string
-                created_at:
+                cedar_text:
                     type: string
-                    format: date-time
+                is_active:
+                    type: boolean
+                enforcement_status:
+                    type: string
+                    enum: [shadow, enforce, inactive]
+                    description: Dynamic status from org policy backend config
                 created_by:
                     type: string
                     format: uuid
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
 
         CedarPolicyListResponse:
             type: object
@@ -16351,14 +16750,23 @@ components:
 
         CedarPolicyTestRequest:
             type: object
-            required: [principal, action, resource]
+            required: [principal_type, principal_id, action, resource_path, vault_id]
             properties:
-                principal:
+                cedar_text:
                     type: string
+                    description: Optional inline Cedar text to test
+                principal_type:
+                    type: string
+                principal_id:
+                    type: string
+                    format: uuid
                 action:
                     type: string
-                resource:
+                resource_path:
                     type: string
+                vault_id:
+                    type: string
+                    format: uuid
                 context:
                     type: object
 
@@ -16368,10 +16776,13 @@ components:
                 decision:
                     type: string
                     enum: [allow, deny]
-                reasons:
-                    type: array
-                    items:
-                        type: string
+                backend:
+                    type: string
+                enforcement_status:
+                    type: string
+                    enum: [shadow, enforce, inactive]
+                note:
+                    type: string
 
         # -------------------------------------------------------------------
         # OPA Policies
@@ -16379,16 +16790,19 @@ components:
 
         CreateOpaPolicyRequest:
             type: object
-            required: [rego_module]
+            required: [name]
             properties:
-                rego_module:
+                name:
+                    type: string
+                rego_source:
                     type: string
                     description: OPA Rego module source
-                description:
+                wasm_bundle_base64:
                     type: string
-                data:
-                    type: object
-                    description: Static data document for the policy
+                    description: Optional WASM bundle (base64)
+                entrypoint:
+                    type: string
+                    default: oneclaw/allow
 
         OpaPolicyResponse:
             type: object
@@ -16396,18 +16810,31 @@ components:
                 id:
                     type: string
                     format: uuid
-                rego_module:
+                org_id:
                     type: string
-                description:
+                    format: uuid
+                name:
                     type: string
-                data:
-                    type: object
-                created_at:
+                rego_source:
                     type: string
-                    format: date-time
+                has_wasm_bundle:
+                    type: boolean
+                entrypoint:
+                    type: string
+                is_active:
+                    type: boolean
+                enforcement_status:
+                    type: string
+                    enum: [shadow, enforce, inactive]
                 created_by:
                     type: string
                     format: uuid
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
 
         OpaPolicyListResponse:
             type: object
@@ -16419,23 +16846,436 @@ components:
 
         OpaPolicyTestRequest:
             type: object
-            required: [input]
+            required: [principal_type, principal_id, action, resource_path, vault_id]
             properties:
-                input:
+                principal_type:
+                    type: string
+                principal_id:
+                    type: string
+                    format: uuid
+                action:
+                    type: string
+                resource_path:
+                    type: string
+                vault_id:
+                    type: string
+                    format: uuid
+                context:
                     type: object
-                    description: Input document for policy evaluation
-                data:
-                    type: object
-                    description: Optional data override
 
         OpaPolicyTestResponse:
             type: object
             properties:
-                result:
-                    type: object
                 decision:
                     type: string
                     enum: [allow, deny]
+                backend:
+                    type: string
+                enforcement_status:
+                    type: string
+                    enum: [shadow, enforce, inactive]
+                note:
+                    type: string
+
+        # -------------------------------------------------------------------
+        # Policy Backend Settings
+        # -------------------------------------------------------------------
+
+        PolicyBackendSettingsResponse:
+            type: object
+            properties:
+                backend:
+                    type: string
+                    enum: [builtin, cedar, opa, builtin+cedar, builtin+opa]
+                mode:
+                    type: string
+                    enum: [shadow, enforce]
+                scope:
+                    type: array
+                    items:
+                        type: string
+                breaker_behavior:
+                    type: string
+                    enum: [fail_closed, fail_open_builtin]
+                policy_version:
+                    type: integer
+                    format: int64
+
+        UpdatePolicyBackendSettingsRequest:
+            type: object
+            properties:
+                backend:
+                    type: string
+                    enum: [builtin, cedar, opa, builtin+cedar, builtin+opa]
+                mode:
+                    type: string
+                    enum: [shadow, enforce]
+                scope:
+                    type: array
+                    items:
+                        type: string
+                breaker_behavior:
+                    type: string
+                    enum: [fail_closed, fail_open_builtin]
+
+        PolicyShadowReportResponse:
+            type: object
+            properties:
+                total_evaluated:
+                    type: integer
+                    format: int64
+                total_divergences:
+                    type: integer
+                    format: int64
+                total_errors:
+                    type: integer
+                    format: int64
+                concordance_rate:
+                    type: number
+                    format: double
+                sample_events:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/PolicyShadowEvent"
+                period_start:
+                    type: string
+                    format: date-time
+                period_end:
+                    type: string
+                    format: date-time
+
+        PolicyShadowEvent:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                backend:
+                    type: string
+                action:
+                    type: string
+                builtin_decision:
+                    type: string
+                backend_decision:
+                    type: string
+                divergent:
+                    type: boolean
+                sampled:
+                    type: boolean
+                eval_duration_ms:
+                    type: integer
+                error_text:
+                    type: string
+                caller_id:
+                    type: string
+                    format: uuid
+                resource_path:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+
+        # -------------------------------------------------------------------
+        # Contract ABIs
+        # -------------------------------------------------------------------
+
+        CreateContractAbiRequest:
+            type: object
+            required: [chain, contract_address, abi_json]
+            properties:
+                chain:
+                    type: string
+                contract_address:
+                    type: string
+                abi_json:
+                    type: array
+                    items:
+                        type: object
+                name:
+                    type: string
+                description:
+                    type: string
+                token_decimals:
+                    type: integer
+
+        ContractAbiResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                contract_address:
+                    type: string
+                abi_json:
+                    type: array
+                    items:
+                        type: object
+                name:
+                    type: string
+                description:
+                    type: string
+                token_decimals:
+                    type: integer
+                created_by:
+                    type: string
+                    format: uuid
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        ContractAbiListResponse:
+            type: object
+            properties:
+                abis:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ContractAbiResponse"
+
+        # -------------------------------------------------------------------
+        # Consensus / Pending Approvals
+        # -------------------------------------------------------------------
+
+        ConsensusTrigger:
+            type: object
+            required: [conditions, approval]
+            properties:
+                conditions:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ConsensusCondition"
+                approval:
+                    $ref: "#/components/schemas/ApprovalRequirement"
+                expiry_secs:
+                    type: integer
+                    format: int64
+                    default: 86400
+                self_approval_allowed:
+                    type: boolean
+                    default: false
+
+        ConsensusCondition:
+            oneOf:
+                - type: object
+                  required: [type, threshold_gwei]
+                  properties:
+                      type:
+                          type: string
+                          enum: [value_above]
+                      threshold_gwei:
+                          type: integer
+                          format: int64
+                - type: object
+                  required: [type, chains]
+                  properties:
+                      type:
+                          type: string
+                          enum: [chain_in]
+                      chains:
+                          type: array
+                          items:
+                              type: string
+                - type: object
+                  required: [type, addresses]
+                  properties:
+                      type:
+                          type: string
+                          enum: [to_address_in]
+                      addresses:
+                          type: array
+                          items:
+                              type: string
+                - type: object
+                  required: [type, selectors]
+                  properties:
+                      type:
+                          type: string
+                          enum: [function_selector_in]
+                      selectors:
+                          type: array
+                          items:
+                              type: string
+                - type: object
+                  required: [type, threshold_raw]
+                  properties:
+                      type:
+                          type: string
+                          enum: [erc20_amount_above]
+                      threshold_raw:
+                          type: string
+                - type: object
+                  required: [type, intent_types]
+                  properties:
+                      type:
+                          type: string
+                          enum: [intent_type_in]
+                      intent_types:
+                          type: array
+                          items:
+                              type: string
+                - type: object
+                  required: [type]
+                  properties:
+                      type:
+                          type: string
+                          enum: [always]
+
+        ApprovalRequirement:
+            type: object
+            required: [min_approvals]
+            properties:
+                min_approvals:
+                    type: integer
+                required_roles:
+                    type: array
+                    items:
+                        type: string
+                per_role_minimums:
+                    type: object
+                    additionalProperties:
+                        type: integer
+
+        SubmitPendingApprovalRequest:
+            type: object
+            required: [policy_id, action, action_payload]
+            properties:
+                policy_id:
+                    type: string
+                    format: uuid
+                action:
+                    type: string
+                action_payload:
+                    type: object
+
+        SubmitPendingApprovalResponse:
+            type: object
+            properties:
+                pending_approval_id:
+                    type: string
+                    format: uuid
+                required_approvals:
+                    type: integer
+                current_approvals:
+                    type: integer
+                expires_at:
+                    type: string
+                    format: date-time
+                status:
+                    type: string
+                message:
+                    type: string
+
+        ApprovePendingApprovalRequest:
+            type: object
+            required: [decision, payload_hash]
+            properties:
+                decision:
+                    type: string
+                    enum: [approve, reject]
+                payload_hash:
+                    type: string
+                reason:
+                    type: string
+
+        PendingApprovalResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                policy_id:
+                    type: string
+                    format: uuid
+                action:
+                    type: string
+                action_payload:
+                    type: object
+                payload_hash:
+                    type: string
+                submitted_by:
+                    type: string
+                    format: uuid
+                submitted_by_type:
+                    type: string
+                status:
+                    type: string
+                required_approvals:
+                    type: integer
+                current_approvals:
+                    type: integer
+                expires_at:
+                    type: string
+                    format: date-time
+                executed_at:
+                    type: string
+                    format: date-time
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+                signatures:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ApprovalSignatureResponse"
+
+        ApprovalSignatureResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                approver_id:
+                    type: string
+                    format: uuid
+                approver_type:
+                    type: string
+                decision:
+                    type: string
+                reason:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+
+        PendingApprovalListResponse:
+            type: object
+            properties:
+                pending_approvals:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/PendingApprovalResponse"
+                total:
+                    type: integer
+                    format: int64
+
+        ExecutePendingApprovalResponse:
+            type: object
+            properties:
+                pending_approval_id:
+                    type: string
+                    format: uuid
+                status:
+                    type: string
+                executed_at:
+                    type: string
+                    format: date-time
+                result:
+                    type: object
 
         # -------------------------------------------------------------------
         # Sub-Organizations
