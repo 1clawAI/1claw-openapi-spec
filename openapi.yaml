@@ -10730,6 +10730,8 @@ components:
                     additionalProperties: true
                 consensus_trigger:
                     $ref: "#/components/schemas/ConsensusTrigger"
+                tx_conditions:
+                    $ref: "#/components/schemas/TxConditions"
 
         UpdatePolicyRequest:
             type: object
@@ -10757,6 +10759,8 @@ components:
                     additionalProperties: true
                 consensus_trigger:
                     $ref: "#/components/schemas/ConsensusTrigger"
+                tx_conditions:
+                    $ref: "#/components/schemas/TxConditions"
 
         PolicyResponse:
             type: object
@@ -10813,6 +10817,8 @@ components:
                     additionalProperties: true
                 consensus_trigger:
                     $ref: "#/components/schemas/ConsensusTrigger"
+                tx_conditions:
+                    $ref: "#/components/schemas/TxConditions"
 
         PolicyListResponse:
             type: object
@@ -12005,6 +12011,13 @@ components:
                         OfferCancel, AccountSet, EscrowCreate, NFTokenMint, AMMCreate,
                         and 20+ more. Account, Sequence, Fee, LastLedgerSequence, and
                         SigningPubKey are auto-filled when absent.
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: >
+                        Optional pending approval ID. When consensus policies match,
+                        clients resubmit with this field set to bypass the 202 gate
+                        after the approval has been executed.
 
         SignTransactionRequest:
             type: object
@@ -12472,6 +12485,13 @@ components:
                         OfferCancel, AccountSet, EscrowCreate, NFTokenMint, AMMCreate,
                         and 20+ more. Account, Sequence, Fee, LastLedgerSequence, and
                         SigningPubKey are auto-filled when absent.
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: >
+                        Optional pending approval ID. When consensus policies match,
+                        clients resubmit with this field set to bypass the 202 gate
+                        after the approval has been executed.
 
         SignIntentResponse:
             type: object
@@ -16990,16 +17010,24 @@ components:
                     type: string
                 contract_address:
                     type: string
+                    description: Contract address, or Solana program id when interface_kind is solana_idl
                 abi_json:
-                    type: array
-                    items:
-                        type: object
+                    description: EVM ABI JSON array, or Solana IDL object when interface_kind is solana_idl
+                    oneOf:
+                        - type: array
+                          items:
+                              type: object
+                        - type: object
                 name:
                     type: string
                 description:
                     type: string
                 token_decimals:
                     type: integer
+                interface_kind:
+                    type: string
+                    enum: [evm_abi, solana_idl]
+                    default: evm_abi
 
         ContractAbiResponse:
             type: object
@@ -17015,15 +17043,22 @@ components:
                 contract_address:
                     type: string
                 abi_json:
-                    type: array
-                    items:
-                        type: object
+                    description: EVM ABI JSON array, or Solana IDL object
+                    oneOf:
+                        - type: array
+                          items:
+                              type: object
+                        - type: object
                 name:
                     type: string
                 description:
                     type: string
                 token_decimals:
                     type: integer
+                interface_kind:
+                    type: string
+                    enum: [evm_abi, solana_idl]
+                    default: evm_abi
                 created_by:
                     type: string
                     format: uuid
@@ -17045,6 +17080,45 @@ components:
         # -------------------------------------------------------------------
         # Consensus / Pending Approvals
         # -------------------------------------------------------------------
+
+        TxConditions:
+            type: object
+            description: |
+                Signing-time AND conditions on access policies (all tiers).
+                Ignored on secret reads. Evaluated when a TransactionContext is present.
+            additionalProperties: true
+            properties:
+                function_name_in:
+                    type: array
+                    items:
+                        type: string
+                function_selector_in:
+                    type: array
+                    items:
+                        type: string
+                erc20_amount_above:
+                    type: string
+                value_above:
+                    type: string
+                    description: Native value threshold in gwei
+                to_address_in:
+                    type: array
+                    items:
+                        type: string
+                chain_in:
+                    type: array
+                    items:
+                        type: string
+                intent_type_in:
+                    type: array
+                    items:
+                        type: string
+                decode_failed:
+                    type: boolean
+                program_id_in:
+                    type: array
+                    items:
+                        type: string
 
         ConsensusTrigger:
             type: object

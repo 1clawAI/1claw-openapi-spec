@@ -16727,6 +16727,9 @@
           },
           "consensus_trigger": {
             "$ref": "#/components/schemas/ConsensusTrigger"
+          },
+          "tx_conditions": {
+            "$ref": "#/components/schemas/TxConditions"
           }
         }
       },
@@ -16766,6 +16769,9 @@
           },
           "consensus_trigger": {
             "$ref": "#/components/schemas/ConsensusTrigger"
+          },
+          "tx_conditions": {
+            "$ref": "#/components/schemas/TxConditions"
           }
         }
       },
@@ -16841,6 +16847,9 @@
           },
           "consensus_trigger": {
             "$ref": "#/components/schemas/ConsensusTrigger"
+          },
+          "tx_conditions": {
+            "$ref": "#/components/schemas/TxConditions"
           }
         }
       },
@@ -18482,6 +18491,11 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Raw XRPL transaction JSON for full transaction type coverage. When present (and chain is XRP), the handler uses the xrpl-rust binary codec to encode and sign the transaction as-is. Supports all XRPL transaction types: Payment, TrustSet, OfferCreate, OfferCancel, AccountSet, EscrowCreate, NFTokenMint, AMMCreate, and 20+ more. Account, Sequence, Fee, LastLedgerSequence, and SigningPubKey are auto-filled when absent.\n"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional pending approval ID. When consensus policies match, clients resubmit with this field set to bypass the 202 gate after the approval has been executed.\n"
           }
         }
       },
@@ -19131,6 +19145,11 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Raw XRPL transaction JSON for full transaction type coverage. When present (and chain is XRP), the handler uses the xrpl-rust binary codec to encode and sign the transaction as-is. Supports all XRPL transaction types: Payment, TrustSet, OfferCreate, OfferCancel, AccountSet, EscrowCreate, NFTokenMint, AMMCreate, and 20+ more. Account, Sequence, Fee, LastLedgerSequence, and SigningPubKey are auto-filled when absent.\n"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional pending approval ID. When consensus policies match, clients resubmit with this field set to bypass the 202 gate after the approval has been executed.\n"
           }
         }
       },
@@ -25808,13 +25827,22 @@
             "type": "string"
           },
           "contract_address": {
-            "type": "string"
+            "type": "string",
+            "description": "Contract address, or Solana program id when interface_kind is solana_idl"
           },
           "abi_json": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
+            "description": "EVM ABI JSON array, or Solana IDL object when interface_kind is solana_idl",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              {
+                "type": "object"
+              }
+            ]
           },
           "name": {
             "type": "string"
@@ -25824,6 +25852,14 @@
           },
           "token_decimals": {
             "type": "integer"
+          },
+          "interface_kind": {
+            "type": "string",
+            "enum": [
+              "evm_abi",
+              "solana_idl"
+            ],
+            "default": "evm_abi"
           }
         }
       },
@@ -25845,10 +25881,18 @@
             "type": "string"
           },
           "abi_json": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
+            "description": "EVM ABI JSON array, or Solana IDL object",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              {
+                "type": "object"
+              }
+            ]
           },
           "name": {
             "type": "string"
@@ -25858,6 +25902,14 @@
           },
           "token_decimals": {
             "type": "integer"
+          },
+          "interface_kind": {
+            "type": "string",
+            "enum": [
+              "evm_abi",
+              "solana_idl"
+            ],
+            "default": "evm_abi"
           },
           "created_by": {
             "type": "string",
@@ -25880,6 +25932,59 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ContractAbiResponse"
+            }
+          }
+        }
+      },
+      "TxConditions": {
+        "type": "object",
+        "description": "Signing-time AND conditions on access policies (all tiers).\nIgnored on secret reads. Evaluated when a TransactionContext is present.\n",
+        "additionalProperties": true,
+        "properties": {
+          "function_name_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "function_selector_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "erc20_amount_above": {
+            "type": "string"
+          },
+          "value_above": {
+            "type": "string",
+            "description": "Native value threshold in gwei"
+          },
+          "to_address_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chain_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "intent_type_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decode_failed": {
+            "type": "boolean"
+          },
+          "program_id_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }
