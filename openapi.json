@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "2.36.0",
+    "version": "0.51.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -190,6 +190,10 @@
     {
       "name": "Portfolio",
       "description": "Unified balance aggregator"
+    },
+    {
+      "name": "Environment Variables",
+      "description": "Per-vault and org-shared environment variable management"
     }
   ],
   "paths": {
@@ -3017,6 +3021,353 @@
         }
       }
     },
+    "/v1/vaults/{vault_id}/env-vars": {
+      "get": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "List environment variables",
+        "description": "List all environment variables for a vault, optionally filtered by environment.",
+        "operationId": "listEnvVars",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by environment (production, preview, development, or custom)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Environment variable list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "env_vars": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EnvVar"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "Create environment variable",
+        "operationId": "createEnvVar",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnvVarRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Environment variable created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvVar"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{vault_id}/env-vars/resolve": {
+      "get": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "Resolve environment variables",
+        "description": "Resolve the final KEY=VALUE set for an environment with full precedence (shared < vault < branch override).",
+        "operationId": "resolveEnvVars",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "git_branch",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved environment variables",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveEnvVarsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vaults/{vault_id}/env-vars/{key}": {
+      "get": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "Get environment variable",
+        "operationId": "getEnvVar",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Environment variable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvVar"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "Update environment variable",
+        "operationId": "updateEnvVar",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEnvVarRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Environment variable updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvVar"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "Delete environment variable",
+        "operationId": "deleteEnvVar",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{vault_id}/environments": {
+      "get": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "List vault environments",
+        "operationId": "listVaultEnvironments",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vault environment list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "environments": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VaultEnvironment"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "Create custom environment",
+        "operationId": "createVaultEnvironment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnvironmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Environment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultEnvironment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{vault_id}/environments/{slug}": {
+      "delete": {
+        "tags": [
+          "Environment Variables"
+        ],
+        "summary": "Delete custom environment",
+        "operationId": "deleteVaultEnvironment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VaultId"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
     "/v1/agents/enroll": {
       "post": {
         "tags": [
@@ -5352,6 +5703,213 @@
         "responses": {
           "204": {
             "description": "Member removed"
+          }
+        }
+      }
+    },
+    "/v1/org/env-vars": {
+      "get": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "List org shared environment variables",
+        "operationId": "listOrgEnvVars",
+        "responses": {
+          "200": {
+            "description": "Org shared environment variable list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "env_vars": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OrgEnvVar"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Create org shared environment variable",
+        "operationId": "createOrgEnvVar",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrgEnvVarRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Org shared env var created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgEnvVar"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/org/env-vars/{key}": {
+      "patch": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Update org shared environment variable",
+        "operationId": "updateOrgEnvVar",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrgEnvVarRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Org shared env var updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgEnvVar"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/org/env-vars/{id}": {
+      "delete": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Delete org shared environment variable",
+        "operationId": "deleteOrgEnvVar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/v1/org/env-vars/{id}/link": {
+      "post": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Link org shared env var to a vault",
+        "operationId": "linkOrgEnvVar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "vault_id"
+                ],
+                "properties": {
+                  "vault_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Linked"
+          }
+        }
+      }
+    },
+    "/v1/org/env-vars/{id}/links/{vault_id}": {
+      "delete": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Unlink org shared env var from a vault",
+        "operationId": "unlinkOrgEnvVar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "vault_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unlinked"
           }
         }
       }
@@ -24228,6 +24786,10 @@
           "image": {
             "type": "string"
           },
+          "environment": {
+            "type": "string",
+            "description": "Vault environment to resolve env vars from (e.g. production, preview, development)"
+          },
           "env_public": {
             "type": "object",
             "additionalProperties": {
@@ -24282,6 +24844,10 @@
           },
           "image": {
             "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "description": "Vault environment to resolve env vars from"
           },
           "env_public": {
             "type": "object",
@@ -24368,6 +24934,11 @@
           "image": {
             "type": "string",
             "nullable": true
+          },
+          "environment": {
+            "type": "string",
+            "nullable": true,
+            "description": "Vault environment for env var resolution"
           },
           "env_public": {
             "type": "object",
@@ -26935,6 +27506,292 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "EnvVar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "git_branch": {
+            "type": "string",
+            "nullable": true
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for sensitive vars in list responses"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "created_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateEnvVarRequest": {
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Uppercase alphanumeric + underscore, 1-256 chars"
+          },
+          "value": {
+            "type": "string"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "production",
+              "preview",
+              "development"
+            ]
+          },
+          "git_branch": {
+            "type": "string",
+            "description": "Branch override (preview only)"
+          },
+          "sensitive": {
+            "type": "boolean",
+            "default": false
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateEnvVarRequest": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      },
+      "ResolveEnvVarsResponse": {
+        "type": "object",
+        "properties": {
+          "vars": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "sources": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "shared",
+                "vault",
+                "branch_override"
+              ]
+            }
+          },
+          "environment": {
+            "type": "string"
+          },
+          "git_branch": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VaultEnvironment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_builtin": {
+            "type": "boolean"
+          },
+          "copied_from": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_detached": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateEnvironmentRequest": {
+        "type": "object",
+        "required": [
+          "slug"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Lowercase alphanumeric + hyphens, 2-30 chars"
+          },
+          "description": {
+            "type": "string"
+          },
+          "copy_from": {
+            "type": "string",
+            "description": "Copy env vars from this environment"
+          }
+        }
+      },
+      "OrgEnvVar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "linked_vaults": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateOrgEnvVarRequest": {
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "production",
+              "preview",
+              "development"
+            ]
+          },
+          "sensitive": {
+            "type": "boolean",
+            "default": false
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateOrgEnvVarRequest": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "comment": {
+            "type": "string"
           }
         }
       }
