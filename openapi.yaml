@@ -625,7 +625,17 @@ paths:
         post:
             tags: [Authentication]
             summary: Complete passkey registration
+            description: |
+                When the account already has a password, passkey, or TOTP,
+                `X-Auth-Confirm` is required (purpose `security.passkey.register`).
             operationId: passkeyRegisterComplete
+            parameters:
+                - name: X-Auth-Confirm
+                  in: header
+                  required: false
+                  description: Re-auth token (`rat_`) or account password
+                  schema:
+                      type: string
             requestBody:
                 required: true
                 content:
@@ -768,6 +778,12 @@ paths:
         delete:
             tags: [Authentication]
             summary: Delete a passkey
+            description: |
+                Removes a registered passkey. Requires recent re-authentication
+                (`X-Auth-Confirm` with a `rat_` token from `POST /v1/auth/reauth`
+                using purpose `security.passkey.delete`). Passkey or TOTP is
+                required when either is enrolled. Deleting the last passkey is
+                refused while vault passkey unlock is enabled.
             operationId: deletePasskey
             parameters:
                 - name: passkey_id
@@ -776,9 +792,17 @@ paths:
                   schema:
                       type: string
                       format: uuid
+                - name: X-Auth-Confirm
+                  in: header
+                  required: true
+                  description: Re-auth token (`rat_`) or account password
+                  schema:
+                      type: string
             responses:
                 "200":
                     description: Passkey deleted
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     /v1/approvals/request:
         post:
@@ -861,6 +885,13 @@ paths:
             tags: [Authentication]
             summary: Delete current user account
             operationId: deleteMe
+            parameters:
+                - name: X-Auth-Confirm
+                  in: header
+                  required: true
+                  description: Re-auth token (`rat_`, purpose `account.delete`) or password
+                  schema:
+                      type: string
             requestBody:
                 required: true
                 content:
@@ -877,6 +908,52 @@ paths:
                     description: Account deleted
                 "400":
                     $ref: "#/components/responses/BadRequest"
+
+    /v1/auth/settings:
+        get:
+            tags: [Authentication]
+            summary: Get user security settings
+            operationId: getSecuritySettings
+            responses:
+                "200":
+                    description: Security settings
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    require_passkey_for_vaults:
+                                        type: boolean
+                                    passkey_count:
+                                        type: integer
+        patch:
+            tags: [Authentication]
+            summary: Update user security settings
+            description: |
+                Disabling `require_passkey_for_vaults` requires `X-Auth-Confirm`
+                (purpose `security.vault_passkey.disable`) with a passkey or TOTP
+                when either is enrolled.
+            operationId: updateSecuritySettings
+            parameters:
+                - name: X-Auth-Confirm
+                  in: header
+                  required: false
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                require_passkey_for_vaults:
+                                    type: boolean
+            responses:
+                "200":
+                    description: Updated settings
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     # MFA
 
@@ -953,7 +1030,18 @@ paths:
         delete:
             tags: [Authentication]
             summary: Disable MFA
+            description: |
+                Requires a valid TOTP or recovery code in the body, or a passkey
+                re-auth token in `X-Auth-Confirm` (purpose `security.mfa.disable`).
+                Account password alone is not accepted while TOTP is enabled.
             operationId: mfaDisable
+            parameters:
+                - name: X-Auth-Confirm
+                  in: header
+                  required: false
+                  description: Passkey or TOTP re-auth token (`rat_`)
+                  schema:
+                      type: string
             requestBody:
                 required: true
                 content:
@@ -1118,8 +1206,15 @@ paths:
                 Returns a full export of the authenticated user's data including
                 profile, vaults, agents, secrets metadata, and policies. Intended
                 for GDPR data-portability requests. Only available to human users
-                (not agents).
+                (not agents). Requires `X-Auth-Confirm` (purpose `account.export`);
+                passkey or TOTP when either is enrolled.
             operationId: exportUserData
+            parameters:
+                - name: X-Auth-Confirm
+                  in: header
+                  required: true
+                  schema:
+                      type: string
             responses:
                 "200":
                     description: User data export
@@ -10278,8 +10373,11 @@ components:
             properties:
                 code:
                     type: string
+                    description: TOTP or recovery code
                 password:
                     type: string
+                    description: Deprecated. Password is no longer sufficient to disable MFA.
+                    deprecated: true
 
         # --- Device Auth ---
 
