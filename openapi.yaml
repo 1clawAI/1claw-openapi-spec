@@ -17207,7 +17207,33 @@ components:
                     type: string
                 value_above:
                     type: string
-                    description: Native value threshold in gwei
+                    description: Native value threshold in wei (arbitrary-precision string)
+                eip712_primary_type_in:
+                    type: array
+                    items:
+                        type: string
+                    description: Match EIP-712 typed_data primaryType (case-sensitive)
+                eip712_verifying_contract_in:
+                    type: array
+                    items:
+                        type: string
+                    description: Match EIP-712 domain.verifyingContract (case-insensitive)
+                eip712_domain_name_in:
+                    type: array
+                    items:
+                        type: string
+                    description: Match EIP-712 domain.name
+                eip712_domain_chain_id_in:
+                    type: array
+                    items:
+                        type: integer
+                        format: int64
+                    description: Match EIP-712 domain.chainId
+                eip7702_authorized_addresses_in:
+                    type: array
+                    items:
+                        type: string
+                    description: Match EIP-7702 authorization_list delegate addresses (case-insensitive)
                 to_address_in:
                     type: array
                     items:
@@ -17338,14 +17364,19 @@ components:
         ConsensusCondition:
             oneOf:
                 - type: object
-                  required: [type, threshold_gwei]
+                  required: [type]
                   properties:
                       type:
                           type: string
                           enum: [value_above]
+                      threshold_wei:
+                          type: string
+                          description: Value threshold in wei (arbitrary-precision string). Preferred over threshold_gwei.
                       threshold_gwei:
                           type: integer
                           format: int64
+                          deprecated: true
+                          description: Deprecated — use threshold_wei for arbitrary precision
                 - type: object
                   required: [type, chains]
                   properties:
@@ -17400,6 +17431,19 @@ components:
                       type:
                           type: string
                           enum: [always]
+                - type: object
+                  required: [type, actions]
+                  properties:
+                      type:
+                          type: string
+                          enum: [action_in]
+                      actions:
+                          type: array
+                          items:
+                              type: string
+                          description: |
+                              Control-plane actions to match, e.g. policy.create, policy.update,
+                              policy.delete, signing_key.export, member.role_change, member.remove
 
         ApprovalRequirement:
             type: object
@@ -17415,6 +17459,12 @@ components:
                     type: object
                     additionalProperties:
                         type: integer
+                require_credential_types:
+                    type: array
+                    items:
+                        type: string
+                        enum: [password, passkey, totp, biometric, api_key]
+                    description: At least one approval must use one of these credential types
 
         SubmitPendingApprovalRequest:
             type: object
@@ -17457,6 +17507,10 @@ components:
                     type: string
                 reason:
                     type: string
+                credential_type:
+                    type: string
+                    enum: [password, passkey, totp, biometric, api_key]
+                    description: Authentication method used for this approval vote
 
         PendingApprovalResponse:
             type: object
