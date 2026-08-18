@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.51.0
+    version: 0.52.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -11457,6 +11457,17 @@ components:
                     format: date-time
                     nullable: true
                     description: Optional expiration time for the agent's API key.
+                environment:
+                    type: string
+                    description: Named environment for this agent (production, preview, development, or custom).
+                environment_locked:
+                    type: boolean
+                    default: false
+                    description: When true, the environment tag cannot be changed after creation.
+                env_auto_resolve:
+                    type: boolean
+                    default: false
+                    description: When true, env var resolve endpoints auto-fill environment from this agent's tag.
 
         UpdateAgentRequest:
             type: object
@@ -11609,6 +11620,20 @@ components:
                     format: date-time
                     nullable: true
                     description: Optional expiration time for the agent's API key. Set to null to clear.
+                environment:
+                    type: string
+                    nullable: true
+                    description: Named environment for this agent (production, preview, development, or custom).
+                environment_locked:
+                    type: boolean
+                    description: When true, the environment tag cannot be changed after creation.
+                env_auto_resolve:
+                    type: boolean
+                    description: When true, env var resolve endpoints auto-fill environment from this agent's tag.
+                per_environment_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: Per-environment guardrail overrides keyed by environment slug.
 
         AgentResponse:
             type: object
@@ -11837,6 +11862,20 @@ components:
                     description: Multi-chain; one Safe per chain
                     items:
                         $ref: "#/components/schemas/AgentSmartAccountResponse"
+                environment:
+                    type: string
+                    nullable: true
+                    description: Named environment this agent belongs to (production, preview, development, or custom).
+                environment_locked:
+                    type: boolean
+                    description: When true, the environment tag is locked and cannot be changed.
+                env_auto_resolve:
+                    type: boolean
+                    description: When true, env var resolve endpoints auto-fill environment from this agent's tag.
+                per_environment_guardrails:
+                    type: object
+                    additionalProperties: true
+                    description: Per-environment guardrail overrides keyed by environment slug.
 
         KnownToken:
             type: object
