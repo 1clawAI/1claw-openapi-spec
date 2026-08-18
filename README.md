@@ -40,7 +40,13 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.48.0)
+## What's in the spec (v0.52.0)
+
+### Agent Environment Tagging (v0.52)
+- **Agent fields** — `environment`, `environment_locked`, `env_auto_resolve`, `per_environment_guardrails` on create/update/response schemas
+- **JWT claim** — Agent tokens include `environment` when the agent has a tag
+- **Policy conditions** — `environment_in` array in built-in policy `conditions` JSON
+- **Env var resolution** — `GET /v1/vaults/{id}/env-vars/resolve` accepts optional `environment`; auto-fills from agent tag when `env_auto_resolve` is true
 
 ### Cedar/OPA Enforcement v2 (v0.48)
 - **Policy backend** — `GET/PATCH /v1/org/settings/policy-backend`, `GET /v1/org/policy-shadow-report`
