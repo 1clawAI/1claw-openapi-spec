@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.53.0",
+    "version": "0.53.1",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -19979,6 +19979,15 @@
             "type": "string",
             "format": "uuid",
             "description": "Optional pending approval ID. When consensus policies match, clients resubmit with this field set to bypass the 202 gate after the approval has been executed.\n"
+          },
+          "raw_transaction": {
+            "type": "string",
+            "description": "Pre-built raw transaction as a base64-encoded byte string. When provided, the handler decodes and deep-inspects the transaction for policy evaluation before signing. Supported for non-EVM chains where the client constructs the transaction payload.\n"
+          },
+          "tron_transaction": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Pre-built Tron transaction JSON object. When provided, the handler signs the transaction as-is using the Tron protobuf format. Enables full Tron transaction type coverage beyond simple TRX/TRC-20 transfers.\n"
           }
         }
       },
@@ -20633,6 +20642,15 @@
             "type": "string",
             "format": "uuid",
             "description": "Optional pending approval ID. When consensus policies match, clients resubmit with this field set to bypass the 202 gate after the approval has been executed.\n"
+          },
+          "raw_transaction": {
+            "type": "string",
+            "description": "Pre-built raw transaction as a base64-encoded byte string. When provided, the handler decodes and deep-inspects the transaction for policy evaluation before signing. Supported for non-EVM chains where the client constructs the transaction payload.\n"
+          },
+          "tron_transaction": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Pre-built Tron transaction JSON object. When provided, the handler signs the transaction as-is using the Tron protobuf format. Enables full Tron transaction type coverage beyond simple TRX/TRC-20 transfers.\n"
           }
         }
       },
