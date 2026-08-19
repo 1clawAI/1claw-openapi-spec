@@ -194,6 +194,18 @@
     {
       "name": "Environment Variables",
       "description": "Per-vault and org-shared environment variable management"
+    },
+    {
+      "name": "Wallet Access",
+      "description": "Role-based wallet access policies for agents and users"
+    },
+    {
+      "name": "Credential Recovery",
+      "description": "MFA/passkey/password recovery escape hatch with admin approval"
+    },
+    {
+      "name": "Shamir KEK",
+      "description": "Shamir secret-sharing for org-level Key Encryption Keys"
     }
   ],
   "paths": {
@@ -16032,6 +16044,588 @@
           }
         }
       }
+    },
+    "/v1/wallets/access-policies": {
+      "post": {
+        "tags": [
+          "Wallet Access"
+        ],
+        "summary": "Create a wallet access policy",
+        "description": "Create a role-based wallet access policy granting an agent or user\nspecific permissions (send, swap, receive) on a treasury wallet chain.\n",
+        "operationId": "createWalletAccessPolicy",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWalletAccessPolicyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Policy created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletAccessPolicyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Wallet Access"
+        ],
+        "summary": "List wallet access policies for the org",
+        "operationId": "listWalletAccessPolicies",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wallet_chain",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by chain (e.g. ethereum, solana)"
+          },
+          {
+            "name": "target_agent_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Filter by target agent"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Policy list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletAccessPolicyListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/wallets/access-policies/{id}": {
+      "delete": {
+        "tags": [
+          "Wallet Access"
+        ],
+        "summary": "Delete a wallet access policy",
+        "operationId": "deleteWalletAccessPolicy",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Policy deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/auth/credential-recovery/request": {
+      "post": {
+        "tags": [
+          "Credential Recovery"
+        ],
+        "summary": "Initiate credential recovery",
+        "description": "Start a credential recovery request for MFA reset, passkey reset,\nor password reset. Requires admin approval per org policy.\n",
+        "operationId": "requestCredentialRecovery",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRecoveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recovery request created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRecoveryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/auth/credential-recovery/requests": {
+      "get": {
+        "tags": [
+          "Credential Recovery"
+        ],
+        "summary": "List recovery requests for the org",
+        "description": "Admin/owner only. Returns pending, approved, and rejected recovery requests.",
+        "operationId": "listCredentialRecoveryRequests",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending_approval",
+                "approved",
+                "rejected",
+                "expired"
+              ]
+            },
+            "description": "Filter by status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recovery request list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRecoveryListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/auth/credential-recovery/requests/{id}/approve": {
+      "post": {
+        "tags": [
+          "Credential Recovery"
+        ],
+        "summary": "Approve a recovery request",
+        "description": "Admin/owner approves a pending recovery request. May return a one-time recovery code.",
+        "operationId": "approveCredentialRecovery",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Request approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRecoveryApproveResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/auth/credential-recovery/requests/{id}": {
+      "delete": {
+        "tags": [
+          "Credential Recovery"
+        ],
+        "summary": "Cancel or reject a recovery request",
+        "operationId": "cancelCredentialRecovery",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request cancelled"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/org/credential-recovery-policy": {
+      "get": {
+        "tags": [
+          "Credential Recovery"
+        ],
+        "summary": "Get org credential recovery policy",
+        "operationId": "getCredentialRecoveryPolicy",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recovery policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRecoveryPolicyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Credential Recovery"
+        ],
+        "summary": "Update org credential recovery policy",
+        "operationId": "updateCredentialRecoveryPolicy",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRecoveryPolicyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Policy updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRecoveryPolicyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/org/shamir-kek/setup": {
+      "post": {
+        "tags": [
+          "Shamir KEK"
+        ],
+        "summary": "Set up Shamir KEK for the org",
+        "description": "Initialize a Shamir secret-sharing KEK for the org. Splits the master\nkey into shares distributed to custodians. Shares are returned one-time\nonly and must be stored securely by each custodian.\n",
+        "operationId": "setupShamirKek",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShamirKekSetupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Shamir KEK configured (shares returned one-time)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShamirKekSetupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/org/shamir-kek": {
+      "get": {
+        "tags": [
+          "Shamir KEK"
+        ],
+        "summary": "Get Shamir KEK status",
+        "description": "Returns the current Shamir KEK configuration status for the org.",
+        "operationId": "getShamirKekStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shamir KEK status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShamirKekStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/org/shamir-kek/reconstruct": {
+      "post": {
+        "tags": [
+          "Shamir KEK"
+        ],
+        "summary": "Reconstruct KEK from shares",
+        "description": "Submit Shamir shares to reconstruct the org KEK. Requires at least\n`threshold` valid shares. Used during disaster recovery.\n",
+        "operationId": "reconstructShamirKek",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShamirKekReconstructRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconstruction result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShamirKekReconstructResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/org/shamir-kek/recovery-codes": {
+      "get": {
+        "tags": [
+          "Shamir KEK"
+        ],
+        "summary": "Get Shamir recovery codes (one-time)",
+        "description": "Returns the one-time recovery codes for the Shamir KEK. These codes\ncan be used as an emergency fallback if custodian shares are lost.\nCodes are only returned once — subsequent calls return 410.\n",
+        "operationId": "getShamirKekRecoveryCodes",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recovery codes (one-time)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShamirKekRecoveryCodesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "410": {
+            "description": "Codes already retrieved"
+          }
+        }
+      }
+    },
+    "/v1/org/shamir-kek/verify-recovery-code": {
+      "post": {
+        "tags": [
+          "Shamir KEK"
+        ],
+        "summary": "Verify a Shamir recovery code",
+        "description": "Check whether a recovery code is valid without consuming it.",
+        "operationId": "verifyShamirKekRecoveryCode",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShamirKekVerifyCodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShamirKekVerifyCodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28079,6 +28673,478 @@
           },
           "comment": {
             "type": "string"
+          }
+        }
+      },
+      "CreateWalletAccessPolicyRequest": {
+        "type": "object",
+        "required": [
+          "wallet_chain",
+          "permissions"
+        ],
+        "properties": {
+          "wallet_chain": {
+            "type": "string",
+            "description": "Chain for which the policy applies (e.g. ethereum, solana)"
+          },
+          "target_agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Agent granted access (mutually exclusive with target_user_id)"
+          },
+          "target_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "User granted access (mutually exclusive with target_agent_id)"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "send",
+                "swap",
+                "receive"
+              ]
+            }
+          },
+          "conditions": {
+            "type": "object",
+            "properties": {
+              "max_value_per_tx_eth": {
+                "type": "string",
+                "description": "Max value per transaction in ETH"
+              },
+              "daily_limit_eth": {
+                "type": "string",
+                "description": "Daily spend limit in ETH"
+              },
+              "allowed_chains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowed_tokens": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WalletAccessPolicyResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wallet_chain": {
+            "type": "string"
+          },
+          "target_agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "target_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "send",
+                "swap",
+                "receive"
+              ]
+            }
+          },
+          "conditions": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "max_value_per_tx_eth": {
+                "type": "string",
+                "nullable": true
+              },
+              "daily_limit_eth": {
+                "type": "string",
+                "nullable": true
+              },
+              "allowed_chains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true
+              },
+              "allowed_tokens": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true
+              }
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WalletAccessPolicyListResponse": {
+        "type": "object",
+        "properties": {
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletAccessPolicyResponse"
+            }
+          }
+        }
+      },
+      "CredentialRecoveryRequest": {
+        "type": "object",
+        "required": [
+          "recovery_type"
+        ],
+        "properties": {
+          "recovery_type": {
+            "type": "string",
+            "enum": [
+              "mfa_reset",
+              "passkey_reset",
+              "password_reset"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Optional justification for the recovery request"
+          }
+        }
+      },
+      "CredentialRecoveryResponse": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_approval",
+              "approved",
+              "rejected",
+              "expired"
+            ]
+          },
+          "recovery_type": {
+            "type": "string",
+            "enum": [
+              "mfa_reset",
+              "passkey_reset",
+              "password_reset"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CredentialRecoveryListResponse": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CredentialRecoveryResponse"
+            }
+          }
+        }
+      },
+      "CredentialRecoveryApproveResponse": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved"
+            ]
+          },
+          "recovery_code": {
+            "type": "string",
+            "nullable": true,
+            "description": "One-time recovery code (only present for certain recovery types)"
+          }
+        }
+      },
+      "CredentialRecoveryPolicyResponse": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "require_admin_approval": {
+            "type": "boolean"
+          },
+          "delay_hours": {
+            "type": "integer",
+            "description": "Waiting period before recovery takes effect"
+          },
+          "allowed_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "mfa_reset",
+                "passkey_reset",
+                "password_reset"
+              ]
+            }
+          }
+        }
+      },
+      "CredentialRecoveryPolicyRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "require_admin_approval": {
+            "type": "boolean"
+          },
+          "delay_hours": {
+            "type": "integer"
+          },
+          "allowed_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "mfa_reset",
+                "passkey_reset",
+                "password_reset"
+              ]
+            }
+          }
+        }
+      },
+      "ShamirKekSetupRequest": {
+        "type": "object",
+        "required": [
+          "threshold",
+          "total_shares",
+          "custodian_emails"
+        ],
+        "properties": {
+          "threshold": {
+            "type": "integer",
+            "enum": [
+              2,
+              3
+            ],
+            "description": "Minimum shares required to reconstruct the KEK"
+          },
+          "total_shares": {
+            "type": "integer",
+            "enum": [
+              3,
+              5
+            ],
+            "description": "Total number of shares to generate"
+          },
+          "custodian_emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "description": "Email addresses of share custodians"
+          }
+        }
+      },
+      "ShamirKekSetupResponse": {
+        "type": "object",
+        "properties": {
+          "kek_id": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "integer"
+          },
+          "total_shares": {
+            "type": "integer"
+          },
+          "shares": {
+            "type": "array",
+            "description": "One-time share distribution (never returned again)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "custodian_email": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "share_b64": {
+                  "type": "string",
+                  "description": "Base64-encoded share"
+                }
+              }
+            }
+          },
+          "custody_mode": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ShamirKekStatusResponse": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "kek_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "threshold": {
+            "type": "integer",
+            "nullable": true
+          },
+          "total_shares": {
+            "type": "integer",
+            "nullable": true
+          },
+          "custody_mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "custodians": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "share_provided": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ShamirKekReconstructRequest": {
+        "type": "object",
+        "required": [
+          "shares"
+        ],
+        "properties": {
+          "shares": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "index",
+                "share_b64"
+              ],
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "share_b64": {
+                  "type": "string",
+                  "description": "Base64-encoded share"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ShamirKekReconstructResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "reconstructed"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ShamirKekRecoveryCodesResponse": {
+        "type": "object",
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ShamirKekVerifyCodeRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "ShamirKekVerifyCodeResponse": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
           }
         }
       }
