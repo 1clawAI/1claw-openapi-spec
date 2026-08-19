@@ -10424,6 +10424,37 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/auth/credential-recovery/requests/{id}/execute:
+        post:
+            tags: [Credential Recovery]
+            summary: Execute an approved credential recovery request
+            description: >-
+                Execute an approved credential recovery request after the delay
+                window has elapsed. Only org owners or admins can execute.
+            operationId: executeCredentialRecovery
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Recovery executed
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CredentialRecoveryExecuteResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/auth/credential-recovery/requests/{id}:
         delete:
             tags: [Credential Recovery]
@@ -19085,6 +19116,21 @@ components:
                     type: string
                     nullable: true
                     description: One-time recovery code (only present for certain recovery types)
+
+        CredentialRecoveryExecuteResponse:
+            type: object
+            properties:
+                request_id:
+                    type: string
+                    format: uuid
+                status:
+                    type: string
+                    enum: [executed]
+                recovery_type:
+                    type: string
+                executed_at:
+                    type: string
+                    format: date-time
 
         CredentialRecoveryPolicyResponse:
             type: object
