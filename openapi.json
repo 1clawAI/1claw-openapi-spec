@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.52.0",
+    "version": "0.53.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -6355,6 +6355,55 @@
         }
       }
     },
+    "/v1/audit/verify": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Verify audit hash chain integrity",
+        "operationId": "verifyAuditChain",
+        "description": "Verifies the HMAC-SHA256 integrity hash chain for audit events in the\ncalling organization. Returns whether the chain is valid, how many\nevents were verified, and the point of first break (if any).\n",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1000,
+              "maximum": 10000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chain verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditVerifyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/security/ip-rules": {
       "get": {
         "tags": [
@@ -8375,6 +8424,34 @@
                       ]
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/shroud/attestation": {
+      "get": {
+        "tags": [
+          "Shroud"
+        ],
+        "summary": "TEE attestation proof (public)",
+        "operationId": "getShroudAttestation",
+        "security": [],
+        "description": "Public endpoint returning the TEE attestation proof for Shroud.\nReturns the GCE Confidential VM identity token and image hash so\ncustomers can verify Shroud is running inside a Confidential VM\nbefore signing contracts. Served from shroud.1claw.xyz.\n",
+        "servers": [
+          {
+            "url": "https://shroud.1claw.xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attestation proof",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShroudAttestationResponse"
                 }
               }
             }
@@ -17421,6 +17498,16 @@
           },
           "tx_conditions": {
             "$ref": "#/components/schemas/TxConditions"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional completed approval ID for control-plane consensus bypass. When control-plane consensus policies match, resubmit with this field after the approval has been executed.\n"
+          },
+          "policy_schema_version": {
+            "type": "integer",
+            "default": 2,
+            "description": "Policy schema version. Version 1 = legacy field-matching only.\nVersion 2 = expression engine support in tx_conditions.\n"
           }
         }
       },
@@ -17463,6 +17550,11 @@
           },
           "tx_conditions": {
             "$ref": "#/components/schemas/TxConditions"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional completed approval ID for control-plane consensus bypass.\n"
           }
         }
       },
@@ -17541,6 +17633,10 @@
           },
           "tx_conditions": {
             "$ref": "#/components/schemas/TxConditions"
+          },
+          "policy_schema_version": {
+            "type": "integer",
+            "description": "Policy schema version (1 = legacy, 2 = expression engine)"
           }
         }
       },
@@ -17805,6 +17901,11 @@
             "type": "boolean",
             "default": false,
             "description": "When true, env var resolve endpoints auto-fill environment from this agent's tag."
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional completed approval ID for control-plane consensus bypass when creating an agent under a control-plane governance policy.\n"
           }
         }
       },
@@ -20936,6 +21037,99 @@
           },
           "count": {
             "type": "integer"
+          }
+        }
+      },
+      "AuditVerifyResponse": {
+        "type": "object",
+        "required": [
+          "chain_valid",
+          "events_verified",
+          "events_checked",
+          "scheme"
+        ],
+        "properties": {
+          "chain_valid": {
+            "type": "boolean",
+            "description": "Whether the integrity hash chain is unbroken"
+          },
+          "events_verified": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of events with valid integrity hashes"
+          },
+          "events_checked": {
+            "type": "integer",
+            "description": "Total events examined"
+          },
+          "broken_at_event_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "First event where chain integrity broke (null if valid)"
+          },
+          "scheme": {
+            "type": "object",
+            "properties": {
+              "algorithm": {
+                "type": "string",
+                "example": "HMAC-SHA256"
+              },
+              "chain_structure": {
+                "type": "string"
+              },
+              "hash_field": {
+                "type": "string"
+              },
+              "link_field": {
+                "type": "string"
+              },
+              "documentation": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        }
+      },
+      "ShroudAttestationResponse": {
+        "type": "object",
+        "required": [
+          "attested",
+          "image_hash",
+          "identity_token",
+          "verification"
+        ],
+        "properties": {
+          "attested": {
+            "type": "boolean",
+            "description": "Whether TEE attestation was successfully fetched"
+          },
+          "image_hash": {
+            "type": "string",
+            "description": "Confidential VM image hash (compare against published Docker digest)"
+          },
+          "identity_token": {
+            "type": "string",
+            "description": "GCE metadata identity JWT (verify against Google public keys)"
+          },
+          "verification": {
+            "type": "object",
+            "properties": {
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "google_certs_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expected_audience": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -26790,6 +26984,11 @@
             "type": "boolean",
             "default": false,
             "description": "When true, conditions are also evaluated against inner calls\nextracted from wrapper transactions (multicall, Safe execTransaction,\nERC-4337 handleOps). A match on any inner call counts as an overall match.\n"
+          },
+          "expression": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Mini expression DSL for policy conditions (schema version 2+).\nReferences transaction context fields (chain, value_wei, to_address,\nfunction_selector, etc.) with boolean operators. Fail-closed on parse\nor evaluation errors. Example: `chain == 'ethereum' && value_wei > 1000000000000000000`\n"
           }
         }
       },
@@ -26879,6 +27078,20 @@
           "always": {
             "type": "boolean",
             "description": "When true, this entry always matches regardless of other fields"
+          },
+          "action_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Control-plane actions to match (e.g. policy.create, signing_key.export)"
+          },
+          "action_kind_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Version-agnostic action kind groups (e.g. signing_key.*, policy.*, member.*)\n"
           }
         }
       },
@@ -27076,6 +27289,28 @@
                   "type": "string"
                 },
                 "description": "Control-plane actions to match, e.g. policy.create, policy.update,\npolicy.delete, signing_key.export, member.role_change, member.remove\n"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "action_kinds"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "action_kind_in"
+                ]
+              },
+              "action_kinds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Version-agnostic action kind groups, e.g. signing_key.*, policy.*, member.*\n"
               }
             }
           }

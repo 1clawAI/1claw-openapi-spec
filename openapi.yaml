@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.52.0
+    version: 0.53.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -4129,6 +4129,40 @@ paths:
                 "402":
                     $ref: "#/components/responses/PaymentRequired"
 
+    /v1/audit/verify:
+        get:
+            tags: [Audit]
+            summary: Verify audit hash chain integrity
+            operationId: verifyAuditChain
+            description: |
+                Verifies the HMAC-SHA256 integrity hash chain for audit events in the
+                calling organization. Returns whether the chain is valid, how many
+                events were verified, and the point of first break (if any).
+            parameters:
+                - name: from
+                  in: query
+                  schema:
+                      type: string
+                      format: date-time
+                - name: to
+                  in: query
+                  schema:
+                      type: string
+                      format: date-time
+                - name: limit
+                  in: query
+                  schema:
+                      type: integer
+                      default: 1000
+                      maximum: 10000
+            responses:
+                "200":
+                    description: Chain verification result
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AuditVerifyResponse"
+
     # ---------------------------------------------------------------------------
     # Security (IP Rules)
     # ---------------------------------------------------------------------------
@@ -5427,6 +5461,27 @@ paths:
                                         enum: [ok, degraded, unavailable]
 
     # --- Shroud Activity ---
+
+    /v1/shroud/attestation:
+        get:
+            tags: [Shroud]
+            summary: TEE attestation proof (public)
+            operationId: getShroudAttestation
+            security: []
+            description: |
+                Public endpoint returning the TEE attestation proof for Shroud.
+                Returns the GCE Confidential VM identity token and image hash so
+                customers can verify Shroud is running inside a Confidential VM
+                before signing contracts. Served from shroud.1claw.xyz.
+            servers:
+                - url: https://shroud.1claw.xyz
+            responses:
+                "200":
+                    description: Attestation proof
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ShroudAttestationResponse"
 
     /v1/shroud/activity:
         get:
@@ -11180,6 +11235,19 @@ components:
                     $ref: "#/components/schemas/ConsensusTrigger"
                 tx_conditions:
                     $ref: "#/components/schemas/TxConditions"
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: >
+                        Optional completed approval ID for control-plane consensus bypass.
+                        When control-plane consensus policies match, resubmit with this
+                        field after the approval has been executed.
+                policy_schema_version:
+                    type: integer
+                    default: 2
+                    description: |
+                        Policy schema version. Version 1 = legacy field-matching only.
+                        Version 2 = expression engine support in tx_conditions.
 
         UpdatePolicyRequest:
             type: object
@@ -11209,6 +11277,11 @@ components:
                     $ref: "#/components/schemas/ConsensusTrigger"
                 tx_conditions:
                     $ref: "#/components/schemas/TxConditions"
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: >
+                        Optional completed approval ID for control-plane consensus bypass.
 
         PolicyResponse:
             type: object
@@ -11267,6 +11340,9 @@ components:
                     $ref: "#/components/schemas/ConsensusTrigger"
                 tx_conditions:
                     $ref: "#/components/schemas/TxConditions"
+                policy_schema_version:
+                    type: integer
+                    description: Policy schema version (1 = legacy, 2 = expression engine)
 
         PolicyListResponse:
             type: object
@@ -11474,6 +11550,12 @@ components:
                     type: boolean
                     default: false
                     description: When true, env var resolve endpoints auto-fill environment from this agent's tag.
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: >
+                        Optional completed approval ID for control-plane consensus bypass
+                        when creating an agent under a control-plane governance policy.
 
         UpdateAgentRequest:
             type: object
@@ -13704,6 +13786,67 @@ components:
                         $ref: "#/components/schemas/AuditEvent"
                 count:
                     type: integer
+
+        AuditVerifyResponse:
+            type: object
+            required: [chain_valid, events_verified, events_checked, scheme]
+            properties:
+                chain_valid:
+                    type: boolean
+                    description: Whether the integrity hash chain is unbroken
+                events_verified:
+                    type: integer
+                    format: int64
+                    description: Number of events with valid integrity hashes
+                events_checked:
+                    type: integer
+                    description: Total events examined
+                broken_at_event_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: First event where chain integrity broke (null if valid)
+                scheme:
+                    type: object
+                    properties:
+                        algorithm:
+                            type: string
+                            example: HMAC-SHA256
+                        chain_structure:
+                            type: string
+                        hash_field:
+                            type: string
+                        link_field:
+                            type: string
+                        documentation:
+                            type: string
+                            format: uri
+
+        ShroudAttestationResponse:
+            type: object
+            required: [attested, image_hash, identity_token, verification]
+            properties:
+                attested:
+                    type: boolean
+                    description: Whether TEE attestation was successfully fetched
+                image_hash:
+                    type: string
+                    description: Confidential VM image hash (compare against published Docker digest)
+                identity_token:
+                    type: string
+                    description: GCE metadata identity JWT (verify against Google public keys)
+                verification:
+                    type: object
+                    properties:
+                        steps:
+                            type: array
+                            items:
+                                type: string
+                        google_certs_url:
+                            type: string
+                            format: uri
+                        expected_audience:
+                            type: string
 
         AuditEvent:
             type: object
@@ -17658,6 +17801,14 @@ components:
                         When true, conditions are also evaluated against inner calls
                         extracted from wrapper transactions (multicall, Safe execTransaction,
                         ERC-4337 handleOps). A match on any inner call counts as an overall match.
+                expression:
+                    type: string
+                    maxLength: 1024
+                    description: |
+                        Mini expression DSL for policy conditions (schema version 2+).
+                        References transaction context fields (chain, value_wei, to_address,
+                        function_selector, etc.) with boolean operators. Fail-closed on parse
+                        or evaluation errors. Example: `chain == 'ethereum' && value_wei > 1000000000000000000`
 
         ConsensusTrigger:
             type: object
@@ -17731,6 +17882,17 @@ components:
                 always:
                     type: boolean
                     description: When true, this entry always matches regardless of other fields
+                action_in:
+                    type: array
+                    items:
+                        type: string
+                    description: Control-plane actions to match (e.g. policy.create, signing_key.export)
+                action_kind_in:
+                    type: array
+                    items:
+                        type: string
+                    description: |
+                        Version-agnostic action kind groups (e.g. signing_key.*, policy.*, member.*)
 
         TimeWindow:
             type: object
@@ -17843,6 +18005,18 @@ components:
                           description: |
                               Control-plane actions to match, e.g. policy.create, policy.update,
                               policy.delete, signing_key.export, member.role_change, member.remove
+                - type: object
+                  required: [type, action_kinds]
+                  properties:
+                      type:
+                          type: string
+                          enum: [action_kind_in]
+                      action_kinds:
+                          type: array
+                          items:
+                              type: string
+                          description: |
+                              Version-agnostic action kind groups, e.g. signing_key.*, policy.*, member.*
 
         ApprovalRequirement:
             type: object
