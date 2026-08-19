@@ -10255,13 +10255,14 @@ paths:
     # Wallet Access Policies
     # ---------------------------------------------------------------------------
 
-    /v1/wallets/access-policies:
+    /v1/treasury/wallets/access-policies:
         post:
             tags: [Wallet Access]
             summary: Create a wallet access policy
             description: |
-                Create a role-based wallet access policy granting an agent or user
-                specific permissions (send, swap, receive) on a treasury wallet chain.
+                Create a role-based wallet access policy granting an agent, user, role,
+                or platform app specific permissions on treasury wallets within a scope
+                (org-wide, platform app, or single wallet). Requires Pro+ tier.
             operationId: createWalletAccessPolicy
             security:
                 - BearerAuth: []
@@ -10291,17 +10292,18 @@ paths:
             security:
                 - BearerAuth: []
             parameters:
-                - name: wallet_chain
+                - name: scope_type
                   in: query
                   schema:
                       type: string
-                  description: Filter by chain (e.g. ethereum, solana)
-                - name: target_agent_id
+                      enum: [wallet, platform_app, org]
+                  description: Filter by scope type
+                - name: scope_id
                   in: query
                   schema:
                       type: string
                       format: uuid
-                  description: Filter by target agent
+                  description: Filter by scope ID (wallet or platform app UUID)
             responses:
                 "200":
                     description: Policy list
@@ -10312,7 +10314,7 @@ paths:
                 "401":
                     $ref: "#/components/responses/Unauthorized"
 
-    /v1/wallets/access-policies/{id}:
+    /v1/treasury/wallets/access-policies/{id}:
         delete:
             tags: [Wallet Access]
             summary: Delete a wallet access policy
@@ -18997,41 +18999,53 @@ components:
 
         CreateWalletAccessPolicyRequest:
             type: object
-            required: [wallet_chain, permissions]
+            required: [scope_type, principal_type, principal_id]
             properties:
-                wallet_chain:
+                scope_type:
                     type: string
-                    description: Chain for which the policy applies (e.g. ethereum, solana)
-                target_agent_id:
-                    type: string
-                    format: uuid
-                    description: Agent granted access (mutually exclusive with target_user_id)
-                target_user_id:
+                    enum: [wallet, platform_app, org]
+                    description: Policy scope — org-wide, platform app, or single wallet
+                scope_id:
                     type: string
                     format: uuid
-                    description: User granted access (mutually exclusive with target_agent_id)
-                permissions:
+                    nullable: true
+                    description: Wallet or platform app UUID when scope_type is not org
+                principal_type:
+                    type: string
+                    enum: [user, agent, role, platform_app]
+                    description: Who receives the grant
+                principal_id:
+                    type: string
+                    description: User/agent UUID, role name, or platform app UUID
+                can_sign:
+                    type: boolean
+                    default: false
+                can_view_balance:
+                    type: boolean
+                    default: true
+                can_export:
+                    type: boolean
+                    default: false
+                can_send:
+                    type: boolean
+                    default: false
+                can_swap:
+                    type: boolean
+                    default: false
+                allowed_chains:
                     type: array
                     items:
                         type: string
-                        enum: [send, swap, receive]
+                    description: Chains this policy applies to (empty = all)
+                max_value_per_tx_eth:
+                    type: string
+                    description: Max value per transaction in ETH
+                daily_limit_eth:
+                    type: string
+                    description: Daily spend limit in ETH
                 conditions:
                     type: object
-                    properties:
-                        max_value_per_tx_eth:
-                            type: string
-                            description: Max value per transaction in ETH
-                        daily_limit_eth:
-                            type: string
-                            description: Daily spend limit in ETH
-                        allowed_chains:
-                            type: array
-                            items:
-                                type: string
-                        allowed_tokens:
-                            type: array
-                            items:
-                                type: string
+                    description: Additional JSON conditions (reserved for future enforcement)
                 expires_at:
                     type: string
                     format: date-time
@@ -19045,46 +19059,51 @@ components:
                 org_id:
                     type: string
                     format: uuid
-                wallet_chain:
+                scope_type:
                     type: string
-                target_agent_id:
-                    type: string
-                    format: uuid
-                    nullable: true
-                target_user_id:
+                scope_id:
                     type: string
                     format: uuid
                     nullable: true
-                permissions:
+                principal_type:
+                    type: string
+                principal_id:
+                    type: string
+                can_sign:
+                    type: boolean
+                can_view_balance:
+                    type: boolean
+                can_export:
+                    type: boolean
+                can_send:
+                    type: boolean
+                can_swap:
+                    type: boolean
+                allowed_chains:
                     type: array
                     items:
                         type: string
-                        enum: [send, swap, receive]
+                max_value_per_tx_eth:
+                    type: string
+                    nullable: true
+                daily_limit_eth:
+                    type: string
+                    nullable: true
                 conditions:
                     type: object
-                    nullable: true
-                    properties:
-                        max_value_per_tx_eth:
-                            type: string
-                            nullable: true
-                        daily_limit_eth:
-                            type: string
-                            nullable: true
-                        allowed_chains:
-                            type: array
-                            items:
-                                type: string
-                            nullable: true
-                        allowed_tokens:
-                            type: array
-                            items:
-                                type: string
-                            nullable: true
+                is_active:
+                    type: boolean
                 expires_at:
                     type: string
                     format: date-time
                     nullable: true
+                created_by:
+                    type: string
+                    format: uuid
                 created_at:
+                    type: string
+                    format: date-time
+                updated_at:
                     type: string
                     format: date-time
 
