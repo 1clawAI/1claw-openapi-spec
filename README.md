@@ -42,6 +42,13 @@ import spec from "@1claw/openapi-spec/openapi.json";
 
 ## What's in the spec (v0.52.0)
 
+### Environment Variables (v0.51)
+- **Per-key env vars** — `GET/POST /v1/vaults/{id}/env-vars`, `GET/PATCH/DELETE .../{key}`, `GET .../resolve` with three-tier precedence (org shared < vault < branch override)
+- **Vault environments** — `GET/POST /v1/vaults/{id}/environments`, `DELETE .../{slug}` (built-in + tier-gated custom)
+- **Org shared vars** — `GET/POST /v1/org/env-vars`, link/unlink to vaults
+- **Sensitive vars** — write-only after creation; org setting `env.require_sensitive_prod`
+- **Runtime injection** — resolved vars merged into Cloud Runtime container env at start/rebuild
+
 ### Agent Environment Tagging (v0.52)
 - **Agent fields** — `environment`, `environment_locked`, `env_auto_resolve`, `per_environment_guardrails` on create/update/response schemas
 - **JWT claim** — Agent tokens include `environment` when the agent has a tag

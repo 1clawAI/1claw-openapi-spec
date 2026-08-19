@@ -3107,7 +3107,7 @@
           "Environment Variables"
         ],
         "summary": "Resolve environment variables",
-        "description": "Resolve the final KEY=VALUE set for an environment with full precedence (shared < vault < branch override).",
+        "description": "Resolve the final KEY=VALUE set for an environment with full precedence (shared < vault < branch override).\nWhen the caller is an agent with `env_auto_resolve: true`, the `environment` query parameter may be omitted —\nthe server uses the agent's tagged environment from the JWT. Org setting `env.enforce_agent_environment_scope`\nblocks agents from resolving vars outside their tagged environment.\n",
         "operationId": "resolveEnvVars",
         "parameters": [
           {
@@ -3116,17 +3116,19 @@
           {
             "name": "environment",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Target environment (production, preview, development, or custom). Required for human callers; optional for agents with env_auto_resolve when the agent has an environment tag."
           },
           {
             "name": "git_branch",
             "in": "query",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Optional git branch for preview branch overrides"
           }
         ],
         "responses": {
