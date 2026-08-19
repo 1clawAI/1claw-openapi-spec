@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.53.1
+    version: 0.53.2
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -14272,17 +14272,31 @@ components:
 
         ShroudAttestationResponse:
             type: object
-            required: [attested, image_hash, identity_token, verification]
+            required: [attested, attestation_level, image_hash, identity_token, verification]
             properties:
                 attested:
                     type: boolean
-                    description: Whether TEE attestation was successfully fetched
+                    description: |
+                        Whether at least an identity token was obtained (true for identity,
+                        confidential, or sev_snp levels). Backward-compatible boolean; prefer
+                        attestation_level for granularity.
+                attestation_level:
+                    type: string
+                    enum: [none, identity, confidential, sev_snp]
+                    description: |
+                        Granularity of TEE attestation achieved. `none` = dev/non-GCE;
+                        `identity` = GCE metadata JWT only; `confidential` = CC claims present;
+                        `sev_snp` = full SEV-SNP measurement verified against image digest.
                 image_hash:
                     type: string
                     description: Confidential VM image hash (compare against published Docker digest)
                 identity_token:
                     type: string
                     description: GCE metadata identity JWT (verify against Google public keys)
+                confidential_claims:
+                    nullable: true
+                    description: Confidential Computing claims extracted from the identity JWT
+                    $ref: "#/components/schemas/ConfidentialClaims"
                 verification:
                     type: object
                     properties:
@@ -14295,6 +14309,23 @@ components:
                             format: uri
                         expected_audience:
                             type: string
+
+        ConfidentialClaims:
+            type: object
+            nullable: true
+            properties:
+                secboot:
+                    type: boolean
+                    description: Whether secure boot was enabled
+                hwmodel:
+                    type: string
+                    description: Hardware model string (e.g. GCP_AMD_SEV)
+                instance_confidentiality:
+                    type: string
+                    description: Instance confidentiality level from google.compute_engine
+                sw_name:
+                    type: string
+                    description: Software name claim (swname or sw_name)
 
         AuditEvent:
             type: object

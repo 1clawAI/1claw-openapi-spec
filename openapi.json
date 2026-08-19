@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.53.1",
+    "version": "0.53.2",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -21760,6 +21760,7 @@
         "type": "object",
         "required": [
           "attested",
+          "attestation_level",
           "image_hash",
           "identity_token",
           "verification"
@@ -21767,7 +21768,17 @@
         "properties": {
           "attested": {
             "type": "boolean",
-            "description": "Whether TEE attestation was successfully fetched"
+            "description": "Whether at least an identity token was obtained (true for identity,\nconfidential, or sev_snp levels). Backward-compatible boolean; prefer\nattestation_level for granularity.\n"
+          },
+          "attestation_level": {
+            "type": "string",
+            "enum": [
+              "none",
+              "identity",
+              "confidential",
+              "sev_snp"
+            ],
+            "description": "Granularity of TEE attestation achieved. `none` = dev/non-GCE;\n`identity` = GCE metadata JWT only; `confidential` = CC claims present;\n`sev_snp` = full SEV-SNP measurement verified against image digest.\n"
           },
           "image_hash": {
             "type": "string",
@@ -21776,6 +21787,11 @@
           "identity_token": {
             "type": "string",
             "description": "GCE metadata identity JWT (verify against Google public keys)"
+          },
+          "confidential_claims": {
+            "nullable": true,
+            "description": "Confidential Computing claims extracted from the identity JWT",
+            "$ref": "#/components/schemas/ConfidentialClaims"
           },
           "verification": {
             "type": "object",
@@ -21794,6 +21810,28 @@
                 "type": "string"
               }
             }
+          }
+        }
+      },
+      "ConfidentialClaims": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "secboot": {
+            "type": "boolean",
+            "description": "Whether secure boot was enabled"
+          },
+          "hwmodel": {
+            "type": "string",
+            "description": "Hardware model string (e.g. GCP_AMD_SEV)"
+          },
+          "instance_confidentiality": {
+            "type": "string",
+            "description": "Instance confidentiality level from google.compute_engine"
+          },
+          "sw_name": {
+            "type": "string",
+            "description": "Software name claim (swname or sw_name)"
           }
         }
       },
