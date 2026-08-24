@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.56.3
+    version: 0.57.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -5580,6 +5580,28 @@ paths:
                 "401":
                     $ref: "#/components/responses/Unauthorized"
 
+    /v1/treasury/wallets/inference-budget:
+        get:
+            tags: [Treasury Wallets]
+            summary: Get inference budget for current user
+            description: |
+                Returns the user's remaining LLM inference allowance when connected via a platform app.
+                Includes allowance, spent, remaining USD, per-request cap, and billing period end.
+            operationId: getUserInferenceBudget
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Inference budget (or unconfigured message)
+                    content:
+                        application/json:
+                            schema:
+                                oneOf:
+                                    - $ref: "#/components/schemas/InferenceBudgetResponse"
+                                    - $ref: "#/components/schemas/InferenceBudgetUnconfiguredResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     # ---------------------------------------------------------------------------
     # Webhooks
     # ---------------------------------------------------------------------------
@@ -6426,6 +6448,44 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/platform/apps/{appId}/templates/{template_id}/preview:
+        post:
+            tags: [Platform]
+            summary: Preview resolved template spec
+            description: |
+                Resolves `{{params.*}}` and `{{subject.*}}` placeholders in a template spec
+                without provisioning resources. Useful for validating parameterized bootstrap templates.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: template_id
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/TemplatePreviewRequest"
+            responses:
+                "200":
+                    description: Resolved template spec
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TemplatePreviewResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/platform/users/upsert:
         post:
             tags: [Platform]
@@ -6458,6 +6518,31 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/PlatformUserLinkRequiredResponse"
+
+    /v1/platform/siwe/challenge:
+        post:
+            tags: [Platform]
+            summary: Issue SIWE nonce
+            description: |
+                Creates a one-time nonce for Sign-In With Ethereum user provisioning.
+                Requires platform (`plt_`) authentication. The nonce expires in 5 minutes.
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SiweChallengeRequest"
+            responses:
+                "200":
+                    description: Nonce issued
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SiweChallengeResponse"
+                "400":
+                    description: SIWE domain not configured
 
     /v1/platform/apps/{appId}/users:
         get:
@@ -6557,6 +6642,100 @@ paths:
                     description: Connection not yet bootstrapped
                 "404":
                     description: Connection not found
+
+    /v1/platform/connections/{connectionId}:
+        get:
+            tags: [Platform]
+            summary: Get connection details
+            description: |
+                Returns connection status, claim state, wallet address, and provisioned resource IDs.
+                Use for polling the claim loop after bootstrap.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Connection details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ConnectionDetailResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/usage:
+        get:
+            tags: [Platform]
+            summary: Get per-connection usage
+            description: Returns inference spend for the current UTC month for this connection.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Usage summary
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ConnectionUsageResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/entitlements:
+        get:
+            tags: [Platform]
+            summary: List entitlement evaluations
+            description: Returns on-chain entitlement watch status for the connection.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Entitlement watches
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/EntitlementsListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/entitlements/refresh:
+        post:
+            tags: [Platform]
+            summary: Refresh entitlement evaluations
+            description: Triggers an immediate entitlement monitor cycle for this connection's org.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "202":
+                    description: Refresh accepted
+                "404":
+                    $ref: "#/components/responses/NotFound"
 
     /v1/platform/apps/{appId}/audit:
         get:
@@ -16300,12 +16479,29 @@ components:
                 subject_token_type:
                     type: string
                     default: "urn:ietf:params:oauth:token-type:jwt"
+                    description: |
+                        Token type for subject_token. Use `urn:1claw:params:oauth:token-type:siwe`
+                        with `siwe_message` and `siwe_signature` for wallet-based provisioning.
                 email:
                     type: string
                     format: email
                     description: Fallback when subject_token is not provided
                 display_name:
                     type: string
+                siwe_message:
+                    type: string
+                    description: EIP-4361 Sign-In With Ethereum message (required for SIWE upsert)
+                siwe_signature:
+                    type: string
+                    description: Hex-encoded SIWE signature (required for SIWE upsert)
+                return_to:
+                    type: string
+                    format: uri
+                    description: Redirect URL after cross-org link consent
+                create_sub_org:
+                    type: boolean
+                    default: false
+                    description: When true, creates a sub-org under the platform app's org
 
         PlatformUserResponse:
             type: object
@@ -16394,6 +16590,12 @@ components:
                     type: string
                     format: uri
                     description: URL to redirect the user to after claiming resources.
+                parameters:
+                    type: object
+                    additionalProperties: true
+                    description: |
+                        Template parameters substituted as `{{params.*}}` during bootstrap.
+                        Combined with `Idempotency-Key` header for params-aware idempotent replay.
 
         BootstrapResponse:
             type: object
@@ -17082,6 +17284,26 @@ components:
                 max_transactions_per_day:
                     type: integer
                     description: Maximum number of transactions per 24h window
+                inference_allowance_usd:
+                    type: string
+                    description: Monthly LLM inference allowance in USD (decimal string)
+                inference_reserved_pct:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                    default: 25
+                    description: Percent of allowance held in reserve (not spendable)
+                inference_hard_stop:
+                    type: boolean
+                    default: true
+                    description: When true, block inference when allowance is exhausted
+                inference_allowance_mode:
+                    type: string
+                    enum: [policy, credits]
+                    default: policy
+                max_request_cost_usd:
+                    type: string
+                    description: Maximum estimated cost per LLM request in USD
                 human_factor_auth:
                     type: object
                     additionalProperties: true
@@ -17089,6 +17311,180 @@ components:
                         Human factor auth requirements for send/swap/export.
                         Fields: send, swap, export (password_or_passkey | passkey_only | passkey_required | password_only | reauth_token_only),
                         conditional.require_passkey_above_usd, conditional.require_passkey_for_new_recipient.
+
+        SiweChallengeRequest:
+            type: object
+            properties:
+                domain:
+                    type: string
+                    description: Optional SIWE domain override (defaults to platform app's siwe_domain)
+
+        SiweChallengeResponse:
+            type: object
+            required: [nonce, expires_in, domain]
+            properties:
+                nonce:
+                    type: string
+                expires_in:
+                    type: integer
+                    description: Seconds until nonce expiry
+                domain:
+                    type: string
+
+        ConnectionDetailResponse:
+            type: object
+            required: [connection_id, user_id, status, entitlement_status, vault_ids, agent_ids, claim]
+            properties:
+                connection_id:
+                    type: string
+                    format: uuid
+                user_id:
+                    type: string
+                    format: uuid
+                status:
+                    type: string
+                entitlement_status:
+                    type: string
+                wallet_address:
+                    type: string
+                    nullable: true
+                vault_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                agent_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                claimed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                claim:
+                    $ref: "#/components/schemas/ClaimStatusResponse"
+
+        ClaimStatusResponse:
+            type: object
+            required: [status]
+            properties:
+                status:
+                    type: string
+                    enum: [pending, active, claimed]
+                redeemed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+        ConnectionUsageResponse:
+            type: object
+            required: [connection_id, period, inference_spent_usd]
+            properties:
+                connection_id:
+                    type: string
+                    format: uuid
+                period:
+                    type: string
+                    description: UTC month (YYYY-MM)
+                inference_spent_usd:
+                    type: string
+
+        EntitlementsListResponse:
+            type: object
+            required: [evaluations]
+            properties:
+                evaluations:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/EntitlementEvaluationResponse"
+
+        EntitlementEvaluationResponse:
+            type: object
+            required: [id, status, watch_kind, chain, holder_address]
+            properties:
+                id:
+                    type: string
+                status:
+                    type: string
+                watch_kind:
+                    type: string
+                chain:
+                    type: string
+                holder_address:
+                    type: string
+                last_value_raw:
+                    type: string
+                    nullable: true
+                last_checked_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+        TemplatePreviewRequest:
+            type: object
+            properties:
+                parameters:
+                    type: object
+                    additionalProperties: true
+                subject:
+                    type: object
+                    properties:
+                        user_id:
+                            type: string
+                        external_subject:
+                            type: string
+                        wallet_address:
+                            type: string
+                        email:
+                            type: string
+
+        TemplatePreviewResponse:
+            type: object
+            required: [resolved_spec]
+            properties:
+                resolved_spec:
+                    type: object
+                    additionalProperties: true
+
+        InferenceBudgetResponse:
+            type: object
+            required:
+                - allowance_usd
+                - spent_usd
+                - remaining_usd
+                - reserved_pct
+                - max_request_cost_usd
+                - period_end
+            properties:
+                allowance_usd:
+                    type: string
+                spent_usd:
+                    type: string
+                remaining_usd:
+                    type: string
+                reserved_pct:
+                    type: integer
+                max_request_cost_usd:
+                    type: string
+                period_end:
+                    type: string
+                    format: date-time
+                connection_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+
+        InferenceBudgetUnconfiguredResponse:
+            type: object
+            properties:
+                allowance_usd:
+                    type: string
+                    nullable: true
+                remaining_usd:
+                    nullable: true
+                message:
+                    type: string
 
         SpendPolicyResponse:
             type: object
@@ -17124,6 +17520,21 @@ components:
                     items: { type: string }
                 max_transactions_per_day:
                     type: integer
+                    nullable: true
+                inference_allowance_usd:
+                    type: string
+                    nullable: true
+                inference_reserved_pct:
+                    type: integer
+                    nullable: true
+                inference_hard_stop:
+                    type: boolean
+                    nullable: true
+                inference_allowance_mode:
+                    type: string
+                    nullable: true
+                max_request_cost_usd:
+                    type: string
                     nullable: true
                 human_factor_auth:
                     type: object
