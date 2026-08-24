@@ -3750,6 +3750,16 @@
               }
             }
           },
+          "202": {
+            "description": "Transaction held for human approval (graduated tx_approval_policy)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TxAwaitingApproval"
+                }
+              }
+            }
+          },
           "402": {
             "$ref": "#/components/responses/PaymentRequired"
           },
@@ -5045,6 +5055,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecuteResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Execution requires human approval before running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionApprovalRequired"
                 }
               }
             }
@@ -18601,6 +18621,28 @@
             "default": true,
             "description": "When true, card orders route through the human approval queue before x402 payment."
           },
+          "tx_approval_policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Graduated transaction approval policy (HITL thresholds). Separate from hard guardrails."
+          },
+          "typed_data_policy": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "approve"
+            ],
+            "description": "EIP-712 escalation when typed_data matches no allowlist — deny (403) or route to HITL (approve)."
+          },
+          "simulation_failure_policy": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "approve"
+            ],
+            "description": "Simulation failure escalation — deny (422) or route to HITL (approve)."
+          },
           "api_key_expires_at": {
             "type": "string",
             "format": "date-time",
@@ -18763,6 +18805,34 @@
           "card_require_approval": {
             "type": "boolean",
             "description": "When true, card orders route through the human approval queue before x402 payment."
+          },
+          "tx_approval_policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Graduated transaction approval policy (HITL thresholds)."
+          },
+          "typed_data_policy": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "approve"
+            ],
+            "nullable": true,
+            "description": "EIP-712 escalation policy."
+          },
+          "simulation_failure_policy": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "approve"
+            ],
+            "nullable": true,
+            "description": "Simulation failure escalation policy."
+          },
+          "clear_auto_suspended": {
+            "type": "boolean",
+            "description": "When true, clears circuit-breaker auto-suspension (human owner/admin only)."
           },
           "federation_enabled": {
             "type": "boolean",
@@ -19015,6 +19085,32 @@
           "card_require_approval": {
             "type": "boolean",
             "description": "When true, card orders route through the human approval queue before x402 payment."
+          },
+          "tx_approval_policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Graduated transaction approval policy (HITL thresholds)."
+          },
+          "typed_data_policy": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "approve"
+            ],
+            "nullable": true
+          },
+          "simulation_failure_policy": {
+            "type": "string",
+            "enum": [
+              "deny",
+              "approve"
+            ],
+            "nullable": true
+          },
+          "auto_suspended": {
+            "type": "boolean",
+            "description": "True when circuit breaker auto-suspended the agent after repeated guardrail denials."
           },
           "tx_count_today": {
             "type": "integer",
@@ -25405,6 +25501,76 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Intent-specific parameters"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, validate guardrails and approval policy without executing or persisting side effects."
+          },
+          "resume_after_approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Internal — resume execution after human approval (server-injected)."
+          }
+        }
+      },
+      "ExecutionApprovalRequired": {
+        "type": "object",
+        "required": [
+          "error",
+          "approval_id",
+          "status"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "approval_required"
+            ]
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "TxAwaitingApproval": {
+        "type": "object",
+        "required": [
+          "status",
+          "approval_id"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_approval"
+            ]
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tx_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
