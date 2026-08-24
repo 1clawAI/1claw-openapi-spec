@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.56.2
+    version: 0.56.3
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2998,9 +2998,6 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
-                "404":
-                    $ref: "#/components/responses/NotFound"
-
     /v1/agents/{agent_id}/accounts/migrate:
         post:
             tags: [Agents]
@@ -3061,6 +3058,33 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/agents/{agent_id}/accounts/{chain}/deploy:
+        post:
+            tags: [Agents]
+            summary: Lazy-deploy counterfactual Safe (stub)
+            description: Human-only. Broadcasts Safe deployment when Guard audit completes. Returns 501 pre-audit.
+            operationId: deployAgentSafeAccount
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "501":
+                    description: Not implemented (Phase 5.1)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/NotImplementedResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/org/safe/sync-allowances:
         post:
             tags: [Organization]
@@ -3070,10 +3094,41 @@ paths:
             responses:
                 "200":
                     description: Reconciliation report
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AllowanceReconcileReport"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "403":
                     $ref: "#/components/responses/Forbidden"
+
+    /v1/treasury/{treasury_id}/safe/roles-sync:
+        post:
+            tags: [Treasury]
+            summary: Sync treasury Safe Roles module (stub)
+            description: Human-only. Reconciles on-chain Roles config with agent guardrails. Returns 501 pre-audit.
+            operationId: treasurySafeRolesSync
+            parameters:
+                - name: treasury_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "501":
+                    description: Not implemented (Phase 5.9)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/NotImplementedResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
 
     /v1/agents/{agent_id}/safe/cosign:
         post:
@@ -12395,7 +12450,9 @@ components:
                     additionalProperties: true
                     description: |
                         Per-chain guardrail overrides. Keys are signing chains (ethereum, bitcoin, solana, xrp, cardano, tron).
-                        Each value may include max_value, daily_limit, to_allowlist, token_allowlist, max_per_day, overhead_budget, max_ata_creates_per_day.
+                        Each value may include max_value, daily_limit, to_allowlist, token_allowlist, max_per_day,
+                        overhead_budget, max_ata_creates_per_day, max_fee_per_gas_gwei, max_gas_limit,
+                        gas_daily_budget_native (UTC-day cumulative EVM gas estimate in native units).
                         Strictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.
                 tx_max_per_day:
                     type: integer
@@ -12709,7 +12766,8 @@ components:
                     additionalProperties: true
                     description: |
                         Per-chain guardrail overrides. Keys are signing chains (ethereum, bitcoin, solana, xrp, cardano, tron).
-                        Each value may include max_value, daily_limit, to_allowlist, token_allowlist (legacy *_eth keys accepted).
+                        Each value may include max_value, daily_limit, to_allowlist, token_allowlist (legacy *_eth keys accepted),
+                        max_fee_per_gas_gwei, max_gas_limit, gas_daily_budget_native (UTC-day cumulative EVM gas in native units).
                         Strictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.
                 api_key_expires_at:
                     type: string
@@ -19303,6 +19361,39 @@ components:
                 address:
                     type: string
                 version:
+                    type: string
+
+        AllowanceReconcileReport:
+            type: object
+            properties:
+                org_id:
+                    type: string
+                    format: uuid
+                agents_checked:
+                    type: integer
+                compiled:
+                    type: array
+                    items:
+                        type: object
+                        additionalProperties: true
+                drift_detected:
+                    type: array
+                    items:
+                        type: object
+                        additionalProperties: true
+                onchain_sync:
+                    type: string
+                    description: counterfactual when on-chain broadcast is stubbed pre-audit
+
+        NotImplementedResponse:
+            type: object
+            required: [error, phase, message]
+            properties:
+                error:
+                    type: string
+                phase:
+                    type: string
+                message:
                     type: string
 
         # -------------------------------------------------------------------
