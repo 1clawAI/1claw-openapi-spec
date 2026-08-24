@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.53.2",
+    "version": "0.53.4",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.xyz"
@@ -5053,7 +5053,41 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "403": {
-            "$ref": "#/components/responses/Forbidden"
+            "description": "Guardrail violation or permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/GuardrailViolation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ProblemDetails"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request params exceed binding max_request_bytes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardrailViolation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Binding or agent execution rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardrailViolation"
+                }
+              }
+            }
           }
         }
       }
@@ -10177,6 +10211,45 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/approvals/{approval_id}/status": {
+      "get": {
+        "tags": [
+          "Approvals"
+        ],
+        "summary": "Poll approval status (agent-only)",
+        "description": "Lightweight status poll for agents waiting on human approval.\nReturns `status` and `expires_at` only. Agents may only poll\napprovals they created (`agent_id` must match the caller).\n",
+        "operationId": "getApprovalStatus",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Approval status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalStatusResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -24423,6 +24496,89 @@
           }
         }
       },
+      "ApprovalStatusResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "expired"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "GuardrailViolation": {
+        "type": "object",
+        "required": [
+          "error",
+          "reason_code",
+          "approval_available"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "guardrail_violation"
+            ]
+          },
+          "reason_code": {
+            "type": "string",
+            "enum": [
+              "binding_rpm_exceeded",
+              "agent_rpm_exceeded",
+              "graphql_mutation_blocked",
+              "graphql_depth_exceeded",
+              "graphql_parse_failed",
+              "graphql_introspection_blocked",
+              "response_too_large",
+              "request_too_large",
+              "method_not_allowed",
+              "header_not_allowed",
+              "dns_private_ip_blocked",
+              "agent_suspended",
+              "outside_time_window",
+              "secret_in_request",
+              "concurrency_exceeded",
+              "org_frozen"
+            ]
+          },
+          "limit": {
+            "type": "string",
+            "nullable": true
+          },
+          "current": {
+            "type": "string",
+            "nullable": true
+          },
+          "attempted": {
+            "type": "string",
+            "nullable": true
+          },
+          "approval_available": {
+            "type": "boolean",
+            "default": false
+          },
+          "retry_after_seconds": {
+            "type": "integer",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "EmailOtpVerifyResponse": {
         "type": "object",
         "required": [
@@ -25012,8 +25168,7 @@
             "additionalProperties": true
           },
           "guardrails": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/BindingGuardrails"
           },
           "credential": {
             "type": "object",
@@ -25033,8 +25188,7 @@
             "additionalProperties": true
           },
           "guardrails": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/BindingGuardrails"
           },
           "is_active": {
             "type": "boolean"
@@ -25046,6 +25200,78 @@
           },
           "credential_source": {
             "$ref": "#/components/schemas/CredentialSource"
+          }
+        }
+      },
+      "BindingGuardrails": {
+        "type": "object",
+        "description": "Per-binding execution guardrails enforced at execute time.",
+        "properties": {
+          "allowed_hosts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Host allowlist (trailing * wildcard supported). Empty = unrestricted at binding level."
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Path allowlist for HTTP/GraphQL bindings."
+          },
+          "max_requests_per_minute": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Per-binding RPM; strictest of binding and agent limits wins. Denied executions do not count."
+          },
+          "max_duration_ms": {
+            "type": "integer",
+            "description": "Upstream timeout cap for this binding."
+          },
+          "max_request_bytes": {
+            "type": "integer",
+            "default": 262144,
+            "description": "Max serialized execute `params` size in bytes (default 256 KiB)."
+          },
+          "max_response_bytes": {
+            "type": "integer",
+            "description": "Max upstream response body bytes (default 1 MiB, hard cap 4 MiB)."
+          },
+          "allowed_request_headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Agent-supplied headers permitted in execute params. Defaults to content-type, accept, user-agent, idempotency-key."
+          },
+          "allow_mutations": {
+            "type": "boolean",
+            "default": true,
+            "description": "GraphQL only — when false, mutation operations return 403 guardrail_violation."
+          },
+          "allow_introspection": {
+            "type": "boolean",
+            "default": false,
+            "description": "GraphQL only — when false, __schema/__type introspection is blocked."
+          },
+          "max_query_depth": {
+            "type": "integer",
+            "default": 10,
+            "description": "GraphQL max selection depth."
+          },
+          "max_aliases": {
+            "type": "integer",
+            "default": 30,
+            "description": "GraphQL max alias count."
+          },
+          "allowed_operations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "GraphQL operation kinds allowed (query, mutation, subscription)."
           }
         }
       },
@@ -25092,8 +25318,7 @@
             "additionalProperties": true
           },
           "guardrails": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/BindingGuardrails"
           },
           "is_active": {
             "type": "boolean"
