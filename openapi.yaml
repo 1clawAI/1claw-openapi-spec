@@ -3636,6 +3636,34 @@ paths:
                 "404":
                     description: Agent-keys vault not found
 
+    /v1/org/status:
+        get:
+            tags: [Organization]
+            summary: Organization operational status
+            description: Returns whether the org is emergency-frozen (blocks agent tx/execution).
+            operationId: getOrgStatus
+            responses:
+                "200":
+                    description: Current org status
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [org_id, status]
+                                properties:
+                                    org_id:
+                                        type: string
+                                        format: uuid
+                                    status:
+                                        type: string
+                                        enum: [active, frozen]
+                                    frozen_at:
+                                        type: string
+                                        format: date-time
+                                        nullable: true
+                "403":
+                    description: Forbidden
+
     /v1/org/freeze:
         post:
             tags: [Organization]
