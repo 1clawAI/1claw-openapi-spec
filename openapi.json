@@ -5611,6 +5611,80 @@
         }
       }
     },
+    "/v1/org/freeze": {
+      "post": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Emergency org-wide freeze",
+        "description": "Sets organizations.frozen_at — blocks agent tx/execution until unfreeze. Owner/admin only.",
+        "operationId": "freezeOrg",
+        "responses": {
+          "200": {
+            "description": "Organization frozen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "frozen"
+                      ]
+                    },
+                    "org_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/org/unfreeze": {
+      "post": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Clear org-wide freeze",
+        "description": "Clears organizations.frozen_at. Owner/admin only.",
+        "operationId": "unfreezeOrg",
+        "responses": {
+          "200": {
+            "description": "Organization unfrozen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "unfrozen"
+                      ]
+                    },
+                    "org_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/v1/org/bankr-config": {
       "get": {
         "tags": [
@@ -18643,6 +18717,61 @@
             ],
             "description": "Simulation failure escalation — deny (422) or route to HITL (approve)."
           },
+          "tx_block_unlimited_approvals": {
+            "type": "boolean",
+            "default": false,
+            "description": "Block unlimited ERC-20 approvals (max uint256 / setApprovalForAll)."
+          },
+          "tx_per_recipient_max_per_day": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Max transactions to the same recipient address per UTC day."
+          },
+          "tx_per_recipient_daily_limit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Max native-unit spend to the same recipient per UTC day."
+          },
+          "new_recipient_cap_native": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cap on first-time recipient spend in native units."
+          },
+          "tx_max_value_usd": {
+            "type": "string",
+            "nullable": true,
+            "description": "Per-transaction USD cap (requires price oracle)."
+          },
+          "tx_daily_limit_usd": {
+            "type": "string",
+            "nullable": true,
+            "description": "Rolling 24h USD spend cap (requires price oracle)."
+          },
+          "raw_signing_policy": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny",
+              "approve"
+            ],
+            "default": "allow",
+            "description": "Raw digest signing policy — allow, deny, or route to HITL (approve)."
+          },
+          "personal_sign_policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "personal_sign guardrails (message allowlist, max bytes, etc.)."
+          },
+          "allow_erc4337": {
+            "type": "boolean",
+            "default": false,
+            "description": "Allow ERC-4337 gasless UserOperations."
+          },
+          "allow_eip7702": {
+            "type": "boolean",
+            "default": false,
+            "description": "Allow EIP-7702 (tx type 4) set-code transactions."
+          },
           "api_key_expires_at": {
             "type": "string",
             "format": "date-time",
@@ -18829,6 +18958,57 @@
             ],
             "nullable": true,
             "description": "Simulation failure escalation policy."
+          },
+          "tx_block_unlimited_approvals": {
+            "type": "boolean",
+            "description": "Block unlimited ERC-20 approvals (max uint256 / setApprovalForAll)."
+          },
+          "tx_per_recipient_max_per_day": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Max transactions to the same recipient per UTC day. Null clears."
+          },
+          "tx_per_recipient_daily_limit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Max native spend to same recipient per UTC day. Null clears."
+          },
+          "new_recipient_cap_native": {
+            "type": "string",
+            "nullable": true,
+            "description": "First-time recipient native cap. Null clears."
+          },
+          "tx_max_value_usd": {
+            "type": "string",
+            "nullable": true,
+            "description": "Per-tx USD cap. Null clears."
+          },
+          "tx_daily_limit_usd": {
+            "type": "string",
+            "nullable": true,
+            "description": "Rolling 24h USD spend cap. Null clears."
+          },
+          "raw_signing_policy": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny",
+              "approve"
+            ],
+            "description": "Raw digest signing policy."
+          },
+          "personal_sign_policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "personal_sign guardrails JSON."
+          },
+          "allow_erc4337": {
+            "type": "boolean",
+            "description": "Allow ERC-4337 gasless UserOperations."
+          },
+          "allow_eip7702": {
+            "type": "boolean",
+            "description": "Allow EIP-7702 (tx type 4)."
           },
           "clear_auto_suspended": {
             "type": "boolean",
@@ -19107,6 +19287,49 @@
               "approve"
             ],
             "nullable": true
+          },
+          "tx_block_unlimited_approvals": {
+            "type": "boolean",
+            "description": "Block unlimited ERC-20 approvals."
+          },
+          "tx_per_recipient_max_per_day": {
+            "type": "integer",
+            "nullable": true
+          },
+          "tx_per_recipient_daily_limit": {
+            "type": "string",
+            "nullable": true
+          },
+          "new_recipient_cap_native": {
+            "type": "string",
+            "nullable": true
+          },
+          "tx_max_value_usd": {
+            "type": "string",
+            "nullable": true
+          },
+          "tx_daily_limit_usd": {
+            "type": "string",
+            "nullable": true
+          },
+          "raw_signing_policy": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny",
+              "approve"
+            ]
+          },
+          "personal_sign_policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "allow_erc4337": {
+            "type": "boolean"
+          },
+          "allow_eip7702": {
+            "type": "boolean"
           },
           "auto_suspended": {
             "type": "boolean",
