@@ -6216,10 +6216,58 @@ paths:
                       type: string
                       format: uuid
             responses:
-                "204":
-                    description: Deleted
+                "200":
+                    description: Soft-deleted; slug released for reuse within the org
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformAppDeleteResponse"
                 "403":
                     description: Only human users can delete platform apps
+
+    /v1/platform/apps/{appId}/transfer-ownership:
+        post:
+            tags: [Platform]
+            summary: Transfer platform app to another organization
+            description: |
+                Moves the platform app record to another organization. Requires org
+                owner/admin in the source org and step-up auth (`X-Auth-Confirm`,
+                purpose `platform.app.transfer`). End-user connections and provisioned
+                resources remain in their original organizations.
+            operationId: transferPlatformAppOwnership
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: header
+                  name: X-Auth-Confirm
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/TransferPlatformAppOwnershipRequest"
+            responses:
+                "200":
+                    description: Ownership transferred
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TransferPlatformAppOwnershipResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
 
     /v1/platform/apps/{appId}/rotate-key:
         post:
@@ -7110,6 +7158,34 @@ paths:
                                             $ref: "#/components/schemas/SpendPolicyResponse"
 
     /v1/platform/apps/{appId}/spend-policies/{policyId}:
+        get:
+            tags: [Platform]
+            summary: Get a spend policy by ID
+            operationId: getSpendPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: policyId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Spend policy
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SpendPolicyResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
         delete:
             tags: [Platform]
             summary: Delete a spend policy
@@ -7183,6 +7259,12 @@ paths:
                   schema:
                       type: string
                       format: uuid
+                - in: header
+                  name: Idempotency-Key
+                  required: false
+                  schema:
+                      type: string
+                  description: Optional replay protection; same key + body returns cached response (409 on body mismatch).
             requestBody:
                 required: true
                 content:
@@ -7191,11 +7273,19 @@ paths:
                             $ref: "#/components/schemas/CreateSpendPolicyRequest"
             responses:
                 "200":
-                    description: Spend policy set
+                    description: Spend policy set (or idempotent replay)
                     content:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/SpendPolicyResponse"
+                "201":
+                    description: Spend policy created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SpendPolicyResponse"
+                "409":
+                    description: Idempotency-Key reused with different body
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "403":
@@ -7250,6 +7340,79 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/ApprovalListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/approvals/{approvalId}:
+        get:
+            tags: [Platform]
+            summary: Get a connection-scoped approval
+            operationId: getConnectionApproval
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: approvalId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Approval detail
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApprovalResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/pending-approvals:
+        get:
+            tags: [Platform]
+            summary: List pending consensus approvals for a connection
+            description: |
+                Returns pending approvals for agents provisioned on the connection,
+                including `action_payload` and `payload_hash` for consensus UX.
+                Requires plt_ platform auth.
+            operationId: listConnectionPendingApprovals
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: status
+                  in: query
+                  schema:
+                      type: string
+                      default: pending
+                - name: limit
+                  in: query
+                  schema:
+                      type: integer
+                      default: 50
+                - name: offset
+                  in: query
+                  schema:
+                      type: integer
+                      default: 0
+            responses:
+                "200":
+                    description: Pending approvals list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PendingApprovalListResponse"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -16435,6 +16598,46 @@ components:
                     nullable: true
                     description: Optional expiration time for the platform API key. Set to null to clear.
 
+        PlatformAppDeleteResponse:
+            type: object
+            required: [deleted, soft_delete, slug_released, former_slug]
+            properties:
+                deleted:
+                    type: boolean
+                soft_delete:
+                    type: boolean
+                slug_released:
+                    type: boolean
+                former_slug:
+                    type: string
+
+        TransferPlatformAppOwnershipRequest:
+            type: object
+            properties:
+                target_org_id:
+                    type: string
+                    format: uuid
+                target_user_email:
+                    type: string
+                    format: email
+            description: Provide `target_org_id` or `target_user_email` (owner/admin in destination org).
+
+        TransferPlatformAppOwnershipResponse:
+            type: object
+            required: [app_id, former_org_id, new_org_id, message]
+            properties:
+                app_id:
+                    type: string
+                    format: uuid
+                former_org_id:
+                    type: string
+                    format: uuid
+                new_org_id:
+                    type: string
+                    format: uuid
+                message:
+                    type: string
+
         PlatformAppResponse:
             type: object
             properties:
@@ -17161,6 +17364,17 @@ components:
                 created_at:
                     type: string
                     format: date-time
+
+        ApprovalListResponse:
+            type: object
+            required: [approvals, total]
+            properties:
+                approvals:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ApprovalResponse"
+                total:
+                    type: integer
 
         ApprovalStatusResponse:
             type: object

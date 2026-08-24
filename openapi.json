@@ -9648,11 +9648,83 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Deleted"
+          "200": {
+            "description": "Soft-deleted; slug released for reuse within the org",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformAppDeleteResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Only human users can delete platform apps"
+          }
+        }
+      }
+    },
+    "/v1/platform/apps/{appId}/transfer-ownership": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Transfer platform app to another organization",
+        "description": "Moves the platform app record to another organization. Requires org\nowner/admin in the source org and step-up auth (`X-Auth-Confirm`,\npurpose `platform.app.transfer`). End-user connections and provisioned\nresources remain in their original organizations.\n",
+        "operationId": "transferPlatformAppOwnership",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Auth-Confirm",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferPlatformAppOwnershipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ownership transferred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferPlatformAppOwnershipResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -11085,6 +11157,53 @@
       }
     },
     "/v1/platform/apps/{appId}/spend-policies/{policyId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Get a spend policy by ID",
+        "operationId": "getSpendPolicy",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "policyId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Spend policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendPolicyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
       "delete": {
         "tags": [
           "Platform"
@@ -11127,6 +11246,57 @@
       }
     },
     "/v1/platform/connections/{connectionId}/spend-policy": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Get effective spend policy for a connection",
+        "description": "Returns the effective spend policy for the connected user, resolving\nper-user overrides before app-level defaults. Requires plt_ platform auth.\n",
+        "operationId": "getConnectionSpendPolicy",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Effective spend policy (or null)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/SpendPolicyResponse"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
       "put": {
         "tags": [
           "Platform"
@@ -11148,6 +11318,15 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional replay protection; same key + body returns cached response (409 on body mismatch)."
           }
         ],
         "requestBody": {
@@ -11162,7 +11341,17 @@
         },
         "responses": {
           "200": {
-            "description": "Spend policy set",
+            "description": "Spend policy set (or idempotent replay)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendPolicyResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Spend policy created",
             "content": {
               "application/json": {
                 "schema": {
@@ -11176,6 +11365,201 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Idempotency-Key reused with different body"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/approvals": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "List approvals for a platform connection",
+        "description": "Returns approvals assigned to the connection's user, filtered to agents\nprovisioned on the connection. Requires plt_ platform auth.\n",
+        "operationId": "listConnectionApprovals",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "risk_tier",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection-scoped approvals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/approvals/{approvalId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Get a connection-scoped approval",
+        "operationId": "getConnectionApproval",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Approval detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/pending-approvals": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "List pending consensus approvals for a connection",
+        "description": "Returns pending approvals for agents provisioned on the connection,\nincluding `action_payload` and `payload_hash` for consensus UX.\nRequires plt_ platform auth.\n",
+        "operationId": "listConnectionPendingApprovals",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "pending"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending approvals list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingApprovalListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -24898,6 +25282,69 @@
           }
         }
       },
+      "PlatformAppDeleteResponse": {
+        "type": "object",
+        "required": [
+          "deleted",
+          "soft_delete",
+          "slug_released",
+          "former_slug"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          },
+          "soft_delete": {
+            "type": "boolean"
+          },
+          "slug_released": {
+            "type": "boolean"
+          },
+          "former_slug": {
+            "type": "string"
+          }
+        }
+      },
+      "TransferPlatformAppOwnershipRequest": {
+        "type": "object",
+        "properties": {
+          "target_org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_user_email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "description": "Provide `target_org_id` or `target_user_email` (owner/admin in destination org)."
+      },
+      "TransferPlatformAppOwnershipResponse": {
+        "type": "object",
+        "required": [
+          "app_id",
+          "former_org_id",
+          "new_org_id",
+          "message"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "former_org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "new_org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "PlatformAppResponse": {
         "type": "object",
         "properties": {
@@ -25941,6 +26388,24 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApprovalListResponse": {
+        "type": "object",
+        "required": [
+          "approvals",
+          "total"
+        ],
+        "properties": {
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalResponse"
+            }
+          },
+          "total": {
+            "type": "integer"
           }
         }
       },
