@@ -963,6 +963,43 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/auth/human-factor-auth:
+        get:
+            tags: [Authentication]
+            summary: Get effective human factor auth policy
+            description: |
+                Returns the resolved HFA policy for treasury wallet send, swap, and export.
+                Precedence: user override → spend policy → platform defaults.
+            operationId: getHumanFactorAuth
+            responses:
+                "200":
+                    description: Effective HFA policy
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/HumanFactorAuthResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+        put:
+            tags: [Authentication]
+            summary: Set user human factor auth policy
+            operationId: upsertHumanFactorAuth
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpsertHumanFactorAuthRequest"
+            responses:
+                "200":
+                    description: Updated policy
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/HumanFactorAuthResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     # MFA
 
     /v1/auth/mfa/status:
@@ -16715,6 +16752,13 @@ components:
                 max_transactions_per_day:
                     type: integer
                     description: Maximum number of transactions per 24h window
+                human_factor_auth:
+                    type: object
+                    additionalProperties: true
+                    description: |
+                        Human factor auth requirements for send/swap/export.
+                        Fields: send, swap, export (password_or_passkey | passkey_only | passkey_required | password_only | reauth_token_only),
+                        conditional.require_passkey_above_usd, conditional.require_passkey_for_new_recipient.
 
         SpendPolicyResponse:
             type: object
@@ -16751,11 +16795,53 @@ components:
                 max_transactions_per_day:
                     type: integer
                     nullable: true
+                human_factor_auth:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
                 created_at:
                     type: string
                     format: date-time
 
         # --- Risk Engine ---
+
+        HumanFactorAuthPolicy:
+            type: object
+            properties:
+                send:
+                    type: string
+                    enum: [password_or_passkey, passkey_only, passkey_required, password_only, reauth_token_only]
+                swap:
+                    type: string
+                    enum: [password_or_passkey, passkey_only, passkey_required, password_only, reauth_token_only]
+                export:
+                    type: string
+                    enum: [password_or_passkey, passkey_only, passkey_required, password_only, reauth_token_only]
+                conditional:
+                    type: object
+                    properties:
+                        require_passkey_above_usd:
+                            type: string
+                            nullable: true
+                        require_passkey_for_new_recipient:
+                            type: boolean
+
+        UpsertHumanFactorAuthRequest:
+            type: object
+            required: [policy]
+            properties:
+                policy:
+                    $ref: "#/components/schemas/HumanFactorAuthPolicy"
+
+        HumanFactorAuthResponse:
+            type: object
+            required: [policy, source]
+            properties:
+                policy:
+                    $ref: "#/components/schemas/HumanFactorAuthPolicy"
+                source:
+                    type: string
+                    description: user | spend_policy | default
 
         RiskEvent:
             type: object
