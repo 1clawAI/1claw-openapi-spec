@@ -1404,6 +1404,9 @@
                     "require_passkey_for_vaults": {
                       "type": "boolean"
                     },
+                    "require_passkey_for_mfa": {
+                      "type": "boolean"
+                    },
                     "passkey_count": {
                       "type": "integer"
                     }
@@ -1419,7 +1422,7 @@
           "Authentication"
         ],
         "summary": "Update user security settings",
-        "description": "Disabling `require_passkey_for_vaults` requires `X-Auth-Confirm`\n(purpose `security.vault_passkey.disable`) with a passkey or TOTP\nwhen either is enrolled.\n",
+        "description": "Disabling `require_passkey_for_vaults` requires `X-Auth-Confirm`\n(purpose `security.vault_passkey.disable`) with a passkey or TOTP\nwhen either is enrolled.\n\nDisabling `require_passkey_for_mfa` requires `X-Auth-Confirm`\n(purpose `security.mfa_passkey.disable`) with a passkey or TOTP\nwhen either is enrolled.\n",
         "operationId": "updateSecuritySettings",
         "parameters": [
           {
@@ -1439,6 +1442,9 @@
                 "type": "object",
                 "properties": {
                   "require_passkey_for_vaults": {
+                    "type": "boolean"
+                  },
+                  "require_passkey_for_mfa": {
                     "type": "boolean"
                   }
                 }
@@ -1603,6 +1609,84 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MfaVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MFA verified, JWT issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/auth/mfa/passkey/begin": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Begin passkey MFA verification during login",
+        "operationId": "mfaPasskeyBegin",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "mfa_token"
+                ],
+                "properties": {
+                  "mfa_token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "WebAuthn challenge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyAssertBeginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/auth/mfa/passkey/complete": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete passkey MFA verification during login",
+        "operationId": "mfaPasskeyComplete",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaPasskeyCompleteRequest"
               }
             }
           }
@@ -18031,6 +18115,14 @@
           },
           "mfa_token": {
             "type": "string"
+          },
+          "mfa_method": {
+            "type": "string",
+            "enum": [
+              "totp",
+              "passkey"
+            ],
+            "description": "When MFA is required, which second factor to collect"
           }
         }
       },
@@ -18052,6 +18144,19 @@
           },
           "refresh_token": {
             "type": "string"
+          },
+          "mfa_required": {
+            "type": "boolean"
+          },
+          "mfa_token": {
+            "type": "string"
+          },
+          "mfa_method": {
+            "type": "string",
+            "enum": [
+              "totp",
+              "passkey"
+            ]
           }
         }
       },
@@ -18276,6 +18381,15 @@
         "type": "object",
         "properties": {
           "enabled": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "totp_enabled": {
+            "type": "boolean"
+          },
+          "passkey_mfa_enabled": {
             "type": "boolean"
           }
         }
@@ -26050,6 +26164,33 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "MfaPasskeyCompleteRequest": {
+        "type": "object",
+        "required": [
+          "mfa_token",
+          "credential_id",
+          "authenticator_data",
+          "client_data_json",
+          "signature"
+        ],
+        "properties": {
+          "mfa_token": {
+            "type": "string"
+          },
+          "credential_id": {
+            "type": "string"
+          },
+          "authenticator_data": {
+            "type": "string"
+          },
+          "client_data_json": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
           }
         }
       },
