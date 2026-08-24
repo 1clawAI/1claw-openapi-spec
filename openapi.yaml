@@ -2998,6 +2998,127 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/accounts/migrate:
+        post:
+            tags: [Agents]
+            summary: EOA to Safe migration wizard
+            description: Human-only. Provisions counterfactual Safe and returns sweep plan. Onchain module broadcast stubbed pre-audit.
+            operationId: migrateAgentToSafe
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [chain]
+                            properties:
+                                chain:
+                                    type: string
+                                deprecate_eoa:
+                                    type: boolean
+            responses:
+                "200":
+                    description: Migration plan
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MigrationPlanResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/accounts/{chain}/deprecate-eoa:
+        post:
+            tags: [Agents]
+            summary: Mark agent EOA account deprecated
+            operationId: deprecateAgentEoa
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Updated account
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentAccountResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/org/safe/sync-allowances:
+        post:
+            tags: [Organization]
+            summary: Reconcile Safe allowance targets (org admin)
+            description: Compiles tx_daily_limit targets for Safe agents. Onchain read/write stubbed pre-audit.
+            operationId: syncOrgSafeAllowances
+            responses:
+                "200":
+                    description: Reconciliation report
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/agents/{agent_id}/safe/cosign:
+        post:
+            tags: [Agents]
+            summary: Enable Vault co-signer (stub)
+            operationId: enableSafeCosign
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "501":
+                    description: Not implemented (Phase 5.2)
+
+    /v1/agents/{agent_id}/safe/passkey-enroll:
+        post:
+            tags: [Agents]
+            summary: Enroll passkey Safe owner (stub)
+            operationId: enrollSafePasskeyOwner
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "501":
+                    description: Not implemented (Phase 5.5)
+
+    /v1/agents/{agent_id}/safe/timelock:
+        post:
+            tags: [Agents]
+            summary: Configure Zodiac timelock (stub)
+            operationId: configureSafeTimelock
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "501":
+                    description: Not implemented (Phase 5.6)
+
+    /v1/agents/{agent_id}/safe/erc4337:
+        post:
+            tags: [Agents]
+            summary: Enable ERC-4337 Safe lane (stub)
+            operationId: enableSafeErc4337
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "501":
+                    description: Not implemented (Phase 5.8)
+
     /v1/agents/{agent_id}/guardrails/replay:
         post:
             tags: [Agents]
@@ -19093,9 +19214,64 @@ components:
                     type: string
                 address:
                     type: string
+                safe_version:
+                    type: string
+                modules_enabled:
+                    type: array
+                    items:
+                        type: string
+                deploy_status:
+                    type: string
+                cosign_enabled:
+                    type: boolean
+                metadata:
+                    type: object
                 created_at:
                     type: string
                     format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        MigrationPlanResponse:
+            type: object
+            properties:
+                agent_id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                safe_address:
+                    type: string
+                safe_version:
+                    type: string
+                modules:
+                    type: array
+                    items:
+                        type: string
+                eoa_address:
+                    type: string
+                sweep_instructions:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            asset:
+                                type: string
+                            action:
+                                type: string
+                            note:
+                                type: string
+                roles_config_hash:
+                    type: string
+                allowance_config_hash:
+                    type: string
+                warnings:
+                    type: array
+                    items:
+                        type: string
+                deploy_status:
+                    type: string
 
         ProvisionAgentAccountRequest:
             type: object
