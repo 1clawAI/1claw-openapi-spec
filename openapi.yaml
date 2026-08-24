@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.56.0
+    version: 0.56.1
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -16585,32 +16585,52 @@ components:
                     format: date-time
                     nullable: true
 
+        GuardrailReasonCode:
+            type: string
+            description: |
+                Stable snake_case reason codes for guardrail violations (Convention 1).
+                Shadow-mode `"log"` emits the same codes in `guardrail_shadow.would_deny`
+                audit events with `enforced: false`. 202 HITL responses use
+                `approval_available: true` instead of a deny reason_code.
+            enum:
+                - binding_rpm_exceeded
+                - agent_rpm_exceeded
+                - graphql_mutation_blocked
+                - graphql_depth_exceeded
+                - graphql_parse_failed
+                - graphql_introspection_blocked
+                - response_too_large
+                - request_too_large
+                - method_not_allowed
+                - header_not_allowed
+                - dns_private_ip_blocked
+                - agent_suspended
+                - outside_time_window
+                - secret_in_request
+                - concurrency_exceeded
+                - org_frozen
+                - price_unavailable
+                - gas_fee_exceeded
+                - unlimited_approval_blocked
+                - tx_per_recipient_limit_exceeded
+                - tx_max_value_exceeded
+                - tx_daily_limit_exceeded
+                - delegation_signing_blocked
+                - recipient_screening_failed
+                - screening_provider_unavailable
+                - human_factor_auth_required
+                - register_passkey_required
+
         GuardrailViolation:
             type: object
+            description: Convention 1 machine-readable guardrail denial JSON body.
             required: [error, reason_code, approval_available]
             properties:
                 error:
                     type: string
                     enum: [guardrail_violation]
                 reason_code:
-                    type: string
-                    enum:
-                        - binding_rpm_exceeded
-                        - agent_rpm_exceeded
-                        - graphql_mutation_blocked
-                        - graphql_depth_exceeded
-                        - graphql_parse_failed
-                        - graphql_introspection_blocked
-                        - response_too_large
-                        - request_too_large
-                        - method_not_allowed
-                        - header_not_allowed
-                        - dns_private_ip_blocked
-                        - agent_suspended
-                        - outside_time_window
-                        - secret_in_request
-                        - concurrency_exceeded
-                        - org_frozen
+                    $ref: "#/components/schemas/GuardrailReasonCode"
                 limit:
                     type: string
                     nullable: true
@@ -16629,6 +16649,11 @@ components:
                 detail:
                     type: string
                     nullable: true
+
+        GuardrailDenial:
+            description: Alias of GuardrailViolation (Convention 1 JSON shape).
+            allOf:
+                - $ref: "#/components/schemas/GuardrailViolation"
 
         # --- Email OTP ---
 
