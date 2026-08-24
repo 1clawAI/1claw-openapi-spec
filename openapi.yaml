@@ -7136,6 +7136,36 @@ paths:
                     $ref: "#/components/responses/NotFound"
 
     /v1/platform/connections/{connectionId}/spend-policy:
+        get:
+            tags: [Platform]
+            summary: Get effective spend policy for a connection
+            description: |
+                Returns the effective spend policy for the connected user, resolving
+                per-user overrides before app-level defaults. Requires plt_ platform auth.
+            operationId: getConnectionSpendPolicy
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Effective spend policy (or null)
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    policy:
+                                        oneOf:
+                                            - $ref: "#/components/schemas/SpendPolicyResponse"
+                                            - type: "null"
+                "404":
+                    $ref: "#/components/responses/NotFound"
         put:
             tags: [Platform]
             summary: Set per-user spend policy override
@@ -7170,6 +7200,58 @@ paths:
                     $ref: "#/components/responses/BadRequest"
                 "403":
                     $ref: "#/components/responses/Forbidden"
+
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/approvals:
+        get:
+            tags: [Platform]
+            summary: List approvals for a platform connection
+            description: |
+                Returns approvals assigned to the connection's user, filtered to agents
+                provisioned on the connection. Requires plt_ platform auth.
+            operationId: listConnectionApprovals
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: status
+                  in: query
+                  required: false
+                  schema:
+                      type: string
+                - name: risk_tier
+                  in: query
+                  required: false
+                  schema:
+                      type: integer
+                - name: limit
+                  in: query
+                  required: false
+                  schema:
+                      type: integer
+                      default: 50
+                - name: offset
+                  in: query
+                  required: false
+                  schema:
+                      type: integer
+                      default: 0
+            responses:
+                "200":
+                    description: Connection-scoped approvals
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApprovalListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
 
     # --- Approvals ---
 
