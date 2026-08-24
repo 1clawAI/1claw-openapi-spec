@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.53.4
+    version: 0.56.0
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2903,6 +2903,100 @@ paths:
     # ---------------------------------------------------------------------------
     # Agent Delegations
     # ---------------------------------------------------------------------------
+
+    /v1/agents/{agent_id}/accounts:
+        get:
+            tags: [Agents]
+            summary: List agent on-chain accounts
+            operationId: listAgentAccounts
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Agent accounts
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentAccountListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        post:
+            tags: [Agents]
+            summary: Provision an agent account record
+            description: Human-only. Creates a DB record for an EOA or Safe account (Safe onchain sync is stubbed).
+            operationId: provisionAgentAccount
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ProvisionAgentAccountRequest"
+            responses:
+                "201":
+                    description: Account provisioned
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentAccountResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/guardrails/replay:
+        post:
+            tags: [Agents]
+            summary: Dry-run guardrail changes against recent transactions
+            description: Human-only. Compares draft guardrails against recent agent transactions.
+            operationId: replayAgentGuardrails
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/GuardrailReplayRequest"
+            responses:
+                "200":
+                    description: Replay report
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GuardrailReplayResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/safe/module-registry/{chain}:
+        get:
+            tags: [Agents]
+            summary: List Safe module registry entries for a chain
+            operationId: getSafeModuleRegistry
+            security: []
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Module registry
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SafeModuleRegistryResponse"
 
     /v1/agents/{agent_id}/delegations:
         post:
@@ -9759,6 +9853,59 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/org/guardrail-shadow-report:
+        get:
+            tags: [Organization]
+            summary: Get guardrail shadow divergence report
+            description: |
+                Returns Convention 6 shadow-mode violations (`guardrail_shadow.would_deny` audit events)
+                grouped by reason code. Owner/admin only.
+            operationId: getGuardrailShadowReport
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: since
+                  in: query
+                  schema:
+                      type: string
+                      format: date-time
+                - name: until
+                  in: query
+                  schema:
+                      type: string
+                      format: date-time
+            responses:
+                "200":
+                    description: Guardrail shadow report
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GuardrailShadowReportResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/org/guardrail-revisions:
+        get:
+            tags: [Organization]
+            summary: List guardrail revision history
+            description: Audit trail of agent and binding guardrail changes. Owner/admin only.
+            operationId: listGuardrailRevisions
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Guardrail revisions
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GuardrailRevisionListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     # ---------------------------------------------------------------------------
     # Contract ABI Registry
     # ---------------------------------------------------------------------------
@@ -12379,6 +12526,10 @@ components:
                     type: object
                     additionalProperties: true
                     description: Per-environment guardrail overrides keyed by environment slug.
+                address_screening_policy:
+                    type: object
+                    additionalProperties: true
+                    description: Recipient address screening policy. `mode` may be `off`, `deny`, or `approve`.
 
         AgentResponse:
             type: object
@@ -12666,6 +12817,10 @@ components:
                     type: object
                     additionalProperties: true
                     description: Per-environment guardrail overrides keyed by environment slug.
+                address_screening_policy:
+                    type: object
+                    additionalProperties: true
+                    description: Recipient address screening policy. `mode` may be `off`, `deny`, or `approve`.
 
         KnownToken:
             type: object
@@ -18552,6 +18707,181 @@ components:
                 created_at:
                     type: string
                     format: date-time
+
+        GuardrailShadowReportResponse:
+            type: object
+            properties:
+                org_id:
+                    type: string
+                    format: uuid
+                since:
+                    type: string
+                    format: date-time
+                until:
+                    type: string
+                    format: date-time
+                total_would_deny:
+                    type: integer
+                    format: int64
+                by_reason:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/GuardrailShadowReasonRow"
+
+        GuardrailShadowReasonRow:
+            type: object
+            properties:
+                reason_code:
+                    type: string
+                would_deny_count:
+                    type: integer
+                    format: int64
+                enforced_count:
+                    type: integer
+                    format: int64
+
+        GuardrailRevisionListResponse:
+            type: object
+            properties:
+                revisions:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/GuardrailRevisionRow"
+
+        GuardrailRevisionRow:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                resource_type:
+                    type: string
+                    enum: [agent, binding]
+                resource_id:
+                    type: string
+                    format: uuid
+                actor_id:
+                    type: string
+                    format: uuid
+                before_json:
+                    type: object
+                    additionalProperties: true
+                after_json:
+                    type: object
+                    additionalProperties: true
+                change_kind:
+                    type: string
+                    enum: [narrowing, widening, neutral]
+                approval_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+
+        GuardrailReplayRequest:
+            type: object
+            properties:
+                days:
+                    type: integer
+                    minimum: 1
+                    maximum: 90
+                draft_guardrails:
+                    type: object
+                    additionalProperties: true
+                draft_approval_policy:
+                    type: object
+                    additionalProperties: true
+
+        GuardrailReplayResponse:
+            type: object
+            properties:
+                agent_id:
+                    type: string
+                    format: uuid
+                window_days:
+                    type: integer
+                    format: int64
+                allowed:
+                    type: integer
+                    format: int64
+                denied:
+                    type: integer
+                    format: int64
+                would_require_approval:
+                    type: integer
+                    format: int64
+                samples:
+                    type: array
+                    items:
+                        type: object
+                        additionalProperties: true
+
+        AgentAccountListResponse:
+            type: object
+            properties:
+                accounts:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/AgentAccountResponse"
+
+        AgentAccountResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                org_id:
+                    type: string
+                    format: uuid
+                agent_id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                account_type:
+                    type: string
+                address:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+
+        ProvisionAgentAccountRequest:
+            type: object
+            required: [chain]
+            properties:
+                chain:
+                    type: string
+                account_type:
+                    type: string
+                    default: eoa
+                address:
+                    type: string
+
+        SafeModuleRegistryResponse:
+            type: object
+            properties:
+                chain:
+                    type: string
+                modules:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/SafeModuleInfo"
+
+        SafeModuleInfo:
+            type: object
+            properties:
+                name:
+                    type: string
+                address:
+                    type: string
+                version:
+                    type: string
 
         # -------------------------------------------------------------------
         # Contract ABIs
