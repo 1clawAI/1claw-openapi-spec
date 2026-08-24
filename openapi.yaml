@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: 0.56.1
+    version: 0.56.2
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2368,6 +2368,16 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/AgentResponse"
+                "202":
+                    description: |
+                        Guardrail widening queued for human approval. The change is not
+                        applied until approved via POST /v1/approvals/{approval_id}/decide.
+                        Resubmit this PATCH with `approval_id` set to the returned value
+                        after approval to apply the widening.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GuardrailWideningQueuedResponse"
                 "404":
                     $ref: "#/components/responses/NotFound"
         delete:
@@ -3305,6 +3315,15 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/BindingResponse"
+                "202":
+                    description: |
+                        Binding guardrail widening queued for human approval. Resubmit
+                        PATCH with `approval_id` after approval via
+                        POST /v1/approvals/{approval_id}/decide.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GuardrailWideningQueuedResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "404":
@@ -5280,6 +5299,29 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/treasury/wallets/auth-policy:
+        get:
+            tags: [Treasury Wallets]
+            summary: Get effective human factor auth policy for embedded clients
+            description: |
+                Returns the resolved human factor auth (HFA) policy governing treasury
+                wallet send, swap, and export, plus the number of passkeys registered
+                for the calling user. Intended for embedded wallet clients; equivalent
+                to GET /v1/auth/human-factor-auth with an additional passkey count.
+                Precedence: user override → platform app → spend policy → defaults.
+            operationId: getTreasuryAuthPolicy
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Effective HFA policy with passkey registration count
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryAuthPolicyResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     /v1/treasury/wallets/spend-policy:
         get:
             tags: [Treasury Wallets]
@@ -7104,9 +7146,10 @@ paths:
             tags: [Authentication]
             summary: Begin passkey transaction authorization
             description: |
-                Requires `tx_digest` — SHA-256 hex of canonical `chain|to|value_wei|data`
-                for the treasury send being authorized. The server recomputes this digest
-                on send and rejects passkey tokens that do not match.
+                Requires `tx_digest` — SHA-256 hex of the canonical digest for the
+                treasury action being authorized (`send` or `swap`). The server
+                recomputes this digest on send/swap and rejects passkey tokens that
+                do not match.
             operationId: passkeyTxAssertBegin
             security:
                 - BearerAuth: []
@@ -7115,17 +7158,20 @@ paths:
                 content:
                     application/json:
                         schema:
-                            type: object
-                            required: [tx_digest]
-                            properties:
-                                tx_digest:
-                                    type: string
-                                    description: 64-char hex SHA-256 of canonical send params
+                            $ref: "#/components/schemas/PasskeyTxAssertBeginRequest"
             responses:
                 "200":
                     description: WebAuthn challenge
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PasskeyAssertBeginResponse"
                 "400":
-                    description: Missing or invalid tx_digest
+                    description: Missing or invalid tx_digest, or invalid action
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    description: No passkeys registered for the user
 
     /v1/auth/passkeys/tx-assert/complete:
         post:
@@ -12567,6 +12613,13 @@ components:
                     type: object
                     additionalProperties: true
                     description: Recipient address screening policy. `mode` may be `off`, `deny`, or `approve`.
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: >
+                        Approved policy_change id when applying a queued guardrail
+                        widening. Resubmit PATCH with this field after the approval
+                        has been approved via POST /v1/approvals/{approval_id}/decide.
 
         AgentResponse:
             type: object
@@ -16866,7 +16919,82 @@ components:
                     $ref: "#/components/schemas/HumanFactorAuthPolicy"
                 source:
                     type: string
-                    description: user | spend_policy | default
+                    description: user | platform_app | spend_policy | default
+
+        TreasuryAuthPolicyResponse:
+            type: object
+            required: [policy, source, registered_passkeys]
+            properties:
+                policy:
+                    $ref: "#/components/schemas/HumanFactorAuthPolicy"
+                source:
+                    type: string
+                    description: user | platform_app | spend_policy | default
+                registered_passkeys:
+                    type: integer
+                    minimum: 0
+                    description: Number of WebAuthn passkeys registered for the calling user.
+
+        PasskeyTxAssertBeginRequest:
+            type: object
+            required: [tx_digest]
+            properties:
+                tx_digest:
+                    type: string
+                    description: 64-char hex SHA-256 of canonical send or swap params
+                action:
+                    type: string
+                    enum: [send, swap]
+                    default: send
+                    description: Treasury action being authorized. Defaults to `send`.
+
+        PasskeyAssertBeginResponse:
+            type: object
+            required: [challenge, rp_id, timeout, user_verification, allow_credentials]
+            properties:
+                challenge:
+                    type: string
+                rp_id:
+                    type: string
+                timeout:
+                    type: integer
+                user_verification:
+                    type: string
+                allow_credentials:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/AllowCredential"
+
+        AllowCredential:
+            type: object
+            required: [id, type]
+            properties:
+                id:
+                    type: string
+                type:
+                    type: string
+                    enum: [public-key]
+                transports:
+                    type: array
+                    items:
+                        type: string
+
+        GuardrailWideningQueuedResponse:
+            type: object
+            required: [status, approval_id, revision_id, message]
+            properties:
+                status:
+                    type: string
+                    enum: [awaiting_approval]
+                approval_id:
+                    type: string
+                    format: uuid
+                revision_id:
+                    type: string
+                    format: uuid
+                message:
+                    type: string
+                    description: Human-readable explanation of the queued change.
 
         RiskEvent:
             type: object
@@ -17104,6 +17232,13 @@ components:
                     description: "Legacy: inline credential value."
                 credential_source:
                     $ref: "#/components/schemas/CredentialSource"
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: >
+                        Approved policy_change id when applying a queued binding
+                        guardrail widening. Resubmit PATCH with this field after
+                        approval via POST /v1/approvals/{approval_id}/decide.
 
         BindingGuardrails:
             type: object
