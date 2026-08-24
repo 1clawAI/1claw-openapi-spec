@@ -9053,7 +9053,7 @@ paths:
             summary: Chat with a running runtime agent
             description: |
                 Human-only. Proxies to the runtime container's OpenAI-compatible
-                `POST /v1/chat/completions` (hermes / openclaw / openclaude chat bridge).
+                `POST /v1/chat/completions` (hermes / openclaw / openclaude / opencode chat bridge).
                 Starts the runtime if stopped. Streams SSE when `Accept: text/event-stream`
                 or `stream: true`. Conversation history is ephemeral (pass `messages`).
                 Requires a public URL (shell access, Shroud sidecar, or HTTP hosting).

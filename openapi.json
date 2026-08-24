@@ -14199,7 +14199,7 @@
           "Runtimes"
         ],
         "summary": "Chat with a running runtime agent",
-        "description": "Human-only. Proxies to the runtime container's OpenAI-compatible\n`POST /v1/chat/completions` (hermes / openclaw / openclaude chat bridge).\nStarts the runtime if stopped. Streams SSE when `Accept: text/event-stream`\nor `stream: true`. Conversation history is ephemeral (pass `messages`).\nRequires a public URL (shell access, Shroud sidecar, or HTTP hosting).\n",
+        "description": "Human-only. Proxies to the runtime container's OpenAI-compatible\n`POST /v1/chat/completions` (hermes / openclaw / openclaude / opencode chat bridge).\nStarts the runtime if stopped. Streams SSE when `Accept: text/event-stream`\nor `stream: true`. Conversation history is ephemeral (pass `messages`).\nRequires a public URL (shell access, Shroud sidecar, or HTTP hosting).\n",
         "operationId": "runtimeChat",
         "parameters": [
           {
