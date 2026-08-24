@@ -40,7 +40,13 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.52.0)
+## What's in the spec (v0.55.0)
+
+### Graduated HITL & extended guardrails (v0.54–0.55)
+- **Agent fields** — `tx_approval_policy`, `typed_data_policy`, `simulation_failure_policy`, `raw_signing_policy`, `personal_sign_policy`, `tx_block_unlimited_approvals`, per-recipient limits, USD caps, `allow_erc4337`, `allow_eip7702`, `auto_suspended`, `clear_auto_suspended` (update)
+- **Org freeze** — `POST /v1/org/freeze`, `POST /v1/org/unfreeze` (owner/admin emergency stop)
+- **Sign HITL** — EIP-712 and raw digest intents can return **202** `awaiting_approval` when policy is `approve`
+- **Webhooks** — `tx.awaiting_approval`, `sign.awaiting_approval`, `agent.suspended`, `org.frozen`
 
 ### Environment Variables (v0.51)
 - **Per-key env vars** — `GET/POST /v1/vaults/{id}/env-vars`, `GET/PATCH/DELETE .../{key}`, `GET .../resolve` with three-tier precedence (org shared < vault < branch override)
