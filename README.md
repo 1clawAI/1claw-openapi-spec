@@ -1,4 +1,4 @@
-# @1claw/openapi-spec
+# @1claw/openapi-spec (v0.58.0)
 
 OpenAPI 3.1.0 specification for the [1Claw Vault API](https://1claw.xyz). Use this package to generate API clients in any language.
 
@@ -40,7 +40,27 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.55.0)
+## What's in the spec (v0.58.0)
+
+### Platform control plane (v0.58)
+- **App-scoped reads (`plt_`)** — `GET /v1/platform/connections/{id}/approvals`, pending-approvals (includes `payload_hash`), spend-policy
+- **Spend policy** — `GET /v1/platform/apps/{id}/spend-policies/{policy_id}`; `PUT .../connections/{id}/spend-policy` supports optional **`Idempotency-Key`** (24h body-hash replay)
+- **App lifecycle** — soft-delete returns `{ id, slug, deleted_at }`; slug unique per org; inactive apps return 404
+- **Ownership transfer** — `POST /v1/platform/apps/{id}/transfer-ownership` with step-up auth
+
+### Platform API expansion (v0.57)
+- **SIWE provisioning** — `POST /v1/platform/siwe/challenge`; upsert with wallet subject token
+- **Parameterized templates** — bootstrap `parameters` JSON; `POST .../templates/{tid}/preview` dry-runs `{{params.*}}` / `{{subject.*}}`
+- **Connection polling** — `GET /v1/platform/connections/{id}` (status, claim, entitlements, wallet address)
+- **Per-connection usage** — `GET .../connections/{id}/usage` (inference spend, UTC period)
+- **On-chain entitlements** — template `entitlements[]`; refresh + monitor endpoints
+- **Inference budgets** — spend policy inference allowance fields; `GET /v1/treasury/wallets/inference-budget`
+
+### Safe accounts & guardrail governance (v0.56)
+- **Agent accounts** — `GET/POST /v1/agents/{id}/accounts`, migrate/deprecate EOA, module registry
+- **Guardrail governance** — shadow report, revisions, replay; widening guardrails return **202** + approval
+- **Human Factor Auth** — treasury send/swap/export step-up policies
+- **Org unfreeze** — T3 step-up; cumulative gas budget ledger
 
 ### Graduated HITL & extended guardrails (v0.54–0.55)
 - **Agent fields** — `tx_approval_policy`, `typed_data_policy`, `simulation_failure_policy`, `raw_signing_policy`, `personal_sign_policy`, `tx_block_unlimited_approvals`, per-recipient limits, USD caps, `allow_erc4337`, `allow_eip7702`, `auto_suspended`, `clear_auto_suspended` (update)
