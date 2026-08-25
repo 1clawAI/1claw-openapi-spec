@@ -9159,6 +9159,45 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/AutomationPresetsResponse"
 
+    /v1/agents/{agent_id}/automations:
+        post:
+            tags: [Automations]
+            summary: Create agent automation (agent-only)
+            operationId: createAgentAutomation
+            description: |
+                Agent-scoped create for simple manual or webhook automations from chat/runtime tools.
+                Allowed step types: log, notify, memory_get, memory_put, wait (max 10).
+                Cron, swap, http, and transaction steps require human dashboard setup.
+                Requires agent JWT; agent_id in path must match the caller.
+            parameters:
+                - name: agent_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/AgentCreateAutomationRequest"
+            responses:
+                "201":
+                    description: Automation created (includes one-time webhook credentials when trigger_type is webhook)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationCreatedResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     # ---------------------------------------------------------------------------
     # Runtimes
     # ---------------------------------------------------------------------------
@@ -18667,6 +18706,33 @@ components:
                         - type: object
                           additionalProperties: true
 
+        AgentCreateAutomationRequest:
+            type: object
+            required: [name, workflow_spec]
+            description: |
+                Agent-scoped automation create. Defaults to manual trigger.
+                workflow_spec must use only agent-allowed step types (log, notify, memory_get, memory_put, wait).
+            properties:
+                name:
+                    type: string
+                    maxLength: 128
+                trigger_type:
+                    type: string
+                    enum: [manual, webhook]
+                    default: manual
+                workflow_spec:
+                    oneOf:
+                        - type: array
+                          items:
+                              type: object
+                              additionalProperties: true
+                        - type: object
+                          additionalProperties: true
+                auto_trigger:
+                    type: boolean
+                    default: false
+                    description: When true (manual trigger only), start a run immediately after creation
+
         UpdateAutomationRequest:
             type: object
             properties:
@@ -18750,6 +18816,10 @@ components:
                     type: string
                     nullable: true
                     description: Resolved agent display name (enriched list field)
+                created_by_type:
+                    type: string
+                    enum: [user, agent]
+                    description: Whether the automation was created by a human or agent (chat-native create)
                 created_at:
                     type: string
                     format: date-time
