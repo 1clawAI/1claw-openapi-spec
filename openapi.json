@@ -11302,7 +11302,7 @@
           "Platform"
         ],
         "summary": "Set per-user spend policy override",
-        "description": "Override the app-wide spend policy for a specific connected user. This\npolicy takes precedence over the app default. Remove by deleting the\nconnection-level policy.\n",
+        "description": "Replace the per-user spend policy for a connected user (deactivates the\nprevious active row, then inserts). Requires plt_ platform auth.\nOptional `Idempotency-Key` header must cover the full request body — reusing\nthe same key with different parameters returns 409.\n",
         "operationId": "setUserSpendPolicy",
         "security": [
           {
@@ -11557,6 +11557,261 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/pending-approvals/{approvalId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Get a connection-scoped pending approval (with payload_hash)",
+        "operationId": "getConnectionPendingApproval",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending approval detail including action_payload and payload_hash",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingApprovalResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/pending-approvals/{approvalId}/decide": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Decide a pending approval for a connection user",
+        "description": "Platform apps vote on behalf of the connected user after verifying intent\nout-of-band (e.g. wallet mandate). Requires `payload_hash` matching the\npending row. Accepts `decision`: `approve` or `reject` (aliases `approved` /\n`rejected`). plt_ auth only; scoped to agents on the connection.\n",
+        "operationId": "decideConnectionPendingApproval",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated pending approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingApprovalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Already voted"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/approvals/{approvalId}/decide": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Decide a mobile/agent approval for a connection user",
+        "description": "Platform apps decide agent approval requests on behalf of the connected user.\nAccepts `decision`: `approved` or `rejected` (aliases `approve` / `reject`).\nplt_ auth only.\n",
+        "operationId": "decideConnectionApproval",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "decision"
+                ],
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected",
+                      "approve",
+                      "reject"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decided approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Already decided"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/signing-keys/{chain}": {
+      "delete": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Deactivate a signing key for a connection agent",
+        "description": "Deactivates the signing key for an agent provisioned on the connection.\nWhen multiple agents exist, pass `agent_id` query param. plt_ auth only.\n",
+        "operationId": "deactivateConnectionSigningKey",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "chain",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Key deactivated"
+          },
+          "400": {
+            "description": "Multiple agents — agent_id required"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -14117,6 +14372,61 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/automations": {
+      "post": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Create agent automation (agent-only)",
+        "operationId": "createAgentAutomation",
+        "description": "Agent-scoped create for simple manual or webhook automations from chat/runtime tools.\nAllowed step types: log, notify, memory_get, memory_put, wait (max 10).\nCron, swap, http, and transaction steps require human dashboard setup.\nRequires agent JWT; agent_id in path must match the caller.\n",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreateAutomationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Automation created (includes one-time webhook credentials when trigger_type is webhook)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -28137,6 +28447,48 @@
           }
         }
       },
+      "AgentCreateAutomationRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "workflow_spec"
+        ],
+        "description": "Agent-scoped automation create. Defaults to manual trigger.\nworkflow_spec must use only agent-allowed step types (log, notify, memory_get, memory_put, wait).\n",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "trigger_type": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "webhook"
+            ],
+            "default": "manual"
+          },
+          "workflow_spec": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
+          },
+          "auto_trigger": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true (manual trigger only), start a run immediately after creation"
+          }
+        }
+      },
       "UpdateAutomationRequest": {
         "type": "object",
         "properties": {
@@ -28268,6 +28620,14 @@
             "type": "string",
             "nullable": true,
             "description": "Resolved agent display name (enriched list field)"
+          },
+          "created_by_type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent"
+            ],
+            "description": "Whether the automation was created by a human or agent (chat-native create)"
           },
           "created_at": {
             "type": "string",
