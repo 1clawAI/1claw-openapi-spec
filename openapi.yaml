@@ -6425,6 +6425,35 @@ paths:
                                     $ref: "#/components/schemas/PlatformTemplateResponse"
 
     /v1/platform/apps/{appId}/templates/{template_id}:
+        get:
+            tags: [Platform]
+            summary: Get a bootstrap template
+            description: Returns the full template spec for a platform app. plt_ or user JWT.
+            operationId: getPlatformTemplate
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: appId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: template_id
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Template details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PlatformTemplateResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
         patch:
             tags: [Platform]
             summary: Update a bootstrap template
@@ -7578,6 +7607,79 @@ paths:
                     description: Key deactivated
                 "400":
                     description: Multiple agents — agent_id required
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/runtimes:
+        post:
+            tags: [Platform]
+            summary: Create a runtime for a connection agent
+            description: |
+                Creates a Cloud Runtime in the end-user's org for an agent on this connection.
+                Use instead of `POST /v1/runtimes` with a plt_ key (which resolves to the platform org).
+                App must verify user intent out-of-band (e.g. wallet mandate) before calling.
+            operationId: createConnectionRuntime
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateConnectionRuntimeRequest"
+            responses:
+                "201":
+                    description: Runtime created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/agents/{agentId}/chat:
+        post:
+            tags: [Platform]
+            summary: Chat with a connection agent (plt_ scoped)
+            description: |
+                Send a chat message to an agent provisioned on this connection, acting as the
+                connected end-user. Use instead of `POST /v1/agents/{id}/chat` with a plt_ key.
+            operationId: connectionAgentChat
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: agentId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SendMessageRequest"
+            responses:
+                "200":
+                    description: Message sent (JSON or SSE stream)
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -17858,6 +17960,16 @@ components:
                     items:
                         type: string
                         format: uuid
+                runtime_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                automation_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
                 claimed_at:
                     type: string
                     format: date-time
@@ -18964,6 +19076,35 @@ components:
                                 additionalProperties: true
 
         # --- Runtimes ---
+
+        CreateConnectionRuntimeRequest:
+            type: object
+            required: [name]
+            properties:
+                name:
+                    type: string
+                agent_id:
+                    type: string
+                    format: uuid
+                    description: Required when multiple agents on the connection; defaults to sole agent
+                template:
+                    type: string
+                preset:
+                    type: string
+                    default: medium
+                env_public:
+                    type: object
+                    additionalProperties: true
+                idle_timeout_secs:
+                    type: integer
+                expose_http:
+                    type: boolean
+                slug:
+                    type: string
+                inbound_auth:
+                    type: string
+                startup_command:
+                    type: string
 
         CreateRuntimeRequest:
             type: object
