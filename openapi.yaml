@@ -7506,7 +7506,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: "#/components/schemas/ApproveDecisionRequest"
+                            $ref: "#/components/schemas/ApprovePendingApprovalRequest"
             responses:
                 "200":
                     description: Updated pending approval
@@ -7674,7 +7674,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: "#/components/schemas/SendMessageRequest"
+                            $ref: "#/components/schemas/SendChatMessageRequest"
             responses:
                 "200":
                     description: Message sent (JSON or SSE stream)
@@ -21004,7 +21004,7 @@ components:
             properties:
                 decision:
                     type: string
-                    enum: [approve, reject]
+                    enum: [approve, reject, approved, rejected]
                 payload_hash:
                     type: string
                 reason:
