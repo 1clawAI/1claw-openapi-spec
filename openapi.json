@@ -9374,6 +9374,46 @@
         }
       }
     },
+    "/v1/shroud/inspect-content": {
+      "post": {
+        "tags": [
+          "Shroud"
+        ],
+        "summary": "Inspect text for security threats",
+        "description": "Standalone content inspection (MCP `inspect_content` parity). Scans for command\ninjection, encoding tricks, social engineering, PII, and suspicious URLs.\nFail-closed — returns `safe: false` when high/critical threats match.\nAccepts plt_ platform keys, agent JWTs, and user JWTs.\n",
+        "operationId": "inspectContent",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectContentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inspection report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectContentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
     "/v1/shroud/activity": {
       "get": {
         "tags": [
@@ -9891,6 +9931,47 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/apps/{appId}/webhooks": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Platform webhook delivery catalog",
+        "description": "Returns whether `webhook_url` is configured and the event types delivered to\nthe platform app webhook (payload includes `connection_id` when applicable).\nOrg-scoped webhook subscriptions (`GET /v1/webhooks`) are separate.\n",
+        "operationId": "getPlatformWebhooks",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook configuration summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformWebhookInfoResponse"
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -11672,6 +11753,58 @@
             "$ref": "#/components/responses/NotFound"
           }
         }
+      },
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Create a pending consensus approval for a connection agent",
+        "description": "Platform apps submit over-cap or consensus-gated actions on behalf of a\nconnected user's agent. When `policy_id` is omitted, the server resolves the\nmatching agent `consensus_trigger` policy from `action_payload` (chain, to, value).\nReturns **202** with `pending_approval_id` and `payload_hash` for decide/execute.\nRequires plt_ auth; agent must be provisioned on the connection.\n",
+        "operationId": "createConnectionPendingApproval",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionSubmitPendingApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Pending approval created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitPendingApprovalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/v1/platform/connections/{connectionId}/pending-approvals/{approvalId}": {
@@ -12408,7 +12541,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MemoryEntryResponse"
+                  "$ref": "#/components/schemas/MemoryEntry"
                 }
               }
             }
@@ -12484,7 +12617,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MemoryEntryResponse"
+                  "$ref": "#/components/schemas/MemoryEntry"
                 }
               }
             }
@@ -32936,6 +33069,121 @@
           },
           "action_payload": {
             "type": "object"
+          }
+        }
+      },
+      "ConnectionSubmitPendingApprovalRequest": {
+        "type": "object",
+        "required": [
+          "action_payload"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required when the connection has multiple agents"
+          },
+          "policy_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional — auto-resolved from agent consensus policies when omitted"
+          },
+          "action": {
+            "type": "string",
+            "default": "transaction"
+          },
+          "action_payload": {
+            "type": "object",
+            "description": "Transaction/intent fields (chain, to, value, …) hashed for decide binding"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Human-readable label included in webhook payloads"
+          }
+        }
+      },
+      "InspectContentRequest": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 102400
+          },
+          "context": {
+            "type": "string",
+            "enum": [
+              "input",
+              "output"
+            ],
+            "description": "Inspection context (reserved for future rules)"
+          }
+        }
+      },
+      "InspectContentResponse": {
+        "type": "object",
+        "properties": {
+          "safe": {
+            "type": "boolean"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "malicious"
+            ]
+          },
+          "threat_count": {
+            "type": "integer"
+          },
+          "threats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "unicode_normalized": {
+            "type": "boolean"
+          },
+          "normalized_content": {
+            "type": "string"
+          }
+        }
+      },
+      "PlatformWebhookInfoResponse": {
+        "type": "object",
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "webhook_configured": {
+            "type": "boolean"
+          },
+          "webhook_url_host": {
+            "type": "string"
+          },
+          "platform_events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "org_webhooks_note": {
+            "type": "string"
           }
         }
       },
