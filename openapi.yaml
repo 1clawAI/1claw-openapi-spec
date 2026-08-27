@@ -17136,12 +17136,21 @@ components:
                     type: object
                     description: |
                         Template specification defining vault, agents, policies, and signing keys to bootstrap.
-                        Top-level fields: `vault` (object with name, description), `agents` (array of agent specs
-                        with name, description, shroud_enabled, intents, shroud_config), `policies` (array with
-                        vault_ref, principal_ref, paths, permissions, conditions), and `signing_keys` (array of
-                        `{ chain }` objects — supported chains: ethereum, bitcoin, solana, xrp, cardano, tron).
-                        When `signing_keys` is present, HSM-backed signing keys are auto-provisioned for the
-                        bootstrapped agent.
+                        Top-level fields: `vault` (object with name, description), `agents` (array of agent specs),
+                        `policies` (array with vault_ref, principal_ref, paths, permissions, conditions), and
+                        `signing_keys` (array of `{ chain }` objects — supported chains: ethereum, bitcoin, solana,
+                        xrp, cardano, tron). When `signing_keys` is present, HSM-backed signing keys are
+                        auto-provisioned for the bootstrapped agent.
+
+                        Each agent entry accepts Intents API and Execution Intents flags under any of these aliases
+                        (direct API field name, boolean shorthand, or `{ enabled: true }` object):
+                        - Intents API → `intents_api_enabled`, `intents: true`, or `intents: { enabled: true }`
+                          (maps to `agents.intents_api_enabled`)
+                        - Execution Intents → `execution_intents_enabled`, `execution: true`, or
+                          `execution: { enabled: true }` (maps to `agents.execution_intents_enabled`)
+
+                        Other agent fields: `name`, `description`, `shroud_enabled`, `shroud_config`, `system_prompt`,
+                        `environment`, `signing_keys`, `provision_eoa`, `memory`, `runtime`, `default_llm_provider`.
 
         PlatformTemplateResponse:
             type: object
