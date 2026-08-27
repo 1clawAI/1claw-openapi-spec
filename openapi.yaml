@@ -4018,6 +4018,40 @@ paths:
                 "404":
                     description: Agent-keys vault not found
 
+    /v1/org/onboarding/status:
+        get:
+            tags: [Organization]
+            summary: Onboarding funnel status
+            description: Returns welcome-bundle and MCP connection progress for the connect wizard.
+            operationId: getOnboardingStatus
+            responses:
+                "200":
+                    description: Onboarding status
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OnboardingStatus"
+
+    /v1/onboarding/provision:
+        post:
+            tags: [Organization]
+            summary: Provision MCP onboarding bundle
+            description: Creates welcome vault + sample secret, MCP agent, and default ** policy. Returns one-time API key and stdio MCP config.
+            operationId: provisionOnboarding
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/OnboardingProvisionRequest"
+            responses:
+                "200":
+                    description: Provisioned resources
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OnboardingProvisionResponse"
+
     /v1/org/status:
         get:
             tags: [Organization]
@@ -15622,6 +15656,58 @@ components:
                 message:
                     type: string
                 email:
+                    type: string
+
+        OnboardingStatus:
+            type: object
+            required:
+                - has_vault
+                - has_agent
+                - has_policy
+                - has_sample_secret
+                - first_secret_read
+                - welcome_bundle_complete
+            properties:
+                has_vault:
+                    type: boolean
+                has_agent:
+                    type: boolean
+                has_policy:
+                    type: boolean
+                has_sample_secret:
+                    type: boolean
+                first_secret_read:
+                    type: boolean
+                welcome_bundle_complete:
+                    type: boolean
+                default_vault_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+
+        OnboardingProvisionRequest:
+            type: object
+            properties:
+                agent_name:
+                    type: string
+                client:
+                    type: string
+
+        OnboardingProvisionResponse:
+            type: object
+            required: [agent_id, api_key, vault_id, mcp_stdio_config, verify_prompt]
+            properties:
+                agent_id:
+                    type: string
+                    format: uuid
+                api_key:
+                    type: string
+                vault_id:
+                    type: string
+                    format: uuid
+                mcp_stdio_config:
+                    type: object
+                verify_prompt:
                     type: string
 
         AgentKeysVaultResponse:

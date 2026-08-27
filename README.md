@@ -1,4 +1,4 @@
-# @1claw/openapi-spec (v0.58.0)
+# @1claw/openapi-spec (v0.59.2)
 
 OpenAPI 3.1.0 specification for the [1Claw Vault API](https://1claw.xyz). Use this package to generate API clients in any language.
 
