@@ -1,4 +1,4 @@
-# @1claw/openapi-spec (v0.59.2)
+# @1claw/openapi-spec (v0.59.4)
 
 OpenAPI 3.1.0 specification for the [1Claw Vault API](https://1claw.xyz). Use this package to generate API clients in any language.
 
@@ -39,6 +39,16 @@ openapi-generator generate \
 ```typescript
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
+
+## What's in the spec (v0.59.4)
+
+### Platform connection expansion (v0.59.4)
+- **Portfolio** — `GET /v1/platform/connections/{id}/portfolio` and alias `GET .../balances` (plt_ auth; optional `?chains=`, `?include_tokens=`)
+- **Pending approval create** — `POST /v1/platform/connections/{id}/pending-approvals` (plt_ auth; returns **202** with `pending_approval_id`)
+- **Connection automations** — `GET/POST .../automations`, `POST .../automations/{aid}/runs/{rid}/cancel`
+- **Connection memory** — `GET/PUT/DELETE .../memory/{namespace}/{key}` (optional `?agent_id=`)
+- **Content inspection** — `POST /v1/shroud/inspect-content` (MCP `inspect_content` parity; plt_, agent JWT, user JWT)
+- **Signing keys + agent patch** — `GET .../signing-keys`, `PATCH .../agents/{aid}` (v0.59.3, documented here for completeness)
 
 ## What's in the spec (v0.58.0)
 
