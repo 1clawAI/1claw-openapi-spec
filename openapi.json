@@ -11821,7 +11821,119 @@
         }
       }
     },
+    "/v1/platform/connections/{connectionId}/signing-keys": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "List signing keys for a connection agent",
+        "description": "Returns public signing-key metadata (chain, address, public_key, curve) for\nagent(s) provisioned on the connection. Never includes private keys.\nWhen multiple agents exist, pass `agent_id` query param. plt_ auth only.\n",
+        "operationId": "listConnectionSigningKeys",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signing keys for the connection agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionSigningKeyListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Multiple agents — agent_id required"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/platform/connections/{connectionId}/signing-keys/{chain}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Get a signing key for a connection agent by chain",
+        "description": "Returns public signing-key metadata for one chain on a connection agent.\nNever includes private keys. plt_ auth only.\n",
+        "operationId": "getConnectionSigningKey",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "chain",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signing key metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionSigningKeyDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Multiple agents — agent_id required"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
       "delete": {
         "tags": [
           "Platform"
@@ -22758,6 +22870,59 @@
           }
         }
       },
+      "ConnectionSigningKeyPublic": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          },
+          "curve": {
+            "type": "string"
+          }
+        }
+      },
+      "ConnectionSigningKeyListResponse": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConnectionSigningKeyPublic"
+            }
+          }
+        }
+      },
+      "ConnectionSigningKeyDetailResponse": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chain": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          },
+          "curve": {
+            "type": "string"
+          }
+        }
+      },
       "LeaseBankrKeyRequest": {
         "type": "object",
         "properties": {
@@ -25915,6 +26080,11 @@
             "format": "date-time",
             "nullable": true,
             "description": "Optional expiration time for the platform API key. Set to null to clear."
+          },
+          "siwe_domain": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hostname allowed in SIWE messages for wallet sign-in (EIP-4361)."
           }
         }
       },
@@ -26054,6 +26224,11 @@
             "format": "date-time",
             "nullable": true,
             "description": "When the platform API key was last rotated."
+          },
+          "siwe_domain": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hostname allowed in SIWE messages for wallet sign-in (EIP-4361)."
           },
           "created_at": {
             "type": "string",
