@@ -7722,6 +7722,50 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/platform/connections/{connectionId}/agents/{agentId}:
+        patch:
+            tags: [Platform]
+            summary: Update limited agent settings for a connection
+            description: |
+                Platform-scoped agent update for connected end-users. Allows enabling Intents API,
+                Execution Intents, and updating the default system prompt without human dashboard access.
+                Agent must be provisioned on the connection. plt_ auth only.
+            operationId: patchConnectionAgent
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: agentId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/PatchConnectionAgentRequest"
+            responses:
+                "200":
+                    description: Updated agent settings
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PatchConnectionAgentResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/platform/connections/{connectionId}/runtimes:
         post:
             tags: [Platform]
@@ -14958,6 +15002,31 @@ components:
                     type: string
                 curve:
                     type: string
+
+        PatchConnectionAgentRequest:
+            type: object
+            properties:
+                intents_api_enabled:
+                    type: boolean
+                execution_intents_enabled:
+                    type: boolean
+                system_prompt:
+                    type: string
+                    nullable: true
+
+        PatchConnectionAgentResponse:
+            type: object
+            properties:
+                agent_id:
+                    type: string
+                    format: uuid
+                intents_api_enabled:
+                    type: boolean
+                execution_intents_enabled:
+                    type: boolean
+                system_prompt:
+                    type: string
+                    nullable: true
 
         # Bankr Dynamic Key Vending
         LeaseBankrKeyRequest:
