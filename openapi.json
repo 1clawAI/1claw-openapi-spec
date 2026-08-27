@@ -10331,9 +10331,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PlatformConnectedUserResponse"
+                  "type": "object",
+                  "required": [
+                    "users"
+                  ],
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PlatformConnectedUserResponse"
+                      }
+                    }
                   }
                 }
               }
@@ -11921,6 +11929,150 @@
         }
       }
     },
+    "/v1/platform/connections/{connectionId}/runtimes/{runtimeId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Get a connection runtime (plt_ scoped)",
+        "description": "Returns a runtime provisioned on this connection. Use instead of\n`GET /v1/runtimes/{id}` with a plt_ key (which resolves to the platform org).\n",
+        "operationId": "getConnectionRuntime",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "runtimeId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runtime details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/passkeys/enroll/begin": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Begin passkey enrollment for a connected user",
+        "description": "Starts WebAuthn registration for the end-user on this connection.\nPlatform apps use this instead of `POST /v1/auth/passkeys/register/begin` (user JWT only).\n",
+        "operationId": "connectionPasskeyEnrollBegin",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WebAuthn registration ceremony options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegisterBeginResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/passkeys/enroll/complete": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Complete passkey enrollment for a connected user",
+        "operationId": "connectionPasskeyEnrollComplete",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegisterCompleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Passkey registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegisterCompleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/platform/connections/{connectionId}/agents/{agentId}/chat": {
       "post": {
         "tags": [
@@ -11967,6 +12119,9 @@
         "responses": {
           "200": {
             "description": "Message sent (JSON or SSE stream)"
+          },
+          "402": {
+            "description": "Payment required (LLM billing / inference allowance)"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -20545,6 +20700,10 @@
           "shroud_config": {
             "$ref": "#/components/schemas/ShroudConfig"
           },
+          "system_prompt": {
+            "type": "string",
+            "description": "Default system prompt for agent chat when requests do not override it."
+          },
           "execution_intents_enabled": {
             "type": "boolean",
             "default": false,
@@ -20810,6 +20969,11 @@
           },
           "shroud_config": {
             "$ref": "#/components/schemas/ShroudConfig"
+          },
+          "system_prompt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default system prompt for agent chat (null clears)."
           },
           "execution_intents_enabled": {
             "type": "boolean",
@@ -21153,6 +21317,10 @@
           },
           "shroud_config": {
             "$ref": "#/components/schemas/ShroudConfig"
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "Default system prompt for agent chat when requests do not override it."
           },
           "execution_intents_enabled": {
             "type": "boolean",
@@ -27256,6 +27424,11 @@
           "entitlement_status": {
             "type": "string"
           },
+          "provisioned_tier": {
+            "type": "string",
+            "nullable": true,
+            "description": "Billing tier granted to the end-user org when billing_model is platform_pays\n(from template plan at bootstrap). Null when not provisioned.\n"
+          },
           "wallet_address": {
             "type": "string",
             "nullable": true
@@ -27661,6 +27834,84 @@
             "type": "integer",
             "minimum": 0,
             "description": "Number of WebAuthn passkeys registered for the calling user."
+          }
+        }
+      },
+      "PasskeyRegisterBeginResponse": {
+        "type": "object",
+        "properties": {
+          "challenge": {
+            "type": "string"
+          },
+          "rp_id": {
+            "type": "string"
+          },
+          "rp_name": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "user_display_name": {
+            "type": "string"
+          },
+          "attestation": {
+            "type": "string"
+          },
+          "authenticator_selection": {
+            "type": "object"
+          },
+          "pub_key_cred_params": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "PasskeyRegisterCompleteRequest": {
+        "type": "object",
+        "required": [
+          "credential_id",
+          "attestation_object",
+          "client_data_json"
+        ],
+        "properties": {
+          "credential_id": {
+            "type": "string"
+          },
+          "attestation_object": {
+            "type": "string"
+          },
+          "client_data_json": {
+            "type": "string"
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PasskeyRegisterCompleteResponse": {
+        "type": "object",
+        "properties": {
+          "passkey_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "credential_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -29758,12 +30009,10 @@
       },
       "SendChatMessageRequest": {
         "type": "object",
-        "required": [
-          "message"
-        ],
         "properties": {
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "User message text. Optional when `messages` includes a user turn."
           },
           "conversation_id": {
             "type": "string",
@@ -29779,6 +30028,40 @@
             "type": "string"
           },
           "system_prompt": {
+            "type": "string",
+            "description": "Stored on new conversations when `conversation_id` is omitted."
+          },
+          "system": {
+            "type": "string",
+            "description": "Per-request system prompt alias (same precedence as `system_prompt_override`)."
+          },
+          "system_prompt_override": {
+            "type": "string",
+            "description": "Per-request override; highest precedence except inline `messages` system role."
+          },
+          "messages": {
+            "type": "array",
+            "description": "Optional OpenAI-shaped history. When set, used for LLM context instead of DB history.",
+            "items": {
+              "type": "object",
+              "required": [
+                "role",
+                "content"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "llm_api_key_vault_id": {
+            "type": "string"
+          },
+          "llm_api_key_path": {
             "type": "string"
           }
         }

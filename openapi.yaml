@@ -18055,6 +18055,12 @@ components:
                     type: string
                 entitlement_status:
                     type: string
+                provisioned_tier:
+                    type: string
+                    nullable: true
+                    description: |
+                        Billing tier granted to the end-user org when billing_model is platform_pays
+                        (from template plan at bootstrap). Null when not provisioned.
                 wallet_address:
                     type: string
                     nullable: true
@@ -18317,6 +18323,58 @@ components:
                     type: integer
                     minimum: 0
                     description: Number of WebAuthn passkeys registered for the calling user.
+
+        PasskeyRegisterBeginResponse:
+            type: object
+            properties:
+                challenge:
+                    type: string
+                rp_id:
+                    type: string
+                rp_name:
+                    type: string
+                user_id:
+                    type: string
+                user_name:
+                    type: string
+                user_display_name:
+                    type: string
+                attestation:
+                    type: string
+                authenticator_selection:
+                    type: object
+                pub_key_cred_params:
+                    type: array
+                    items:
+                        type: object
+
+        PasskeyRegisterCompleteRequest:
+            type: object
+            required: [credential_id, attestation_object, client_data_json]
+            properties:
+                credential_id:
+                    type: string
+                attestation_object:
+                    type: string
+                client_data_json:
+                    type: string
+                transports:
+                    type: array
+                    items:
+                        type: string
+                name:
+                    type: string
+
+        PasskeyRegisterCompleteResponse:
+            type: object
+            properties:
+                passkey_id:
+                    type: string
+                    format: uuid
+                credential_id:
+                    type: string
+                name:
+                    type: string
 
         PasskeyTxAssertBeginRequest:
             type: object
