@@ -17011,6 +17011,10 @@ components:
                     format: date-time
                     nullable: true
                     description: Optional expiration time for the platform API key. Set to null to clear.
+                siwe_domain:
+                    type: string
+                    nullable: true
+                    description: Hostname allowed in SIWE messages for wallet sign-in (EIP-4361).
 
         PlatformAppDeleteResponse:
             type: object
@@ -17107,6 +17111,10 @@ components:
                     format: date-time
                     nullable: true
                     description: When the platform API key was last rotated.
+                siwe_domain:
+                    type: string
+                    nullable: true
+                    description: Hostname allowed in SIWE messages for wallet sign-in (EIP-4361).
                 created_at:
                     type: string
                     format: date-time
