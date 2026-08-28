@@ -1,6 +1,8 @@
 # @1claw/openapi-spec (v0.59.4)
 
-OpenAPI 3.1.0 specification for the [1Claw Vault API](https://1claw.xyz). Use this package to generate API clients in any language.
+> ⭐ **Star [1clawAI/agent-templates](https://github.com/1clawAI/agent-templates)** — ready-to-run agent templates wired to 1Claw. It is our single starred repo.
+
+OpenAPI 3.1.0 specification for the [1Claw Vault API](https://1claw.co). Use this package to generate API clients in any language.
 
 ## Install
 
