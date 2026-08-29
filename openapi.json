@@ -1409,6 +1409,10 @@
                     },
                     "passkey_count": {
                       "type": "integer"
+                    },
+                    "passkey_requirements_downgraded": {
+                      "type": "boolean",
+                      "description": "True while this account carries a passkey requirement\nthat the 1claw.xyz → 1claw.co move cleared on its\nbehalf. The two flags above read false, but that was\nnot the user's choice: registering a passkey on the\ncanonical domain restores them.\n"
                     }
                   }
                 }
@@ -6246,7 +6250,7 @@
           "Organization"
         ],
         "summary": "Provision MCP onboarding bundle",
-        "description": "Creates welcome vault + sample secret, MCP agent, and default ** policy. Returns one-time API key and stdio MCP config.",
+        "description": "Creates welcome vault + sample secret, MCP agent, and a policy on the\nvault. Returns one-time API key and stdio MCP config.\n\nThe grant is `**` only when the welcome vault is newly created. If an\norg already has a vault named `default`, it is reused and the agent is\ngranted `examples/**` instead — enough to read the sample it is asked to\nverify with, without exposing secrets already kept there.\n\nSubject to `agent.create` control-plane consensus; see `approval_id`.\n",
         "operationId": "provisionOnboarding",
         "requestBody": {
           "required": false,
@@ -13721,7 +13725,7 @@
           "Authentication"
         ],
         "summary": "Verify email OTP and get JWT",
-        "description": "Verifies the 6-digit code sent to the user's email. If the user does not\nexist, a new account is created. Optionally auto-provisions treasury wallets\nfor the specified chains. Returns a JWT for subsequent API calls.\n",
+        "description": "Verifies the 6-digit code sent to the user's email. Optionally\nauto-provisions treasury wallets for the specified chains. Returns a JWT\nfor subsequent API calls.\n\nAn unrecognized address is rejected unless the request carries\n`platform_app_id` or sets `allow_signup`.\n",
         "operationId": "verifyEmailOtp",
         "security": [],
         "requestBody": {
@@ -13753,6 +13757,11 @@
                       "type": "string"
                     },
                     "description": "Chains to auto-generate wallets for (e.g. [\"ethereum\", \"base\"])"
+                  },
+                  "allow_signup": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Opt in to creating an account when the address is not\nrecognized. Without it an unknown address is rejected\nrather than silently given a new user and org — a valid\ncode proves control of an inbox, not consent to sign up.\nNot required when `platform_app_id` is present: creating\nthe end user on first login is the embedded-wallet flow.\n"
                   }
                 }
               }
@@ -24662,6 +24671,11 @@
           },
           "client": {
             "type": "string"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Approval satisfying an `agent.create` control-plane consensus policy,\nif the org has one. Same field and meaning as on `POST /v1/agents`:\nthe first call returns 202 with the approval to collect, and the\nretry passes its id here.\n"
           }
         }
       },

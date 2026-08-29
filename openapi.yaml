@@ -936,6 +936,14 @@ paths:
                                         type: boolean
                                     passkey_count:
                                         type: integer
+                                    passkey_requirements_downgraded:
+                                        type: boolean
+                                        description: |
+                                            True while this account carries a passkey requirement
+                                            that the 1claw.xyz → 1claw.co move cleared on its
+                                            behalf. The two flags above read false, but that was
+                                            not the user's choice: registering a passkey on the
+                                            canonical domain restores them.
         patch:
             tags: [Authentication]
             summary: Update user security settings
@@ -4036,7 +4044,16 @@ paths:
         post:
             tags: [Organization]
             summary: Provision MCP onboarding bundle
-            description: Creates welcome vault + sample secret, MCP agent, and default ** policy. Returns one-time API key and stdio MCP config.
+            description: |
+                Creates welcome vault + sample secret, MCP agent, and a policy on the
+                vault. Returns one-time API key and stdio MCP config.
+
+                The grant is `**` only when the welcome vault is newly created. If an
+                org already has a vault named `default`, it is reused and the agent is
+                granted `examples/**` instead — enough to read the sample it is asked to
+                verify with, without exposing secrets already kept there.
+
+                Subject to `agent.create` control-plane consensus; see `approval_id`.
             operationId: provisionOnboarding
             requestBody:
                 required: false
@@ -8767,9 +8784,12 @@ paths:
             tags: [Authentication]
             summary: Verify email OTP and get JWT
             description: |
-                Verifies the 6-digit code sent to the user's email. If the user does not
-                exist, a new account is created. Optionally auto-provisions treasury wallets
-                for the specified chains. Returns a JWT for subsequent API calls.
+                Verifies the 6-digit code sent to the user's email. Optionally
+                auto-provisions treasury wallets for the specified chains. Returns a JWT
+                for subsequent API calls.
+
+                An unrecognized address is rejected unless the request carries
+                `platform_app_id` or sets `allow_signup`.
             operationId: verifyEmailOtp
             security: []
             requestBody:
@@ -8793,6 +8813,16 @@ paths:
                                     type: array
                                     items: { type: string }
                                     description: Chains to auto-generate wallets for (e.g. ["ethereum", "base"])
+                                allow_signup:
+                                    type: boolean
+                                    default: false
+                                    description: |
+                                        Opt in to creating an account when the address is not
+                                        recognized. Without it an unknown address is rejected
+                                        rather than silently given a new user and org — a valid
+                                        code proves control of an inbox, not consent to sign up.
+                                        Not required when `platform_app_id` is present: creating
+                                        the end user on first login is the embedded-wallet flow.
             responses:
                 "200":
                     description: Existing user authenticated
@@ -16124,6 +16154,14 @@ components:
                     type: string
                 client:
                     type: string
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: |
+                        Approval satisfying an `agent.create` control-plane consensus policy,
+                        if the org has one. Same field and meaning as on `POST /v1/agents`:
+                        the first call returns 202 with the approval to collect, and the
+                        retry passes its id here.
 
         OnboardingProvisionResponse:
             type: object
