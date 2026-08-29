@@ -23516,8 +23516,10 @@
               "solana",
               "xrp",
               "cardano",
-              "tron"
-            ]
+              "tron",
+              "midnight"
+            ],
+            "description": "`midnight` is Preprod-only and requires the midnight-signer\nsidecar. Note it can be provisioned but not rotated or\nimported: derivation happens in the sidecar, so there is no\nlocal keygen and no raw private key to import. Both of\nthose endpoints refuse it before consuming an approval.\n"
           }
         }
       },

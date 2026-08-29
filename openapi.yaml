@@ -15318,7 +15318,13 @@ components:
             properties:
                 chain:
                     type: string
-                    enum: [ethereum, bitcoin, solana, xrp, cardano, tron]
+                    enum: [ethereum, bitcoin, solana, xrp, cardano, tron, midnight]
+                    description: |
+                        `midnight` is Preprod-only and requires the midnight-signer
+                        sidecar. Note it can be provisioned but not rotated or
+                        imported: derivation happens in the sidecar, so there is no
+                        local keygen and no raw private key to import. Both of
+                        those endpoints refuse it before consuming an approval.
 
         SigningKeyResponse:
             type: object
