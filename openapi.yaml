@@ -10,21 +10,41 @@ info:
         webhook tokens, event triggers, Assist), cloud runtimes with
         interactive shell sessions, agent memory, and discovery.
 
+        ## Domains
+
+        `api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API
+        mints, and the first entry in `servers` — a generated client takes its
+        base URL from there, and the previous ordering pointed every SDK at the
+        domain the issuer had already left. `api.1claw.xyz` still answers and is
+        still accepted on token validation, because tokens minted before the
+        move carry it; it is never minted now.
+
+        One deliberate exception: the Shroud attestation identity token is
+        requested from GCP with `audience: https://api.1claw.xyz`, so
+        `/v1/shroud/attestation` reports that as its `expected_audience`. That
+        is accurate rather than stale — the audience is a verification contract
+        with anyone already checking the token, and moving it is a breaking
+        change for them, not a rename.
+
         All endpoints require JWT Bearer authentication unless marked with
         `security: []`.
     contact:
         email: ops@1claw.xyz
 
 servers:
+    - url: https://api.1claw.co
+      description: Production (canonical)
+    - url: https://shroud.1claw.co
+      description: Shroud TEE Proxy (Intents API + LLM proxy)
+    - url: https://api.1claw.xyz
+      description: Production (legacy domain; still answers, tokens minted before the move carry this issuer)
+    - url: https://shroud.1claw.xyz
+      description: Shroud TEE Proxy (legacy domain)
     - url: http://localhost:8443
       description: Development
-    - url: https://api.1claw.xyz
-      description: Production
-    - url: https://shroud.1claw.xyz
-      description: Shroud TEE Proxy (Intents API + LLM proxy)
 
 x-agentcash-guidance:
-    llmsTxtUrl: https://1claw.xyz/llms.txt
+    llmsTxtUrl: https://1claw.co/llms.txt
 
 security:
     - BearerAuth: []
