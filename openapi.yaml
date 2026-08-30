@@ -17892,6 +17892,13 @@ components:
                     type: boolean
                     default: false
                     description: When true, creates a sub-org under the platform app's org
+                app_id:
+                    type: string
+                    format: uuid
+                    description: |
+                        Required only when calling as a user (the dashboard wizard).
+                        A `plt_` key carries its app in the credential; a user does not,
+                        so the app is named here and checked against the caller's org.
 
         PlatformUserResponse:
             type: object

@@ -27171,6 +27171,11 @@
             "type": "boolean",
             "default": false,
             "description": "When true, creates a sub-org under the platform app's org"
+          },
+          "app_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required only when calling as a user (the dashboard wizard).\nA `plt_` key carries its app in the credential; a user does not,\nso the app is named here and checked against the caller's org.\n"
           }
         }
       },
