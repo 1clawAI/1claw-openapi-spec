@@ -12518,148 +12518,6 @@ paths:
     # Shamir KEK
     # ---------------------------------------------------------------------------
 
-    /v1/org/shamir-kek/setup:
-        post:
-            tags: [Shamir KEK]
-            summary: Set up Shamir KEK for the org
-            description: |
-                Initialize a Shamir secret-sharing KEK for the org. Splits the master
-                key into shares distributed to custodians. Shares are returned one-time
-                only and must be stored securely by each custodian.
-            operationId: setupShamirKek
-            security:
-                - BearerAuth: []
-            requestBody:
-                required: true
-                content:
-                    application/json:
-                        schema:
-                            $ref: "#/components/schemas/ShamirKekSetupRequest"
-            responses:
-                "201":
-                    description: Shamir KEK configured (shares returned one-time)
-                    content:
-                        application/json:
-                            schema:
-                                $ref: "#/components/schemas/ShamirKekSetupResponse"
-                "400":
-                    $ref: "#/components/responses/BadRequest"
-                "401":
-                    $ref: "#/components/responses/Unauthorized"
-                "403":
-                    $ref: "#/components/responses/Forbidden"
-
-    /v1/org/shamir-kek:
-        get:
-            tags: [Shamir KEK]
-            summary: Get Shamir KEK status
-            description: Returns the current Shamir KEK configuration status for the org.
-            operationId: getShamirKekStatus
-            security:
-                - BearerAuth: []
-            responses:
-                "200":
-                    description: Shamir KEK status
-                    content:
-                        application/json:
-                            schema:
-                                $ref: "#/components/schemas/ShamirKekStatusResponse"
-                "401":
-                    $ref: "#/components/responses/Unauthorized"
-
-    /v1/org/shamir-kek/reconstruct:
-        post:
-            tags: [Shamir KEK]
-            summary: Reconstruct KEK from shares
-            description: |
-                Submit Shamir shares to reconstruct the org KEK. Requires at least
-                `threshold` valid shares. Used during disaster recovery.
-            operationId: reconstructShamirKek
-            security:
-                - BearerAuth: []
-            requestBody:
-                required: true
-                content:
-                    application/json:
-                        schema:
-                            $ref: "#/components/schemas/ShamirKekReconstructRequest"
-            responses:
-                "200":
-                    description: Reconstruction result
-                    content:
-                        application/json:
-                            schema:
-                                $ref: "#/components/schemas/ShamirKekReconstructResponse"
-                "400":
-                    $ref: "#/components/responses/BadRequest"
-                "401":
-                    $ref: "#/components/responses/Unauthorized"
-                "403":
-                    $ref: "#/components/responses/Forbidden"
-
-    /v1/org/shamir-kek/recovery-codes:
-        get:
-            tags: [Shamir KEK]
-            summary: Get Shamir recovery codes (one-time)
-            description: |
-                Returns the one-time recovery codes for the Shamir KEK. These codes
-                can be used as an emergency fallback if custodian shares are lost.
-                Codes are only returned once — subsequent calls return 410.
-            operationId: getShamirKekRecoveryCodes
-            security:
-                - BearerAuth: []
-            responses:
-                "200":
-                    description: Recovery codes (one-time)
-                    content:
-                        application/json:
-                            schema:
-                                $ref: "#/components/schemas/ShamirKekRecoveryCodesResponse"
-                "401":
-                    $ref: "#/components/responses/Unauthorized"
-                "403":
-                    $ref: "#/components/responses/Forbidden"
-                "410":
-                    description: Codes already retrieved
-
-    /v1/org/shamir-kek/verify-recovery-code:
-        post:
-            tags: [Shamir KEK]
-            summary: Verify a Shamir recovery code
-            description: Check whether a recovery code is valid without consuming it.
-            operationId: verifyShamirKekRecoveryCode
-            security:
-                - BearerAuth: []
-            requestBody:
-                required: true
-                content:
-                    application/json:
-                        schema:
-                            $ref: "#/components/schemas/ShamirKekVerifyCodeRequest"
-            responses:
-                "200":
-                    description: Verification result
-                    content:
-                        application/json:
-                            schema:
-                                $ref: "#/components/schemas/ShamirKekVerifyCodeResponse"
-                "400":
-                    $ref: "#/components/responses/BadRequest"
-                "401":
-                    $ref: "#/components/responses/Unauthorized"
-
-# =============================================================================
-# COMPONENTS
-# =============================================================================
-
-    # ---------------------------------------------------------------------------
-    # Generated from the router and handler signatures during the release sync.
-    # Summaries come from each handler's own doc comment; request schemas from the
-    # DTO the handler deserialises. Where a type could not be resolved the schema
-    # is left permissive rather than guessed — a wrong schema generates a wrong
-    # client, which is worse than a loose one.
-    # ---------------------------------------------------------------------------
-
     /v1/agents/batch-delete:
         post:
             tags: [Agents]
@@ -12749,7 +12607,7 @@ paths:
                   type: string
         post:
             tags: [Agents]
-            summary: "refresh channel webhook"
+            summary: "Re-register the provider webhook for this channel (repairs a stale or revoked subscription)."
             operationId: refresh_channel_webhook
             responses:
                 '200':
@@ -12774,8 +12632,8 @@ paths:
                   type: string
         post:
             tags: [Agents]
-            summary: "refresh channel webhook"
-            operationId: refresh_channel_webhook
+            summary: "Repair a channel: alias of refresh-webhook, re-registers the provider webhook for this channel."
+            operationId: repair_channel_webhook
             responses:
                 '200':
                     description: Success
