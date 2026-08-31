@@ -12652,6 +12652,1554 @@ paths:
 # COMPONENTS
 # =============================================================================
 
+    # ---------------------------------------------------------------------------
+    # Generated from the router and handler signatures during the release sync.
+    # Summaries come from each handler's own doc comment; request schemas from the
+    # DTO the handler deserialises. Where a type could not be resolved the schema
+    # is left permissive rather than guessed — a wrong schema generates a wrong
+    # client, which is worse than a loose one.
+    # ---------------------------------------------------------------------------
+
+    /v1/agents/batch-delete:
+        post:
+            tags: [Agents]
+            summary: "batch delete agents"
+            operationId: batch_delete_agents
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/enroll/approve:
+        post:
+            tags: [Agents]
+            summary: "Authenticated: consume token, create agent, return API key once.  **Email-bound pending:** caller must belong to the same org and match `human_email`."
+            operationId: approve_enrollment
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - token
+                            properties:
+                                token:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/enroll/deny:
+        post:
+            tags: [Agents]
+            summary: "Authenticated: consume token and delete pending enrollment (deny).  **Email-bound:** caller org and email must match the pending row.  **Link-only:** "
+            operationId: deny_enrollment
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - token
+                            properties:
+                                token:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/enroll/pending:
+        get:
+            tags: [Agents]
+            summary: "Public: validate enrollment token and return pending info for the dashboard (agent name, expires_at). Used so the UI can show 'Approve agent X?' witho"
+            operationId: get_enrollment_pending
+            security: []
+            responses:
+                '200':
+                    description: Success
+                '404':
+                    description: Not found
+    /v1/agents/{agent_id}/channels/{channel_id}/refresh-webhook:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema:
+                  type: string
+            - name: channel_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Agents]
+            summary: "refresh channel webhook"
+            operationId: refresh_channel_webhook
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/{agent_id}/channels/{channel_id}/repair:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema:
+                  type: string
+            - name: channel_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Agents]
+            summary: "refresh channel webhook"
+            operationId: refresh_channel_webhook
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/{agent_id}/eoa:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Agents]
+            summary: "Get the agent's EVM address (no private key exposure)."
+            operationId: get_agent_eoa
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        post:
+            tags: [Agents]
+            summary: "Generate an EVM EOA for an agent. Creates a secp256k1 key, stores it in the __agent-keys vault, and records the derived address on the agent record."
+            operationId: generate_agent_eoa
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/{agent_id}/rotate-signer-key:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Agents]
+            summary: "Rotate the agent's EVM signer key. Generates a new secp256k1 key, builds a swapOwner UserOp on the Safe, signs with the old key, submits to bundler, a"
+            operationId: rotate_signer_key
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/{agent_id}/smart-accounts/{chain_id}:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema:
+                  type: string
+            - name: chain_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        delete:
+            tags: [Agents]
+            summary: "delete smart account"
+            operationId: delete_smart_account
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/agents/{agent_id}/unlock-platform:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Agents]
+            summary: "User-only. Clears platform_locked when the app is no longer actively connected."
+            operationId: unlock_agent_platform
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/audit/export:
+        get:
+            tags: [Audit]
+            summary: "export audit events"
+            operationId: export_audit_events
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/credential-recovery/requests/{id}/cancel:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Auth]
+            summary: "cancel request"
+            operationId: cancel_request
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/migration-status:
+        get:
+            tags: [Auth]
+            summary: "What the account is currently anchored on, and what has to happen next.  The ordering is the part people get wrong, so it lives here rather than being"
+            operationId: migration_status
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/passkeys/vault-assert/begin:
+        post:
+            tags: [Auth]
+            summary: "Begin a passkey assertion that unlocks vault secret reads for users who have `require_passkey_for_vaults` enabled."
+            operationId: vault_assert_begin
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/passkeys/vault-assert/complete:
+        post:
+            tags: [Auth]
+            summary: "Returns a short-lived `passkey_token` for the `X-Passkey-Token` header on secret reads."
+            operationId: vault_assert_complete
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - credential_id
+                                - authenticator_data
+                                - client_data_json
+                                - signature
+                            properties:
+                                credential_id:
+                                    type: string
+                                authenticator_data:
+                                    type: string
+                                client_data_json:
+                                    type: string
+                                signature:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/reauth/begin:
+        post:
+            tags: [Auth]
+            summary: "start a re-authentication ceremony. For passkey: returns a WebAuthn challenge. For password: returns immediately (no challenge needed)."
+            operationId: reauth_begin
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - method
+                            properties:
+                                method:
+                                    type: string
+                                purpose:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/reauth/complete:
+        post:
+            tags: [Auth]
+            summary: "verify re-authentication and issue a single-use token."
+            operationId: reauth_complete
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - method
+                            properties:
+                                method:
+                                    type: string
+                                purpose:
+                                    type: string
+                                password:
+                                    type: string
+                                credential_id:
+                                    type: string
+                                authenticator_data:
+                                    type: string
+                                client_data_json:
+                                    type: string
+                                signature:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/social/disconnect:
+        post:
+            tags: [Auth]
+            summary: "Sever every social identity link, so a social account that once owned this login can no longer reach it.  The case this exists for: someone leaves a c"
+            operationId: disconnect_social
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/sso/authorize:
+        get:
+            tags: [Auth]
+            summary: "returns JSON with authorization_url for WorkOS Hosted Auth."
+            operationId: sso_authorize
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/sso/callback:
+        get:
+            tags: [Auth]
+            summary: "exchange code for profile, find/create user, redirect to dashboard with token."
+            operationId: sso_callback
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/auth/sso/status:
+        get:
+            tags: [Auth]
+            summary: "returns whether SSO is configured (for dashboard to show/hide SSO button)."
+            operationId: sso_status
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/billing/llm-models:
+        get:
+            tags: [Billing]
+            summary: "get llm models"
+            operationId: get_llm_models
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/billing/llm-pricing:
+        get:
+            tags: [Billing]
+            summary: "get llm pricing"
+            operationId: get_llm_pricing
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/billing/promo/redeem:
+        get:
+            tags: [Billing]
+            summary: "get llm billing status"
+            operationId: get_llm_billing_status
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        post:
+            tags: [Billing]
+            summary: "redeem promo"
+            operationId: redeem_promo
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - code
+                            properties:
+                                code:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/billing/promo/validate:
+        get:
+            tags: [Billing]
+            summary: "validate promo"
+            operationId: validate_promo
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/chains/rpc:
+        post:
+            tags: [Chains]
+            summary: "Proxy a single JSON-RPC call to the chain's RPC URL. Only read-only methods in ALLOWED_RPC_METHODS are allowed (Treasury balances, Safe deployment, et"
+            operationId: chain_rpc_proxy
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - chain_id
+                                - method
+                                - params
+                            properties:
+                                chain_id:
+                                    type: integer
+                                method:
+                                    type: string
+                                params:
+                                    type: array
+                                    items:
+                                        type: object
+                                        additionalProperties: true
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/fiat/webhooks:
+        post:
+            tags: [Fiat]
+            summary: "Receive completion events from fiat partners (MoonPay signed body or generic JSON)."
+            operationId: fiat_webhook
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/memory/shared-namespaces:
+        get:
+            tags: [Memory]
+            summary: "list shared namespaces"
+            operationId: list_shared_namespaces
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        post:
+            tags: [Memory]
+            summary: "create shared namespace"
+            operationId: create_shared_namespace
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - namespace
+                                - agent_ids
+                            properties:
+                                namespace:
+                                    type: string
+                                agent_ids:
+                                    type: array
+                                    items:
+                                        type: string
+                                        format: uuid
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/memory/shared-namespaces/{id}:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+        delete:
+            tags: [Memory]
+            summary: "delete shared namespace"
+            operationId: delete_shared_namespace
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        patch:
+            tags: [Memory]
+            summary: "update shared namespace"
+            operationId: update_shared_namespace
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - agent_ids
+                            properties:
+                                agent_ids:
+                                    type: array
+                                    items:
+                                        type: string
+                                        format: uuid
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/onboarding/journey:
+        post:
+            tags: [Onboarding]
+            summary: "record which path a user chose.  The dashboard already had `track()` calls for the wizard, but they POST to a dashboard route that does not exist, so "
+            operationId: record_journey
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - journey
+                            properties:
+                                journey:
+                                    type: string
+                                step:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/org/env-vars/{id}/delete:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Org]
+            summary: "delete org env var"
+            operationId: delete_org_env_var
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/org/kek-custody:
+        get:
+            tags: [Org]
+            summary: "Get current custody mode and share metadata"
+            operationId: get_custody
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        post:
+            tags: [Org]
+            summary: "Setup Shamir key custody"
+            operationId: setup_custody
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - custody_mode
+                            properties:
+                                custody_mode:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/org/kek-custody/reconstruct:
+        get:
+            tags: [Org]
+            summary: "list org env vars"
+            operationId: list_org_env_vars
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        post:
+            tags: [Org]
+            summary: "TEE-bound reconstruction request"
+            operationId: reconstruct
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - approval_id
+                                - action
+                            properties:
+                                approval_id:
+                                    type: object
+                                client_share:
+                                    type: string
+                                action:
+                                    type: object
+                                    additionalProperties: true
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/org/settings:
+        get:
+            tags: [Org]
+            summary: "list org settings"
+            operationId: list_org_settings
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        patch:
+            tags: [Org]
+            summary: "update org setting"
+            operationId: update_org_setting
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - key
+                                - value
+                            properties:
+                                key:
+                                    type: string
+                                value:
+                                    type: string
+                                approval_id:
+                                    type: string
+                                    format: uuid
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/platform/apps/by-slug/{slug}/branding:
+        parameters:
+            - name: slug
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Platform]
+            summary: "Public, returns app name + logo."
+            operationId: app_branding
+            security: []
+            responses:
+                '200':
+                    description: Success
+                '404':
+                    description: Not found
+    /v1/platform/apps/{app_id}/automations:
+        parameters:
+            - name: app_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Platform]
+            summary: "list platform automations"
+            operationId: list_platform_automations
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        post:
+            tags: [Platform]
+            summary: "upsert user"
+            operationId: upsert_user
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                subject_token:
+                                    type: string
+                                subject_token_type:
+                                    type: string
+                                email:
+                                    type: string
+                                display_name:
+                                    type: string
+                                siwe_message:
+                                    type: string
+                                siwe_signature:
+                                    type: string
+                                return_to:
+                                    type: string
+                                create_sub_org:
+                                    type: boolean
+                                app_id:
+                                    type: object
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/platform/connected-apps/{connection_id}/unlock-resources:
+        parameters:
+            - name: connection_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Platform]
+            summary: "Unlocks platform-locked resources for a disconnected (or active) connection the user owns."
+            operationId: unlock_connection_resources
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/platform/connections/{connection_id}/memory:
+        parameters:
+            - name: connection_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Platform]
+            summary: "list connection memory namespaces"
+            operationId: list_connection_memory_namespaces
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/platform/connections/{connection_id}/memory/{namespace}:
+        parameters:
+            - name: connection_id
+              in: path
+              required: true
+              schema:
+                  type: string
+            - name: namespace
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Platform]
+            summary: "list connection memory entries"
+            operationId: list_connection_memory_entries
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/platform/connections/{connection_id}/resources:
+        parameters:
+            - name: connection_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Platform]
+            summary: "list connection resources"
+            operationId: list_connection_resources
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        post:
+            tags: [Platform]
+            summary: "create app policy"
+            operationId: create_app_policy
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                user_id:
+                                    type: object
+                                to_allowlist:
+                                    type: array
+                                    items:
+                                        type: string
+                                to_denylist:
+                                    type: array
+                                    items:
+                                        type: string
+                                max_value_per_tx_eth:
+                                    type: string
+                                daily_limit_eth:
+                                    type: string
+                                allowed_chains:
+                                    type: array
+                                    items:
+                                        type: string
+                                allowed_tokens:
+                                    type: array
+                                    items:
+                                        type: string
+                                max_transactions_per_day:
+                                    type: integer
+                                human_factor_auth:
+                                    type: object
+                                    additionalProperties: true
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/platform/link-account:
+        post:
+            tags: [Platform]
+            summary: "Authenticated user links their account to a platform app. Used by the dashboard `/connect/{slug}/link` consent flow for cross-org users."
+            operationId: link_account
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - client_id
+                            properties:
+                                client_id:
+                                    type: string
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/platform/orphaned-resources:
+        get:
+            tags: [Platform]
+            summary: "platform-locked agents/vaults with no active connection."
+            operationId: list_orphaned_platform_resources
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/reports/request:
+        post:
+            tags: [Reports]
+            summary: "Public (no auth). Submits lead info, sends email with download link."
+            operationId: request_report
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - first_name
+                                - last_name
+                                - email
+                                - company
+                            properties:
+                                first_name:
+                                    type: string
+                                last_name:
+                                    type: string
+                                email:
+                                    type: string
+                                company:
+                                    type: string
+                                job_title:
+                                    type: string
+                                report_slug:
+                                    type: string
+                                marketing_consent:
+                                    type: boolean
+            responses:
+                '200':
+                    description: Success
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/chat/conversations:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Runtimes]
+            summary: "list runtime chat conversations"
+            operationId: list_runtime_chat_conversations
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/chat/conversations/{conversation_id}:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+            - name: conversation_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        delete:
+            tags: [Runtimes]
+            summary: "Archives a runtime chat session so the next message starts a fresh conversation."
+            operationId: archive_runtime_chat_conversation
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+        get:
+            tags: [Runtimes]
+            summary: "get runtime chat conversation"
+            operationId: get_runtime_chat_conversation
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/chat/diagnostics:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Runtimes]
+            summary: "Human-only snapshot of chat auth wiring: which platform env vars Vault will inject on the next Start and which upstream URL chat proxies to."
+            operationId: runtime_chat_diagnostics
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/chat/unlock:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Runtimes]
+            summary: "Step-up (password or passkey reauth token, purpose=`runtime_chat`) unlocks dashboard runtime chat for 15 minutes — same trust bar as Shell/Logs."
+            operationId: unlock_runtime_chat
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/logs/stream:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Runtimes]
+            summary: "SSE live log streaming"
+            operationId: stream_runtime_logs
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/logs/unlock:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Runtimes]
+            summary: "Step-up (password or passkey reauth token) unlocks log fetch/stream for 15 minutes."
+            operationId: unlock_runtime_logs
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/rebuild:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Runtimes]
+            summary: "Phase 1: invalidate the cached image tag and return the runtime to `stopped`. Next `start` re-pulls the image; for `source_repo` runtimes the entrypoi"
+            operationId: rebuild_runtime
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/runtimes/{runtime_id}/restart:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Runtimes]
+            summary: "Force stop (best-effort) then start. Recovers stale `running` rows and proxy timeouts where the client never received the start response."
+            operationId: restart_runtime
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/vaults/{vault_id}/secret-version-disable/{*path_and_version}:
+        parameters:
+            - name: vault_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Vaults]
+            summary: "Disable a specific version so it can no longer be read (but is retained for audit)."
+            operationId: disable_version
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/vaults/{vault_id}/secret-version/{*path_and_version}:
+        parameters:
+            - name: vault_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            tags: [Vaults]
+            summary: "get secret version"
+            operationId: get_secret_version
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/vaults/{vault_id}/unlock-platform:
+        parameters:
+            - name: vault_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Vaults]
+            summary: "unlock vault platform"
+            operationId: unlock_vault_platform
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden, or the plan does not include this
+                '404':
+                    description: Not found
+    /v1/webinars/register:
+        post:
+            tags: [Webinars]
+            summary: "Public (no auth). Registers for a webinar, sends confirmation + calendar invite."
+            operationId: register_webinar
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                - first_name
+                                - last_name
+                                - email
+                                - company
+                            properties:
+                                first_name:
+                                    type: string
+                                last_name:
+                                    type: string
+                                email:
+                                    type: string
+                                company:
+                                    type: string
+                                job_title:
+                                    type: string
+                                webinar_slug:
+                                    type: string
+                                marketing_consent:
+                                    type: boolean
+            responses:
+                '200':
+                    description: Success
+                '404':
+                    description: Not found
+
+    /v1/runtimes/templates:
+        get:
+            tags: [Runtimes]
+            summary: "The provisionable runtime templates, with licence and whether the agent needs its own vendor account"
+            operationId: list_runtime_templates
+            responses:
+                '200':
+                    description: The template catalogue
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    templates:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                id:
+                                                    type: string
+                                                description:
+                                                    type: string
+                                                chat_capable:
+                                                    type: boolean
+                                                license:
+                                                    type: string
+                                                    nullable: true
+                                                    description: SPDX id, or null when the agent is proprietary
+                                                requires_vendor_subscription:
+                                                    type: boolean
+                                                    description: Whether the agent needs a paid account with its vendor. Independent of licence — the Codex CLI is Apache-2.0 and still requires a ChatGPT plan.
+                                                vendor_credential_env:
+                                                    type: string
+                                                    nullable: true
+                '401':
+                    description: Unauthenticated
+    /v1/automations/step-types:
+        get:
+            tags: [Automations]
+            summary: "The automation step vocabulary an automation may use"
+            operationId: list_automation_step_types
+            responses:
+                '200':
+                    description: Supported step types
+                '401':
+                    description: Unauthenticated
+    /v1/platform/apps/{app_id}/runtimes:
+        parameters:
+            - name: app_id
+              in: path
+              required: true
+              schema:
+                  type: string
+                  format: uuid
+        get:
+            tags: [Platform]
+            summary: "Runtimes belonging to a platform app"
+            operationId: list_platform_runtimes
+            responses:
+                '200':
+                    description: Success
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden
+    /v1/agents/{id}/browser/sessions:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+                  format: uuid
+        post:
+            tags: [Browser Bridge]
+            summary: "Open a browser session. Accepts a paired bridge credential only — an agent token is refused, so a session cannot be bootstrapped on an unpaired machine."
+            operationId: create_browser_session
+            parameters:
+                - name: x-1claw-bridge-credential
+                  in: header
+                  required: true
+                  schema:
+                      type: string
+                  description: The bb_ credential from `1claw browser-bridge login`
+                - name: x-1claw-bridge-version
+                  in: header
+                  required: true
+                  schema:
+                      type: string
+                  description: Bridge build. Versions below the server minimum are refused.
+            responses:
+                '200':
+                    description: Session created
+                '400':
+                    description: Missing or unsupported bridge version
+                '401':
+                    description: Not a paired bridge, or an agent token was presented
+    /v1/agents/{id}/browser/fills:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+                  format: uuid
+        post:
+            tags: [Browser Bridge]
+            summary: "Authorise one credential fill. Requires the bridge credential *and* an agent JWT — neither alone is sufficient."
+            operationId: authorize_browser_fill
+            parameters:
+                - name: x-1claw-bridge-credential
+                  in: header
+                  required: true
+                  schema:
+                      type: string
+                - name: x-1claw-bridge-version
+                  in: header
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: A grant, a denial, or a pending approval. Never a secret.
+                '400':
+                    description: Missing or unsupported bridge version
+                '403':
+                    description: Only one of the two required credentials was presented
+
+    /v1/agents/{agent_id}/chat/unlock:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema:
+                  type: string
+                  format: uuid
+        post:
+            tags: [Chat]
+            summary: "Unlock an agent's chat history for reading"
+            operationId: unlock_agent_chat
+            responses:
+                '200':
+                    description: Unlocked
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Forbidden
+                '404':
+                    description: Agent not found
+
 components:
     securitySchemes:
         BearerAuth:
