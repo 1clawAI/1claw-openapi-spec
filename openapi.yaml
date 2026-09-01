@@ -8238,10 +8238,30 @@ paths:
     /v1/platform/connections/{connectionId}/passkeys/enroll/begin:
         post:
             tags: [Platform]
-            summary: Begin passkey enrollment for a connected user
+            summary: Begin passkey enrollment for a connected user (always 403)
+            deprecated: true
             description: |
-                Starts WebAuthn registration for the end-user on this connection.
-                Platform apps use this instead of `POST /v1/auth/passkeys/register/begin` (user JWT only).
+                **This endpoint always returns 403 and cannot be made to work.**
+                The description here previously said platform apps should use it
+                instead of `POST /v1/auth/passkeys/register/begin`, which was
+                wrong and cost integrators a WebAuthn ceremony to discover.
+
+                A passkey enrolled this way is login-capable: it can be asserted
+                through the public sign-in flow to mint a full, non-delegated
+                user session, so an app that enrolled one would hold a credential
+                stronger than the delegation boundary it operates under. The
+                capability was removed for that reason and will not return.
+
+                **A passkey is enrolled by the user, in their own session**, via
+                `POST /v1/auth/passkeys/register/begin`. For a connected user
+                that means completing the claim flow on the connection first.
+
+                To *use* a passkey a connected user already has, see:
+                  - `GET /v1/platform/connections/{connectionId}/passkeys` —
+                    whether the confirm step can be offered at all.
+                  - `POST /v1/platform/connections/{connectionId}/passkeys/tx-assert/begin`
+                    and `.../complete` — ask that user to touch their
+                    authenticator over a specific digest.
             operationId: connectionPasskeyEnrollBegin
             security:
                 - BearerAuth: []
@@ -8253,19 +8273,24 @@ paths:
                       type: string
                       format: uuid
             responses:
-                "200":
-                    description: WebAuthn registration ceremony options
+                "403":
+                    description: |
+                        Always. Platform apps cannot enroll login passkeys for
+                        connected users.
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/PasskeyRegisterBeginResponse"
-                "404":
-                    $ref: "#/components/responses/NotFound"
+                                $ref: "#/components/schemas/ProblemDetails"
 
     /v1/platform/connections/{connectionId}/passkeys/enroll/complete:
         post:
             tags: [Platform]
-            summary: Complete passkey enrollment for a connected user
+            summary: Complete passkey enrollment for a connected user (always 403)
+            deprecated: true
+            description: |
+                **This endpoint always returns 403.** See
+                `POST /v1/platform/connections/{connectionId}/passkeys/enroll/begin`
+                for why, and for the paths that do work.
             operationId: connectionPasskeyEnrollComplete
             security:
                 - BearerAuth: []
@@ -8283,14 +8308,197 @@ paths:
                         schema:
                             $ref: "#/components/schemas/PasskeyRegisterCompleteRequest"
             responses:
-                "201":
-                    description: Passkey registered
+                "403":
+                    description: |
+                        Always. Platform apps cannot enroll login passkeys for
+                        connected users.
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/PasskeyRegisterCompleteResponse"
+                                $ref: "#/components/schemas/ProblemDetails"
+
+    /v1/platform/connections/{connectionId}/passkeys:
+        get:
+            tags: [Platform]
+            summary: Whether a connected user can be asked for a passkey touch
+            description: |
+                Answers one question: can this app offer the passkey confirm
+                step to this user? No credential material is returned — not
+                credential ids, not public keys, not enrolment times.
+
+                `count` is what matters. Passkeys are bound to the domain they
+                were registered on, so an account can hold credentials that this
+                domain cannot offer; `count` reports only those usable on
+                `rp_id`, while `registered_count` is the raw total. Branch on
+                `has_passkey`.
+            operationId: listConnectionPasskeys
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Passkey availability for this connection
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [has_passkey, count, registered_count, rp_id]
+                                properties:
+                                    has_passkey:
+                                        type: boolean
+                                        description: True when count > 0.
+                                    count:
+                                        type: integer
+                                        format: int64
+                                        description: Passkeys usable on rp_id.
+                                    registered_count:
+                                        type: integer
+                                        format: int64
+                                        description: |
+                                            All passkeys on the account, including any
+                                            bound to a different domain.
+                                    rp_id:
+                                        type: string
+                                        description: The domain these counts are measured against.
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/passkeys/tx-assert/begin:
+        post:
+            tags: [Platform]
+            summary: Ask a connected user to touch their authenticator
+            description: |
+                Begins a WebAuthn assertion bound to `tx_digest`, for the user on
+                this connection. The connection in the path is the addressing
+                that `POST /v1/auth/passkeys/tx-assert/begin` lacks: that route
+                resolves the *calling* principal, so with a `plt_` key it looks
+                up the app itself and reports no passkeys. An app never needs to
+                hold an email to name one of its users.
+
+                Returns 404 when the user has no passkey usable on this domain —
+                check `GET /v1/platform/connections/{connectionId}/passkeys`
+                first and only offer the step when `has_passkey` is true.
+            operationId: connectionPasskeyTxAssertBegin
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [tx_digest]
+                            properties:
+                                tx_digest:
+                                    type: string
+                                    description: SHA-256 hex of the exact text being confirmed.
+                                action:
+                                    type: string
+                                    enum: [send, swap]
+                                    default: send
+            responses:
+                "200":
+                    description: WebAuthn assertion ceremony options
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PasskeyAssertBeginResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    description: This user has no passkey registered.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
+
+    /v1/platform/connections/{connectionId}/passkeys/tx-assert/complete:
+        post:
+            tags: [Platform]
+            summary: Verify the touch and return proof of it
+            description: |
+                Verifies the assertion — origin, rpIdHash, the user-verified
+                flag, the signature, and a sign count that must increase, which
+                is what catches a cloned authenticator — and returns a
+                short-lived token proving this user touched their authenticator
+                over that digest.
+
+                The token records that a platform app requested it. That
+                provenance is deliberate: it proves the touch to your
+                application, and it is **refused** as authorization for a
+                1Claw treasury transfer. A user consenting to your action has
+                not consented to moving funds, and those remain a separate
+                assertion from the user's own session.
+            operationId: connectionPasskeyTxAssertComplete
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required:
+                                [
+                                    credential_id,
+                                    authenticator_data,
+                                    client_data_json,
+                                    signature,
+                                ]
+                            properties:
+                                credential_id:
+                                    type: string
+                                authenticator_data:
+                                    type: string
+                                client_data_json:
+                                    type: string
+                                signature:
+                                    type: string
+            responses:
+                "200":
+                    description: Assertion verified
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [passkey_token, expires_in]
+                                properties:
+                                    passkey_token:
+                                        type: string
+                                        description: |
+                                            Single-use proof of the touch, bound to the
+                                            digest and to this user.
+                                    expires_in:
+                                        type: integer
+                                        description: Seconds until the token expires.
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
