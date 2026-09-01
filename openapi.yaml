@@ -7504,6 +7504,26 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+        post:
+            tags: [Platform]
+            summary: Create an approval on a platform connection
+            operationId: createConnectionApproval
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "201":
+                    description: Approval created
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
     /v1/platform/connections/{connectionId}/approvals/{approvalId}:
         get:
             tags: [Platform]
@@ -7896,6 +7916,32 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+        post:
+            tags: [Platform]
+            summary: "Alias for PATCH on this path — same handler, same limited settings. Present because some clients cannot send PATCH."
+            operationId: postConnectionAgent
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: agentId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Agent updated
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
     /v1/platform/connections/{connectionId}/portfolio:
         get:
             tags: [Platform]
@@ -8713,6 +8759,30 @@ paths:
                 "409":
                     $ref: "#/components/responses/Conflict"
 
+        post:
+            tags: [Approvals]
+            summary: "One-click approve or deny, as an API call. The GET on this path is the preview an email link opens; this is the decision itself."
+            operationId: quickDecide
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [token, decision]
+                            properties:
+                                token:
+                                    type: string
+                                decision:
+                                    type: string
+                                    enum: [approve, deny]
+            responses:
+                "200":
+                    description: Decision recorded
+                "400":
+                    description: Malformed or expired token
+                "404":
+                    $ref: "#/components/responses/NotFound"
     /v1/deposit-destinations:
         post:
             tags: [Treasury]
@@ -10559,6 +10629,24 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/MemoryEntryListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Agent Memory]
+            summary: "Delete a memory namespace and every entry in it. Destructive and not reversible; there is no per-entry confirmation."
+            operationId: deleteMemoryNamespace
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: namespace
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "204":
+                    description: Namespace deleted
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "404":
@@ -12649,30 +12737,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/CredentialRecoveryExecuteResponse"
-                "401":
-                    $ref: "#/components/responses/Unauthorized"
-                "403":
-                    $ref: "#/components/responses/Forbidden"
-                "404":
-                    $ref: "#/components/responses/NotFound"
-
-    /v1/auth/credential-recovery/requests/{id}:
-        delete:
-            tags: [Credential Recovery]
-            summary: Cancel or reject a recovery request
-            operationId: cancelCredentialRecovery
-            security:
-                - BearerAuth: []
-            parameters:
-                - name: id
-                  in: path
-                  required: true
-                  schema:
-                      type: string
-                      format: uuid
-            responses:
-                "204":
-                    description: Request cancelled
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "403":
