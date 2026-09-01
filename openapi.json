@@ -12540,6 +12540,7 @@
           {
             "in": "query",
             "name": "agent_id",
+            "description": "Optional only while the connection has exactly one agent.\nWith more than one it becomes required and the call answers\n400 without it — the Fleet template provisions three.\n",
             "required": false,
             "schema": {
               "type": "string",
@@ -26163,12 +26164,17 @@
       },
       "PatchConnectionAgentRequest": {
         "type": "object",
+        "description": "At least one field is required.\n",
         "properties": {
           "intents_api_enabled": {
             "type": "boolean"
           },
           "execution_intents_enabled": {
             "type": "boolean"
+          },
+          "memory_enabled": {
+            "type": "boolean",
+            "description": "Agent memory, off by default. Until this field existed a\nplatform app had no way to turn it on: a bootstrap template\naccepted `memory_enabled` in its spec and never read it, so\nthe capability was reachable only from the end user's own\ndashboard. Templates now honour the flag too.\n"
           },
           "system_prompt": {
             "type": "string",
@@ -26187,6 +26193,9 @@
             "type": "boolean"
           },
           "execution_intents_enabled": {
+            "type": "boolean"
+          },
+          "memory_enabled": {
             "type": "boolean"
           },
           "system_prompt": {

@@ -8074,6 +8074,10 @@ paths:
                       type: string
                 - in: query
                   name: agent_id
+                  description: |
+                      Optional only while the connection has exactly one agent.
+                      With more than one it becomes required and the call answers
+                      400 without it — the Fleet template provisions three.
                   required: false
                   schema:
                       type: string
@@ -17038,11 +17042,21 @@ components:
 
         PatchConnectionAgentRequest:
             type: object
+            description: |
+                At least one field is required.
             properties:
                 intents_api_enabled:
                     type: boolean
                 execution_intents_enabled:
                     type: boolean
+                memory_enabled:
+                    type: boolean
+                    description: |
+                        Agent memory, off by default. Until this field existed a
+                        platform app had no way to turn it on: a bootstrap template
+                        accepted `memory_enabled` in its spec and never read it, so
+                        the capability was reachable only from the end user's own
+                        dashboard. Templates now honour the flag too.
                 system_prompt:
                     type: string
                     nullable: true
@@ -17056,6 +17070,8 @@ components:
                 intents_api_enabled:
                     type: boolean
                 execution_intents_enabled:
+                    type: boolean
+                memory_enabled:
                     type: boolean
                 system_prompt:
                     type: string
