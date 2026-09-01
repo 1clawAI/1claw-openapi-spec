@@ -22133,6 +22133,79 @@
         }
       }
     },
+    "/v1/browser/devices": {
+      "post": {
+        "tags": [
+          "Browser Bridge"
+        ],
+        "summary": "Pair a browser bridge and mint its credential. Human callers only, behind a step-up re-auth: pairing is what gives a browser the standing to ask for credentials later.",
+        "operationId": "pair_browser_device",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "label",
+                  "public_key_pin"
+                ],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "Name for this device. Re-pairing an existing label must present the same key."
+                  },
+                  "public_key_pin": {
+                    "type": "string",
+                    "description": "The bridge's public key, pinned on first use for this label."
+                  },
+                  "bridge_version": {
+                    "type": "string"
+                  },
+                  "platform": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Paired. The credential is returned once and there is no endpoint that returns it again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "device_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "credential": {
+                      "type": "string",
+                      "description": "The bb_ bridge credential. Shown once."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated, or step-up re-auth not satisfied"
+          },
+          "403": {
+            "description": "Not a human caller — agents and platform keys cannot pair a device"
+          },
+          "409": {
+            "description": "That label is already pinned to a different key"
+          }
+        }
+      }
+    },
     "/v1/agents/{id}/browser/sessions": {
       "parameters": [
         {
@@ -22171,15 +22244,69 @@
             "description": "Bridge build. Versions below the server minimum are refused."
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "agent_id",
+                  "client_id"
+                ],
+                "properties": {
+                  "agent_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Must belong to the same org as the paired device."
+                  },
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "bridge_version": {
+                    "type": "string"
+                  },
+                  "protocol_version": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Session created"
+            "description": "Session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_token": {
+                      "type": "string",
+                      "description": "bs_ prefixed. Only its hash is stored."
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Missing or unsupported bridge version"
           },
           "401": {
             "description": "Not a paired bridge, or an agent token was presented"
+          },
+          "403": {
+            "description": "The device and the agent are not in the same org"
           }
         }
       }
@@ -22220,15 +22347,70 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "binding_id",
+                  "tab_origin",
+                  "frame_origin"
+                ],
+                "properties": {
+                  "binding_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "tab_origin": {
+                    "type": "string",
+                    "description": "Origin of the tab being driven. Checked against the binding's allowed and sso hosts by exact host match."
+                  },
+                  "frame_origin": {
+                    "type": "string",
+                    "description": "Origin of the frame holding the form. Checked separately — a credential typed into an allowed tab can still land in an attacker's iframe."
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "A grant, a denial, or a pending approval. Never a secret."
+            "description": "A grant, a denial, or a pending approval. Never a secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "grant"
+                      ]
+                    },
+                    "binding_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "login_url": {
+                      "type": "string",
+                      "description": "The bridge navigates here itself. An agent-supplied URL would be the agent choosing who receives the password."
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Missing or unsupported bridge version"
           },
           "403": {
-            "description": "Only one of the two required credentials was presented"
+            "description": "Only one of the two required credentials was presented, an origin is not on the binding's allowlist, or the fill velocity cap was hit"
+          },
+          "404": {
+            "description": "No such binding for this org"
           }
         }
       }
