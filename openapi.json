@@ -22206,6 +22206,122 @@
         }
       }
     },
+    "/v1/browser/credentials": {
+      "post": {
+        "tags": [
+          "Browser Bridge"
+        ],
+        "summary": "Define a binding: which secret may be typed, and into which hosts. Humans only, behind a step-up — an agent that could create one could nominate any path it liked as fillable.",
+        "operationId": "create_browser_credential",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "label",
+                  "vault_id",
+                  "secret_path",
+                  "login_url",
+                  "allowed_hosts"
+                ],
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "vault_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Must belong to the caller's org."
+                  },
+                  "secret_path": {
+                    "type": "string",
+                    "description": "Path of the secret inside that vault. The value never lands in the binding."
+                  },
+                  "login_url": {
+                    "type": "string",
+                    "description": "https only, and its host must be in allowed_hosts or sso_hosts — the bridge navigates here itself, one step before a password is typed."
+                  },
+                  "allowed_hosts": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Bare hostnames, compared exactly. URLs, ports and wildcards are refused: a wildcard would match nothing while looking like it allowed something."
+                  },
+                  "sso_hosts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Identity-provider hosts the login legitimately bounces through."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created. Every field is a pointer or a policy; none is secret."
+          },
+          "400": {
+            "description": "A host is not a bare hostname, allowed_hosts is empty, or login_url is http or outside the allowlist"
+          },
+          "403": {
+            "description": "Not a human caller, step-up not satisfied, or the vault belongs to another org"
+          },
+          "404": {
+            "description": "Vault not found"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Browser Bridge"
+        ],
+        "summary": "List this org's browser credential bindings",
+        "operationId": "list_browser_credentials",
+        "responses": {
+          "200": {
+            "description": "The bindings"
+          }
+        }
+      }
+    },
+    "/v1/browser/credentials/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Browser Bridge"
+        ],
+        "summary": "Remove a browser credential binding",
+        "operationId": "delete_browser_credential",
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Not a human caller"
+          },
+          "404": {
+            "description": "Binding not found"
+          }
+        }
+      }
+    },
     "/v1/agents/{id}/browser/sessions": {
       "parameters": [
         {
