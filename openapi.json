@@ -19814,6 +19814,11 @@
                 "properties": {
                   "token": {
                     "type": "string"
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Consensus approval to spend on this creation.\nApproving an enrollment creates an agent, so it is\ngated on `agent.create` exactly as POST /v1/agents\nis. Orgs without a control-plane consensus policy\nnever need this.\n"
                   }
                 }
               }
@@ -19828,7 +19833,7 @@
             "description": "Unauthenticated"
           },
           "403": {
-            "description": "Forbidden, or the plan does not include this"
+            "description": "Forbidden, the plan does not include this, or the org requires\nM-of-N consensus for `agent.create` and no approval was supplied.\n"
           },
           "404": {
             "description": "Not found"
