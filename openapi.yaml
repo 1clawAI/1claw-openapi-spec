@@ -14512,20 +14512,21 @@ paths:
                                     description: The bridge's navigation counter now. A mismatch means the page moved after the decision.
             responses:
                 '200':
-                    description: The credential. The only route in the feature that returns secret material.
-                    content:
-                        application/json:
+                    description: "The credential itself, as raw bytes — the only route in the feature that returns secret material. Not a JSON envelope: the bridge adopts the body into a zeroable buffer, and a wrapper would force it to parse, interning the secret as a string that lives until GC. Metadata rides in `x-1claw-binding-id` and `x-1claw-form-fingerprint`; the response is `cache-control: no-store`."
+                    headers:
+                        x-1claw-binding-id:
                             schema:
-                                type: object
-                                properties:
-                                    binding_id:
-                                        type: string
-                                        format: uuid
-                                    value:
-                                        description: The secret the binding points at.
-                                    form_fingerprint:
-                                        type: object
-                                        nullable: true
+                                type: string
+                                format: uuid
+                        x-1claw-form-fingerprint:
+                            schema:
+                                type: string
+                            description: The binding's form fingerprint as JSON, when it has one.
+                    content:
+                        application/octet-stream:
+                            schema:
+                                type: string
+                                format: binary
                 '400':
                     description: Missing or unsupported bridge version
                 '403':
