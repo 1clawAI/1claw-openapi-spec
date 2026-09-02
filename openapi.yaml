@@ -14335,7 +14335,7 @@ paths:
                                     minItems: 1
                                     items:
                                         type: string
-                                    description: "Bare hostnames, compared exactly. URLs, ports and wildcards are refused: a wildcard would match nothing while looking like it allowed something."
+                                    description: "Hostnames. A bare entry matches only itself; a leading dot ('.example.com') matches that host and any subdomain. URLs, ports and '*' are refused — '*' has no meaning to the matcher, so it would be stored and then match nothing."
                                 sso_hosts:
                                     type: array
                                     items:
@@ -14489,7 +14489,24 @@ paths:
                                     description: "The bridge's navigation counter. Compared again at consume: a navigation in between means the page decided about is no longer the page in front of the bridge."
                                 form_action_origin:
                                     type: string
-                                    description: "Where the form would POST. Checked as well as the two origins — a login form on an allowed page can still submit to somebody else's host."
+                                    description: "Where the form would POST. Checked as well as the two origins — a login form on an allowed page can still submit to somebody else's host. Absent is not treated as 'same as the tab'; it denies."
+                                form_path:
+                                    type: string
+                                    description: Path of the form being filled, checked against the binding's fingerprint.
+                                field_names:
+                                    type: array
+                                    items:
+                                        type: string
+                                    description: "Field names on that form. Every field the fingerprint expects must be present; extra fields are fine, since sites add hidden inputs."
+                                redirect_chain:
+                                    type: array
+                                    items:
+                                        type: string
+                                    description: "Hosts the login has redirected through, in order. Each is checked against the binding's allowed hosts union its sso hosts."
+                                current_generation:
+                                    type: integer
+                                    format: int64
+                                    description: The target's generation now. A mismatch with `generation` means the page moved and the fill is denied.
                                 tab_origin:
                                     type: string
                                     description: "Origin of the tab being driven. Checked against the binding's allowed and sso hosts by exact host match."
