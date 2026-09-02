@@ -22317,6 +22317,99 @@
             "description": "That label is already pinned to a different key"
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Browser Bridge"
+        ],
+        "summary": "List the browser bridges paired to this organization. Revoked devices are included: 'was this machine ever paired' is the question asked after a laptop goes missing.",
+        "operationId": "list_browser_devices",
+        "responses": {
+          "200": {
+            "description": "The paired devices. No credential material is returned — the row holds an Argon2 hash and a prefix, and neither is exposed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "platform": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "bridge_version": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "last_seen_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "revoked_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true,
+                            "description": "Set once revoked. A revoked credential stops resolving."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          }
+        }
+      }
+    },
+    "/v1/browser/devices/{id}": {
+      "delete": {
+        "tags": [
+          "Browser Bridge"
+        ],
+        "summary": "Revoke a paired bridge. This is what makes a leaked bb_ credential stop working.",
+        "operationId": "revoke_browser_device",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked. Subsequent use of that credential resolves to nothing."
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "No such device in this organization"
+          }
+        }
       }
     },
     "/v1/browser/credentials": {
