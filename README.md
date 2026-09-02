@@ -1,4 +1,4 @@
-# @1claw/openapi-spec (v0.59.4)
+# @1claw/openapi-spec (v0.59.10)
 
 > ⭐ **Star [1clawAI/agent-templates](https://github.com/1clawAI/agent-templates)** — ready-to-run agent templates wired to 1Claw. It is our single starred repo.
 
@@ -41,6 +41,26 @@ openapi-generator generate \
 ```typescript
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
+
+## What's in the spec (v0.59.10)
+
+Additive only — no path or parameter renames, so generated clients keep compiling.
+
+- **Browser device management** — `GET /v1/browser/devices` and
+  `DELETE /v1/browser/devices/{id}`. Revoked devices are listed rather than
+  hidden; revocation is what makes a leaked `bb_` bridge credential stop working.
+- **The fill request gained four required fields** — `form_path`, `field_names`,
+  `redirect_chain` and `current_generation` on
+  `POST /v1/agents/{id}/browser/fills`. They were optional and the server filled
+  them in when absent, which turned three of its own policy checks off. A request
+  missing any of them is refused with a 400 naming them. Send
+  `current_generation` as the generation observed *now*: the same value as
+  `generation` makes the staleness check compare a value to itself.
+- **`POST /v1/vaults` documents 409** for a duplicate name, and what 400 covers
+  (empty, or over 255 characters). Both were 500s. `CreateVaultRequest.name`
+  carries the real constraints.
+- **`POST /v1/runtimes/{id}/chat` documents 503** — the runtime's last start
+  failed under 120s ago and is not being retried yet.
 
 ## What's in the spec (v0.59.4)
 
