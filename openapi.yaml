@@ -1649,7 +1649,17 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/VaultResponse"
                 "400":
-                    $ref: "#/components/responses/BadRequest"
+                    description: The name is empty or longer than 255 characters. Checked before the consensus gate and the quota, so a malformed request consumes neither an approval nor a rate-limit slot.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
+                "409":
+                    description: A vault with that name already exists in this organization. Names are unique per org; this previously surfaced as a 500.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
         get:
             tags: [Vaults]
             summary: List vaults
@@ -10586,6 +10596,17 @@ paths:
                     $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
+                "503":
+                    description: |
+                        The runtime's last start failed less than 120 seconds ago and is not
+                        being retried yet. Chat starts a stopped runtime, so a client that
+                        retries on failure turns every attempt into another deploy — one
+                        polling client did exactly that every 8 seconds for days. Wait out
+                        the cooldown, or call the start endpoint to see the underlying error.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
 
     # ---------------------------------------------------------------------------
     # Agent Memory
@@ -14532,7 +14553,13 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [session_id, binding_id, tab_origin, frame_origin, frame_id, generation]
+                            # form_path, field_names, redirect_chain and current_generation are
+                            # required, not optional. They were accepted as absent and defaulted
+                            # server-side, which turned three of the policy's checks off: the
+                            # redirect loop never ran, current_generation was compared against
+                            # itself, and form_path defaulted to "", matching no fingerprint
+                            # pattern and denying every binding that carried one.
+                            required: [session_id, binding_id, tab_origin, frame_origin, frame_id, generation, form_path, field_names, redirect_chain, current_generation]
                             properties:
                                 session_id:
                                     type: string
@@ -15412,6 +15439,9 @@ components:
             properties:
                 name:
                     type: string
+                    minLength: 1
+                    maxLength: 255
+                    description: Unique within the organization. Trimmed before it is stored, and the trimmed value is what must be unique. Counted in characters, not bytes.
                 description:
                     type: string
                 mpc_custody:

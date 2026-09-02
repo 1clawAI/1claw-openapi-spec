@@ -1,6 +1,6 @@
 {
   "name": "@1claw/openapi-spec",
-  "version": "0.59.9",
+  "version": "0.59.10",
   "description": "OpenAPI 3.1.0 specification for the 1Claw Vault API \u2014 generate clients in any language",
   "license": "MIT",
   "repository": {

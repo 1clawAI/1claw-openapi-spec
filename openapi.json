@@ -2442,7 +2442,24 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
+            "description": "The name is empty or longer than 255 characters. Checked before the consensus gate and the quota, so a malformed request consumes neither an approval nor a rate-limit slot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A vault with that name already exists in this organization. Names are unique per org; this previously surfaced as a 500.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       },
@@ -16438,6 +16455,16 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "The runtime's last start failed less than 120 seconds ago and is not\nbeing retried yet. Chat starts a stopped runtime, so a client that\nretries on failure turns every attempt into another deploy — one\npolling client did exactly that every 8 seconds for days. Wait out\nthe cooldown, or call the start endpoint to see the underlying error.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -22681,7 +22708,11 @@
                   "tab_origin",
                   "frame_origin",
                   "frame_id",
-                  "generation"
+                  "generation",
+                  "form_path",
+                  "field_names",
+                  "redirect_chain",
+                  "current_generation"
                 ],
                 "properties": {
                   "session_id": {
@@ -23998,7 +24029,10 @@
         ],
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Unique within the organization. Trimmed before it is stored, and the trimmed value is what must be unique. Counted in characters, not bytes."
           },
           "description": {
             "type": "string"
