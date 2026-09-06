@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.59.9"
+    version: "0.59.10"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -836,7 +836,21 @@ paths:
         post:
             tags: [Approvals]
             summary: Request human approval (agent-only)
-            description: Agents can request policy changes or other sensitive actions that require human approval.
+            description: |
+                Ask a human to approve an action.
+
+                Two families of action are accepted:
+
+                * the control-plane requests `access_request`, `policy_request`
+                  and `binding_request`, which widen the agent's own authority; and
+                * business actions named `namespace.verb` (`refund.create`,
+                  `social.post`), whose meaning is carried by `summary` and `payload`.
+
+                Actions that 1Claw itself executes on approval — `policy_change`,
+                `card_order`, `agent_transaction`, `agent_execution`,
+                `agent_sign_intent` — are created by the platform and rejected here,
+                because the summary a human reads would be agent-supplied while the
+                side effect would not be.
             operationId: requestApproval
             requestBody:
                 required: true
@@ -848,20 +862,42 @@ paths:
                             properties:
                                 action:
                                     type: string
-                                    description: "Type of action (e.g. policy_change)"
+                                    maxLength: 64
+                                    description: "Control-plane action, or a business action named `namespace.verb`."
+                                    example: refund.create
                                 target_type:
                                     type: string
                                 target_id:
                                     type: string
                                 summary:
                                     type: object
-                                    description: "JSON payload describing the request"
+                                    description: "What the human is shown: title, body, and key-value fields."
+                                    example: {title: "Refund $49.99", body: "Order #1234 arrived damaged."}
+                                payload:
+                                    type: object
+                                    description: |
+                                        What the action will actually do. The enforced risk tier and
+                                        the human-readable line are derived from this, not from
+                                        `summary` — the two can disagree, and only this one describes
+                                        what happens if the human approves.
+                                    example: {amount_usd: "49.99", customer_email: "a.user@example.com"}
                                 reason:
                                     type: string
+                                declared_risk_tier:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 3
+                                    description: |
+                                        Advisory. The server derives the enforced tier from the agent's
+                                        `action_approval_policy` and the payload, then takes the higher
+                                        of the two: a caller may raise its own bar, never lower it.
+                                        The response returns both.
                                 risk_tier:
                                     type: integer
                                     minimum: 1
-                                    maximum: 5
+                                    maximum: 3
+                                    deprecated: true
+                                    description: "Former name for `declared_risk_tier`. Still accepted."
             responses:
                 "202":
                     description: Approval request created
@@ -20558,6 +20594,23 @@ components:
                     type: integer
                     minimum: 1
                     maximum: 3
+                    description: "The tier actually enforced. Authoritative."
+                declared_risk_tier:
+                    type: integer
+                    minimum: 1
+                    maximum: 3
+                    nullable: true
+                    description: "What the caller asked for, when it asked for anything."
+                declared_below_floor:
+                    type: boolean
+                    description: "The caller asked for a lower tier than policy required."
+                human_summary:
+                    type: string
+                    nullable: true
+                    description: "Plain-language line sent to SMS, push and email."
+                payload:
+                    type: object
+                    description: "What the action will do, as submitted."
                 status:
                     type: string
                     enum: [pending, approved, rejected, expired]

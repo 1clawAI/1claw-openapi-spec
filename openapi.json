@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.59.9",
+    "version": "0.59.10",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -1228,7 +1228,7 @@
           "Approvals"
         ],
         "summary": "Request human approval (agent-only)",
-        "description": "Agents can request policy changes or other sensitive actions that require human approval.",
+        "description": "Ask a human to approve an action.\n\nTwo families of action are accepted:\n\n* the control-plane requests `access_request`, `policy_request`\n  and `binding_request`, which widen the agent's own authority; and\n* business actions named `namespace.verb` (`refund.create`,\n  `social.post`), whose meaning is carried by `summary` and `payload`.\n\nActions that 1Claw itself executes on approval — `policy_change`,\n`card_order`, `agent_transaction`, `agent_execution`,\n`agent_sign_intent` — are created by the platform and rejected here,\nbecause the summary a human reads would be agent-supplied while the\nside effect would not be.\n",
         "operationId": "requestApproval",
         "requestBody": {
           "required": true,
@@ -1245,7 +1245,9 @@
                 "properties": {
                   "action": {
                     "type": "string",
-                    "description": "Type of action (e.g. policy_change)"
+                    "maxLength": 64,
+                    "description": "Control-plane action, or a business action named `namespace.verb`.",
+                    "example": "refund.create"
                   },
                   "target_type": {
                     "type": "string"
@@ -1255,15 +1257,35 @@
                   },
                   "summary": {
                     "type": "object",
-                    "description": "JSON payload describing the request"
+                    "description": "What the human is shown: title, body, and key-value fields.",
+                    "example": {
+                      "title": "Refund $49.99",
+                      "body": "Order #1234 arrived damaged."
+                    }
+                  },
+                  "payload": {
+                    "type": "object",
+                    "description": "What the action will actually do. The enforced risk tier and\nthe human-readable line are derived from this, not from\n`summary` — the two can disagree, and only this one describes\nwhat happens if the human approves.\n",
+                    "example": {
+                      "amount_usd": "49.99",
+                      "customer_email": "a.user@example.com"
+                    }
                   },
                   "reason": {
                     "type": "string"
                   },
+                  "declared_risk_tier": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3,
+                    "description": "Advisory. The server derives the enforced tier from the agent's\n`action_approval_policy` and the payload, then takes the higher\nof the two: a caller may raise its own bar, never lower it.\nThe response returns both.\n"
+                  },
                   "risk_tier": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 5
+                    "maximum": 3,
+                    "deprecated": true,
+                    "description": "Former name for `declared_risk_tier`. Still accepted."
                   }
                 }
               }
@@ -31235,7 +31257,28 @@
           "risk_tier": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 3
+            "maximum": 3,
+            "description": "The tier actually enforced. Authoritative."
+          },
+          "declared_risk_tier": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "nullable": true,
+            "description": "What the caller asked for, when it asked for anything."
+          },
+          "declared_below_floor": {
+            "type": "boolean",
+            "description": "The caller asked for a lower tier than policy required."
+          },
+          "human_summary": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plain-language line sent to SMS, push and email."
+          },
+          "payload": {
+            "type": "object",
+            "description": "What the action will do, as submitted."
           },
           "status": {
             "type": "string",
