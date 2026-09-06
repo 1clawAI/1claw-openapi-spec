@@ -11381,6 +11381,68 @@ paths:
                 "200":
                     description: Webhook processed
 
+    /v1/platform/apps/{app_id}/usage:
+        get:
+            tags: [Platform API]
+            summary: Usage for every connection on an app
+            description: |
+                Billable activity for the current month, grouped by end-user connection,
+                **plus what could not be charged to one**.
+
+                The `unattributed` block is not an implementation detail. Summing only the
+                per-connection numbers gives a figure that will not match the invoice you
+                are reconciling against, and the gap is usage that belongs to a real
+                end-user we cannot name.
+
+                Two kinds, deliberately kept apart:
+
+                * `none` — no platform linkage at all. Normal for most traffic, not a problem.
+                * `ambiguous` — the agent belongs to several connections and no
+                  `X-Platform-Connection` header said which. This usage belongs to
+                  *someone*. `has_ambiguous_usage` flags it so you do not have to notice
+                  a non-zero nested number.
+
+                `totals` is derived from the parts, never queried separately, so it cannot
+                disagree with its own breakdown.
+            operationId: getAppUsage
+            parameters:
+                - name: app_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Usage report
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AppUsageReport"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/apps/{app_id}/usage/export:
+        get:
+            tags: [Platform API]
+            summary: Usage as CSV for billing reconciliation
+            description: |
+                The same report as `GET /usage`, as CSV. Includes the `ambiguous`, `none`
+                and `total` rows — a CSV listing only connections looks complete and is
+                not, and whoever imports it has no way to tell.
+            operationId: exportAppUsage
+            parameters:
+                - name: app_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: CSV
+                    content:
+                        text/csv:
+                            schema: { type: string }
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/notification-targets:
         get:
             tags: [Notifications]
@@ -20964,6 +21026,58 @@ components:
                 reason:
                     type: string
                     description: Optional human-readable reason for the decision
+
+        UsageCounts:
+            type: object
+            required: [api_requests, signatures, execution_intents, execution_intents_tee, inference_usd, credits_debited_cents]
+            properties:
+                api_requests: { type: integer, format: int64 }
+                signatures: { type: integer, format: int64 }
+                execution_intents: { type: integer, format: int64 }
+                execution_intents_tee: { type: integer, format: int64 }
+                inference_usd:
+                    type: string
+                    description: A decimal string. Money is not a float; zero is "0".
+                    example: "3.42"
+                credits_debited_cents: { type: integer, format: int64 }
+
+        AppUsageReport:
+            type: object
+            required: [app_id, period_start, period_end, connections, unattributed, totals, has_ambiguous_usage]
+            properties:
+                app_id: { type: string, format: uuid }
+                period_start: { type: string, format: date-time }
+                period_end:
+                    type: string
+                    format: date-time
+                    description: Exclusive. The period is half-open, so an event at midnight belongs to one month, not two.
+                connections:
+                    type: array
+                    items:
+                        type: object
+                        required: [connection_id, usage]
+                        properties:
+                            connection_id: { type: string, format: uuid }
+                            usage: { $ref: "#/components/schemas/UsageCounts" }
+                unattributed:
+                    type: object
+                    description: Usage that could not be charged to a connection.
+                    properties:
+                        ambiguous:
+                            allOf:
+                                - $ref: "#/components/schemas/UsageCounts"
+                            description: The agent belongs to several connections and none was named. This belongs to someone.
+                        none:
+                            allOf:
+                                - $ref: "#/components/schemas/UsageCounts"
+                            description: No platform linkage. Normal for most traffic.
+                totals:
+                    allOf:
+                        - $ref: "#/components/schemas/UsageCounts"
+                    description: Connections plus both unattributed buckets. Derived, not queried.
+                has_ambiguous_usage:
+                    type: boolean
+                    description: Some usage this period belongs to an end-user who cannot be identified.
 
         NotificationTarget:
             type: object
