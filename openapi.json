@@ -17717,6 +17717,109 @@
         }
       }
     },
+    "/v1/org/apply": {
+      "post": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Apply a chart",
+        "description": "Create what the chart describes. Human users only.\n\n**Apply calls the same handlers the HTTP routes call.** Creating a vault\nruns five gates before anything is written — the delegation scope, a name\ncheck, control-plane consensus, a creation rate limit and the tier quota\n— and creating an agent runs its own. A reconciler that wrote through the\nrepositories would skip all of them and would look, in review, exactly\nlike one that did not.\n\nSo if your org has consensus configured on `vault.create`, applying a\nchart queues an approval exactly as a dashboard click would. That resource\ncomes back as `awaiting_approval` rather than failing the whole chart.\n\nPer-resource results: `created`, `unchanged`, `skipped`, `refused`,\n`awaiting_approval`, `failed`. `needs_attention` is true when the chart is\nnot fully applied — something is waiting on a person, whether an approval,\nan OAuth sign-in, or a resource that drifted and was left alone.\n\nSave `applied_state` to `.1claw/apply-state.json`. It records what apply\nset, which is what lets the next run tell drift from a first apply.\n\nv1 creates and reports; it does not delete, prune, or patch in place. An\napply that silently deletes is an apply nobody runs twice.\n",
+        "operationId": "applyChart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "chart"
+                ],
+                "properties": {
+                  "chart": {
+                    "type": "object",
+                    "description": "A chart document — `apiVersion`, `kind`, `metadata`, `spec`."
+                  },
+                  "applied_state": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What happened to each resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chart_name": {
+                      "type": "string"
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "result": {
+                            "type": "string",
+                            "enum": [
+                              "created",
+                              "unchanged",
+                              "skipped",
+                              "refused",
+                              "awaiting_approval",
+                              "failed"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "detail": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "applied_state": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Save to `.1claw/apply-state.json`."
+                    },
+                    "needs_attention": {
+                      "type": "boolean",
+                      "description": "The chart is not fully applied — something is waiting on a person."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/v1/org/apply/diff": {
       "post": {
         "tags": [
