@@ -11522,6 +11522,181 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/peers/{peer_id}:
+        get:
+            tags: [Memory]
+            summary: A peer's profile and derived facts
+            description: |
+                A peer is a shared model of one human, across the agents serving them.
+
+                **An agent reaches a peer only by being named in its observer list.**
+                Being in the same organisation, the same platform connection, or holding
+                a broad scope grants nothing. A peer with no observers is readable by no
+                agent at all — forgetting to set observers must not expose someone's
+                behavioural profile to every agent in the org.
+
+                A peer in another organisation returns 404, the same as an unknown id:
+                whether one exists elsewhere is not something a caller should learn.
+
+                Each fact carries `provenance` — why it is believed. Entries for events
+                that have since expired become tombstones keeping the shape of what was
+                seen without the content, so a belief about a person always has a
+                recoverable basis.
+            operationId: getPeer
+            parameters:
+                - name: peer_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Peer and facts
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    peer: { $ref: "#/components/schemas/Peer" }
+                                    facts:
+                                        type: array
+                                        items: { $ref: "#/components/schemas/PeerFact" }
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/peers/{peer_id}/events:
+        post:
+            tags: [Memory]
+            summary: Record something observed about a person
+            operationId: recordPeerEvent
+            parameters:
+                - name: peer_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [event_type, content]
+                            properties:
+                                event_type:
+                                    type: string
+                                    enum: [message, approval, action, observation]
+                                content: { type: object, additionalProperties: true }
+            responses:
+                "201":
+                    description: Recorded
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    event_id: { type: string, format: uuid }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/peers/{peer_id}/predict-approval:
+        post:
+            tags: [Memory]
+            summary: How has this person decided this before?
+            description: |
+                Answers two different questions, and keeps them apart on purpose.
+
+                `likelihood` is an **observation about a person** — how they have decided
+                comparable requests before. Comparable means the same fingerprint bucket,
+                not the same action type: three approvals of $5 say nothing about $500.
+
+                `suggest_auto` is a **statement about a policy**. It is true only where a
+                rule the operator already wrote would auto-approve this exact case. It is
+                never derived from `likelihood`, and a confident model never becomes new
+                authority. It is false, with `blocked_reason`, when:
+
+                * no rule covers the action (`no_matching_rule`);
+                * a rule says a human decides (`rule_requires_approval`);
+                * the amount is above the rule's own threshold (`above_configured_threshold`);
+                * the derived risk tier is above the lowest (`risk_tier_requires_step_up`);
+                * the action grants or destroys authority (`action_is_sensitive`).
+
+                The policy consulted is the calling agent's own, so a prediction cannot
+                inherit authority from another agent that happens to observe the same
+                person.
+            operationId: predictApproval
+            parameters:
+                - name: peer_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [action_type, effective_risk_tier]
+                            properties:
+                                action_type: { type: string, example: refund.create }
+                                payload: { type: object, additionalProperties: true }
+                                effective_risk_tier:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 3
+            responses:
+                "200":
+                    description: Prediction
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [reasoning, suggest_auto]
+                                properties:
+                                    likelihood:
+                                        type: number
+                                        nullable: true
+                                        description: Absent when there is no comparable history.
+                                    reasoning: { type: string }
+                                    suggest_auto:
+                                        type: boolean
+                                        description: Whether the operator's own policy already permits this.
+                                    blocked_reason:
+                                        type: string
+                                        enum: [no_matching_rule, rule_requires_approval, above_configured_threshold, risk_tier_requires_step_up, action_is_sensitive]
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/peers/by-connection/{connection_id}:
+        get:
+            tags: [Memory]
+            summary: Resolve the peer for a platform connection
+            operationId: getPeerByConnection
+            parameters:
+                - name: connection_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Peer
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    peer: { $ref: "#/components/schemas/Peer" }
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/org/apply/diff:
         post:
             tags: [Organization]
@@ -21232,6 +21407,47 @@ components:
                 has_ambiguous_usage:
                     type: boolean
                     description: Some usage this period belongs to an end-user who cannot be identified.
+
+        Peer:
+            type: object
+            required: [id, peer_type, peer_ref, profile, status, observer_count, created_at]
+            properties:
+                id: { type: string, format: uuid }
+                peer_type: { type: string, enum: [user, platform_connection, external] }
+                peer_ref: { type: string }
+                display_name: { type: string, nullable: true }
+                profile: { type: object, additionalProperties: true }
+                status:
+                    type: string
+                    enum: [active, archived]
+                    description: |
+                        Archived when a connection is disconnected. Agents lose observation;
+                        the person keeps export and delete.
+                observer_count:
+                    type: integer
+                    description: How many agents observe this peer. The list itself is not returned here.
+                created_at: { type: string, format: date-time }
+
+        PeerFact:
+            type: object
+            required: [fact_key, fact_value, provenance, edited_by_human, updated_at]
+            properties:
+                fact_key: { type: string, example: "approval_tendency:refund.create|0-10|known|a@b.co" }
+                fact_value: { type: object, additionalProperties: true }
+                confidence:
+                    type: string
+                    nullable: true
+                    description: 0..1, capped below certainty — no history makes the next decision certain.
+                provenance:
+                    type: array
+                    items: { type: object }
+                    description: |
+                        Why this is believed. Entries are `event`, `tombstone` (the event has
+                        expired; kind and decision are kept, content is not) or `human`.
+                edited_by_human:
+                    type: boolean
+                    description: A person corrected this. The processor will not overwrite it.
+                updated_at: { type: string, format: date-time }
 
         NotificationTarget:
             type: object
