@@ -21548,7 +21548,7 @@ components:
 
         ConnectionUsageResponse:
             type: object
-            required: [connection_id, period, inference_spent_usd]
+            required: [connection_id, period, inference_spent_usd, usage, period_start, period_end]
             properties:
                 connection_id:
                     type: string
@@ -21558,6 +21558,23 @@ components:
                     description: UTC month (YYYY-MM)
                 inference_spent_usd:
                     type: string
+                    description: |
+                        Kept for compatibility — this field predates the breakdown below and
+                        existing integrations read it. Same number as `usage.inference_usd`.
+                usage:
+                    allOf:
+                        - $ref: "#/components/schemas/UsageCounts"
+                    description: |
+                        Everything billable for this connection in the period. Derived from the
+                        same grouped query as the app report, so a connection can never report a
+                        number the app report disagrees with.
+                period_start:
+                    type: string
+                    format: date-time
+                period_end:
+                    type: string
+                    format: date-time
+                    description: Exclusive. The period is half-open.
 
         EntitlementsListResponse:
             type: object
