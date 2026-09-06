@@ -11381,6 +11381,63 @@ paths:
                 "200":
                     description: Webhook processed
 
+    /v1/webhooks/sms/{webhook_path}:
+        post:
+            tags: [Channels]
+            summary: Inbound SMS webhook (Twilio)
+            description: |
+                Called by Twilio when someone texts the channel's number. Public, because
+                the provider calls it — so the `X-Twilio-Signature` header is the only
+                thing establishing that a message is genuine, and it is verified over the
+                exact public URL and every POST parameter.
+
+                A verified signature proves the message came from Twilio, **not** that it
+                came from the right person: anyone who knows the number can text it and
+                their message arrives correctly signed. So the sending number must also
+                match a *verified* SMS notification target.
+
+                A reply may decide an approval only when its server-derived
+                `risk_tier` is 1. Anything higher is answered with a link to confirm in
+                the app; replying cannot decide it. When more than one approval is
+                pending, a bare YES/NO is answered with a request for the reference code
+                rather than applied to a guess.
+
+                Always answers 200 with TwiML — a non-2xx makes Twilio retry a message
+                that was deliberately refused. The exception is a bad signature, which is
+                403, because a persistently failing signature is a misconfiguration as
+                often as an attack and silence would hide both.
+            operationId: smsWebhook
+            security: []
+            parameters:
+                - name: webhook_path
+                  in: path
+                  required: true
+                  schema: { type: string }
+                - name: X-Twilio-Signature
+                  in: header
+                  required: true
+                  schema: { type: string }
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            type: object
+                            properties:
+                                From: { type: string, example: "+14155550123" }
+                                To: { type: string, example: "+14155550999" }
+                                Body: { type: string, example: "YES A1" }
+            responses:
+                "200":
+                    description: TwiML response; `<Response/>` when there is nothing to reply
+                    content:
+                        application/xml:
+                            schema: { type: string }
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/webhooks/discord/{webhook_path}:
         post:
             tags: [Agent Channels]
