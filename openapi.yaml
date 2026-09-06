@@ -16077,6 +16077,22 @@ components:
                     additionalProperties: true
                     nullable: true
                     description: Graduated transaction approval policy (HITL thresholds). Separate from hard guardrails.
+                action_approval_policy:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                    description: |
+                        Which business actions this agent must ask a human about, and above what
+                        amount. `{}` means no per-action rules.
+
+                        Shape: `{ "default_mode": "deny|approve|allow", "rules": [ { "action_type":
+                        "refund.create", "mode": "approve", "require_for_amount_above_usd": "50",
+                        "summary_template": "Refund {{amount_usd}} to {{customer_email}}" } ] }`.
+
+                        A rule can only raise the bar. Editing this is classified as a guardrail
+                        widening, so it routes through the same approval flow as loosening a
+                        transaction limit. Malformed rules are rejected on write rather than
+                        ignored at request time.
                 typed_data_policy:
                     type: string
                     enum: [deny, approve]
@@ -16259,6 +16275,22 @@ components:
                     additionalProperties: true
                     nullable: true
                     description: Graduated transaction approval policy (HITL thresholds).
+                action_approval_policy:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                    description: |
+                        Which business actions this agent must ask a human about, and above what
+                        amount. `{}` means no per-action rules.
+
+                        Shape: `{ "default_mode": "deny|approve|allow", "rules": [ { "action_type":
+                        "refund.create", "mode": "approve", "require_for_amount_above_usd": "50",
+                        "summary_template": "Refund {{amount_usd}} to {{customer_email}}" } ] }`.
+
+                        A rule can only raise the bar. Editing this is classified as a guardrail
+                        widening, so it routes through the same approval flow as loosening a
+                        transaction limit. Malformed rules are rejected on write rather than
+                        ignored at request time.
                 typed_data_policy:
                     type: string
                     enum: [deny, approve]
@@ -16530,6 +16562,22 @@ components:
                     additionalProperties: true
                     nullable: true
                     description: Graduated transaction approval policy (HITL thresholds).
+                action_approval_policy:
+                    type: object
+                    additionalProperties: true
+                    nullable: true
+                    description: |
+                        Which business actions this agent must ask a human about, and above what
+                        amount. `{}` means no per-action rules.
+
+                        Shape: `{ "default_mode": "deny|approve|allow", "rules": [ { "action_type":
+                        "refund.create", "mode": "approve", "require_for_amount_above_usd": "50",
+                        "summary_template": "Refund {{amount_usd}} to {{customer_email}}" } ] }`.
+
+                        A rule can only raise the bar. Editing this is classified as a guardrail
+                        widening, so it routes through the same approval flow as loosening a
+                        transaction limit. Malformed rules are rejected on write rather than
+                        ignored at request time.
                 typed_data_policy:
                     type: string
                     enum: [deny, approve]
