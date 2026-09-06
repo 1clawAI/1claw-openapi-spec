@@ -11443,6 +11443,81 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/org/apply/diff:
+        post:
+            tags: [Organization]
+            summary: What would this chart change?
+            description: |
+                Reconcile a chart against the org without changing anything. Human users
+                only — a chart provisions agents, vaults and access policies, so an agent
+                that could apply one could grant itself access to a vault it cannot
+                currently read.
+
+                A POST rather than a GET because the chart is the request body, and a GET
+                carrying a body is one many proxies and clients drop or mangle. Read-only
+                either way.
+
+                The plan reports five outcomes per resource:
+
+                * `create` — not present, would be created.
+                * `patch` — present, differs only in fields safe to change in place.
+                * `unchanged` — present and matching.
+                * `skipped_drifted` — **changed outside this chart**, so left alone.
+                  Someone edited it by hand for a reason; overwriting that because a file
+                  says otherwise is how a deployment tool destroys an incident fix.
+                * `refused` — the chart asks for a change apply will not make. Guardrail
+                  fields are never patched here: editing them routes through the guardrail
+                  approval flow, and a reconciler writing them directly would be a way
+                  around it.
+
+                Pass `applied_state` from `.1claw/apply-state.json` so drift can be told
+                from a first run — a pre-existing resource is not drifted, it was simply
+                not created by this chart.
+            operationId: diffChart
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [chart]
+                            properties:
+                                chart:
+                                    type: object
+                                    description: A chart document — `apiVersion`, `kind`, `metadata`, `spec`.
+                                applied_state:
+                                    type: object
+                                    additionalProperties: true
+                                    description: What a previous apply recorded, keyed `kind/name`.
+            responses:
+                "200":
+                    description: The plan
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    chart_name: { type: string }
+                                    actions:
+                                        type: array
+                                        items: { type: object }
+                                    warnings:
+                                        type: array
+                                        items: { type: string }
+                                    summary:
+                                        type: object
+                                        properties:
+                                            create: { type: integer }
+                                            patch: { type: integer }
+                                            skipped_drifted: { type: integer }
+                                            unchanged: { type: integer }
+                                            refused: { type: integer }
+                                            no_changes: { type: boolean }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     /v1/notification-targets:
         get:
             tags: [Notifications]

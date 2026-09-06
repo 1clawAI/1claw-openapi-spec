@@ -17717,6 +17717,98 @@
         }
       }
     },
+    "/v1/org/apply/diff": {
+      "post": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "What would this chart change?",
+        "description": "Reconcile a chart against the org without changing anything. Human users\nonly — a chart provisions agents, vaults and access policies, so an agent\nthat could apply one could grant itself access to a vault it cannot\ncurrently read.\n\nA POST rather than a GET because the chart is the request body, and a GET\ncarrying a body is one many proxies and clients drop or mangle. Read-only\neither way.\n\nThe plan reports five outcomes per resource:\n\n* `create` — not present, would be created.\n* `patch` — present, differs only in fields safe to change in place.\n* `unchanged` — present and matching.\n* `skipped_drifted` — **changed outside this chart**, so left alone.\n  Someone edited it by hand for a reason; overwriting that because a file\n  says otherwise is how a deployment tool destroys an incident fix.\n* `refused` — the chart asks for a change apply will not make. Guardrail\n  fields are never patched here: editing them routes through the guardrail\n  approval flow, and a reconciler writing them directly would be a way\n  around it.\n\nPass `applied_state` from `.1claw/apply-state.json` so drift can be told\nfrom a first run — a pre-existing resource is not drifted, it was simply\nnot created by this chart.\n",
+        "operationId": "diffChart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "chart"
+                ],
+                "properties": {
+                  "chart": {
+                    "type": "object",
+                    "description": "A chart document — `apiVersion`, `kind`, `metadata`, `spec`."
+                  },
+                  "applied_state": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "What a previous apply recorded, keyed `kind/name`."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chart_name": {
+                      "type": "string"
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "create": {
+                          "type": "integer"
+                        },
+                        "patch": {
+                          "type": "integer"
+                        },
+                        "skipped_drifted": {
+                          "type": "integer"
+                        },
+                        "unchanged": {
+                          "type": "integer"
+                        },
+                        "refused": {
+                          "type": "integer"
+                        },
+                        "no_changes": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/v1/notification-targets": {
       "get": {
         "tags": [
