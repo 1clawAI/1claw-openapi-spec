@@ -17645,6 +17645,256 @@
         }
       }
     },
+    "/v1/notification-targets": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List your notification targets",
+        "operationId": "listNotificationTargets",
+        "responses": {
+          "200": {
+            "description": "Your targets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NotificationTarget"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Add a notification target",
+        "description": "Where approvals and automation output reach a human: a phone number, an\nhttps webhook, an email address, or a push token.\n\nAn SMS target is created **unverified** and stays that way until someone\nproves they hold the number. Adding a number must not itself be an\nauthorisation — otherwise a session borrowed for five minutes leaves\nbehind a number that can approve things long after it is gone. An\nunverified target still receives notifications; it just cannot reply to\ndecide one.\n",
+        "operationId": "createNotificationTarget",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "target_type",
+                  "config"
+                ],
+                "properties": {
+                  "target_type": {
+                    "type": "string",
+                    "enum": [
+                      "sms",
+                      "webhook",
+                      "expo",
+                      "email"
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "description": "`{\"phone_number\": \"+14155550123\"}` for sms (E.164 only),\n`{\"url\": \"https://…\"}` for webhook (https only),\n`{\"email\": \"…\"}`, or `{\"push_token\": \"…\"}`.\n"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Empty means every event."
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The agent whose SMS channel sends to this target."
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Defaults to the caller."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Target created, unverified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationTarget"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/notification-targets/{id}": {
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Remove a notification target",
+        "operationId": "deleteNotificationTarget",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/notification-targets/{id}/verify/start": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Text a verification code to an SMS target",
+        "description": "Sends a six-digit code from the same channel the target's notifications\nwill come from — a code arriving from a different number than the one\nthe recipient will later see is a code they are right to distrust.\n\nExpires in 10 minutes. Five wrong answers void it.\n",
+        "operationId": "startNotificationTargetVerification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "expires_in_seconds": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/notification-targets/{id}/verify": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Submit the verification code",
+        "operationId": "completeNotificationTargetVerification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "example": "042913"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/webhooks/sms/{webhook_path}": {
       "post": {
         "tags": [
@@ -31485,6 +31735,64 @@
           "reason": {
             "type": "string",
             "description": "Optional human-readable reason for the decision"
+          }
+        }
+      },
+      "NotificationTarget": {
+        "type": "object",
+        "required": [
+          "id",
+          "target_type",
+          "config",
+          "events",
+          "is_active",
+          "verified",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_type": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "webhook",
+              "expo",
+              "email"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "An unverified SMS target receives notifications but cannot decide\nan approval by reply.\n"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
