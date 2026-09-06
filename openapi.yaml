@@ -11425,6 +11425,139 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/OAuthProviderListResponse"
 
+    /v1/connectors/presets:
+        get:
+            tags: [Connectors]
+            summary: List connector presets
+            description: |
+                The catalogue of pre-built connectors — Gmail, Slack, GitHub and the rest.
+                Each preset carries the OAuth provider and scopes to request, plus the
+                binding config and host/path guardrails the agent will execute under.
+
+                No authentication required: this describes what 1Claw supports, not
+                anything belonging to an organisation.
+            operationId: listConnectorPresets
+            security: []
+            responses:
+                "200":
+                    description: Preset catalogue
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    presets:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/ConnectorPreset"
+
+    /v1/agents/{agent_id}/connectors:
+        get:
+            tags: [Connectors]
+            summary: List installed connectors
+            description: |
+                Connectors installed on this agent, and whether each one has actually
+                been connected — an install creates the binding, but the binding is not
+                usable until the OAuth round trip completes.
+            operationId: listInstalledConnectors
+            parameters:
+                - name: agent_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Installed connectors
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    connectors:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/InstalledConnector"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/connectors/{slug}/install:
+        post:
+            tags: [Connectors]
+            summary: Install a connector
+            description: |
+                Creates a binding from the preset — base URL, allowed hosts, allowed
+                paths — and starts the OAuth flow for it. Send the user to the returned
+                `authorization_url` to finish; until they do, the binding exists but
+                holds no credential.
+
+                Human users only. Installing gives an agent reach into a third-party
+                account, and the flow it starts is a person's browser.
+
+                Idempotent by binding name: re-installing re-runs the OAuth flow against
+                the existing binding rather than creating a second one holding a second
+                token for the same account. A name already taken by a binding that is
+                not this connector returns 409.
+            operationId: installConnector
+            parameters:
+                - name: agent_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+                - name: slug
+                  in: path
+                  required: true
+                  description: Connector preset slug, e.g. `gmail`.
+                  schema: { type: string }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                binding_name:
+                                    type: string
+                                    description: Defaults to the preset slug.
+                                scopes:
+                                    type: array
+                                    items: { type: string }
+                                    description: |
+                                        Narrow the preset's scopes. Widening is refused — the
+                                        preset's scope list is the reviewed part of a one-click
+                                        install. Must still include the preset's required scopes.
+                                redirect_after:
+                                    type: string
+                                    description: Where to send the user after the OAuth round trip.
+            responses:
+                "201":
+                    description: Connector installed; OAuth may still be pending
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [binding_id, binding_name, preset_slug, next_step]
+                                properties:
+                                    binding_id: { type: string, format: uuid }
+                                    binding_name: { type: string }
+                                    preset_slug: { type: string }
+                                    authorization_url:
+                                        type: string
+                                        nullable: true
+                                        description: Absent for connectors that use a pasted API key rather than OAuth.
+                                    next_step:
+                                        type: string
+                                        description: What the user still has to do, in words.
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
     /v1/agents/{agent_id}/oauth/connect:
         post:
             tags: [OAuth Connect]
@@ -20614,6 +20747,55 @@ components:
                 reason:
                     type: string
                     description: Optional human-readable reason for the decision
+
+        ConnectorPreset:
+            type: object
+            required: [slug, display_name, description, category, binding_type, base_url, requires_oauth]
+            properties:
+                slug: { type: string, example: gmail }
+                display_name: { type: string, example: Gmail }
+                description: { type: string }
+                category: { type: string, example: communication }
+                provider_slug:
+                    type: string
+                    nullable: true
+                    description: "`oauth_providers.slug`, or null when the connector uses a pasted API key."
+                oauth_scopes:
+                    type: array
+                    items: { type: string }
+                required_scopes:
+                    type: array
+                    items: { type: string }
+                    description: Scopes without which the connector cannot do anything.
+                binding_type: { type: string, example: http }
+                base_url: { type: string, format: uri }
+                allowed_hosts:
+                    type: array
+                    items: { type: string }
+                    description: Hosts the installed binding may reach. Always includes the base URL's host.
+                documentation_url: { type: string, format: uri }
+                tier_required: { type: string, example: free }
+                requires_oauth: { type: boolean }
+
+        InstalledConnector:
+            type: object
+            required: [binding_id, binding_name, preset_slug, is_active, connected, needs_reauth, created_at]
+            properties:
+                binding_id: { type: string, format: uuid }
+                binding_name: { type: string }
+                preset_slug: { type: string }
+                display_name:
+                    type: string
+                    nullable: true
+                    description: Null if the preset has since been retired from the catalogue.
+                is_active: { type: boolean }
+                connected:
+                    type: boolean
+                    description: The OAuth round trip completed and a token is stored.
+                needs_reauth:
+                    type: boolean
+                    description: The stored token was rejected; the user must reconnect.
+                created_at: { type: string, format: date-time }
 
         ApprovalResponse:
             type: object
