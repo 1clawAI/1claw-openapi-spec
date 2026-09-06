@@ -11522,6 +11522,132 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/peers:
+        post:
+            tags: [Memory]
+            summary: Create a peer and name its observers
+            description: |
+                Human users only. Creating a peer decides which agents may read a model
+                of a person, and an agent that could do that could add itself.
+
+                Idempotent on `(org, peer_type, peer_ref)`. Observers are **merged**, not
+                replaced — a second call adding one agent does not revoke the others
+                already watching. Every named observer must be an agent in this
+                organisation, so a typo or an id copied from elsewhere is an error rather
+                than a silent no-op that leaves an operator believing an agent is
+                watching when none is.
+            operationId: createPeer
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [peer_type, peer_ref]
+                            properties:
+                                peer_type: { type: string, enum: [user, platform_connection, external] }
+                                peer_ref: { type: string }
+                                display_name: { type: string }
+                                platform_connection_id: { type: string, format: uuid }
+                                observer_agent_ids:
+                                    type: array
+                                    items: { type: string, format: uuid }
+                                    description: Empty means nobody. A peer with no observers is readable by no agent.
+            responses:
+                "201":
+                    description: Peer created or updated
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    peer: { $ref: "#/components/schemas/Peer" }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/peers/{peer_id}/context:
+        get:
+            tags: [Memory]
+            summary: A context blob for prompt injection
+            description: |
+                What this person's history suggests, as prose an agent can put in a
+                prompt. Best-supported facts first, so a tight budget drops the
+                least-supported beliefs rather than an arbitrary tail — and a fact a
+                human corrected sorts ahead of everything, because a correction someone
+                took the trouble to make is the last thing to cut.
+
+                Never truncates mid-line: half a sentence about a person is worse than
+                one fewer sentence. A peer with no facts returns an empty string rather
+                than a header claiming to describe someone.
+
+                The blob ends by saying these are observations and not instructions,
+                because an agent reading it needs to know the difference.
+            operationId: getPeerContext
+            parameters:
+                - name: peer_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+                - name: budget
+                  in: query
+                  description: Characters. Default 2000, capped at 8000.
+                  schema: { type: integer }
+            responses:
+                "200":
+                    description: Context
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    context: { type: string }
+                                    characters: { type: integer }
+                                    budget: { type: integer }
+                                    facts_available: { type: integer }
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/peer-context:
+        get:
+            tags: [Memory]
+            summary: An agent's own peer context
+            description: |
+                Resolves the peer from the agent's platform connection, so an agent does
+                not need to know a peer id.
+
+                An agent may only ask for its own — otherwise this route would be a way
+                to read a peer through an agent that observes it, from one that does not.
+                The observer check still applies: being the agent named in the path is
+                not the same as observing that connection's peer.
+            operationId: getAgentPeerContext
+            parameters:
+                - name: agent_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+                - name: budget
+                  in: query
+                  schema: { type: integer }
+            responses:
+                "200":
+                    description: Context
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    peer_id: { type: string, format: uuid }
+                                    context: { type: string }
+                                    characters: { type: integer }
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/peers/{peer_id}:
         get:
             tags: [Memory]
