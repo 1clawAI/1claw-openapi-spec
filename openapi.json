@@ -18441,6 +18441,123 @@
         }
       }
     },
+    "/v1/agents/{agent_id}/policy-preset/cedar": {
+      "post": {
+        "tags": [
+          "Policies"
+        ],
+        "summary": "The Cedar a preset compiles to (Feature 6 Phase B)",
+        "description": "Returns the Cedar policy text a preset produces for this agent, already\nvalidated against the deployed Cedar schema. **Read-only — it creates no\npolicy.** The wizard's Advanced tab shows this before anything is written.\n\n**The text is not the whole policy.** The presets denominate limits in USD\n(\"$100 a day\", \"ask above $25\") and the Cedar schema exposes transaction\nvalue only as `value_gwei`, a native-token amount. Converting needs a live\nprice, and a price baked into policy text is wrong the moment it is written\nand stays wrong silently — so the compiler does not convert. The USD limits\ncome back in `residual_guardrails`, still enforced by the agent's guardrail\ncolumns where a live price is applied at evaluation time.\n\nA UI must show `residual_guardrails` alongside the text. Presenting the\nCedar alone would read as complete while permitting every amount.\n\nPolicies are created in **shadow** mode: they report what they would decide\nwithout deciding it, until an operator promotes them.\n",
+        "operationId": "exportPolicyPresetCedar",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "preset"
+                ],
+                "properties": {
+                  "preset": {
+                    "type": "string",
+                    "example": "treasury-operator"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated Cedar plus the limits it cannot carry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "preset": {
+                      "type": "string"
+                    },
+                    "agent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "cedar": {
+                      "type": "string",
+                      "description": "Cedar text, validated against the deployed schema."
+                    },
+                    "residual_guardrails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Limits Cedar cannot express, still enforced by guardrails. Show these next to the text.\n"
+                    },
+                    "enforcement_mode": {
+                      "type": "string",
+                      "enum": [
+                        "shadow"
+                      ]
+                    },
+                    "ir": {
+                      "type": "object",
+                      "description": "Intermediate representation, so a caller can render a different policy backend without re-deriving the preset.\n",
+                      "properties": {
+                        "preset_slug": {
+                          "type": "string"
+                        },
+                        "permit_actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "forbid_actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "secret_paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "residual_guardrails": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/policy-preset": {
       "post": {
         "tags": [
