@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.59.10",
+    "version": "0.60.0",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -10327,6 +10327,344 @@
         "responses": {
           "204": {
             "description": "Template deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/apps/{appId}/fleets/{template_id}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Fleet summary for a template",
+        "description": "Every agent this template provisioned, as one cohort: how many there are, how they split across the template versions they were built from, and how many a previous rollout declined to touch. plt_ or user JWT.\n",
+        "operationId": "getFleet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fleet summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FleetSummaryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/apps/{appId}/fleets/{template_id}/agents": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "List the agents in a fleet",
+        "operationId": "listFleetAgents",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agents in the fleet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFleetAgentsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/apps/{appId}/fleets/{template_id}/bulk-patch": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Patch every agent in a fleet",
+        "description": "Applies one patch to every agent in the cohort. The field allowlist is deliberately narrower than a single-agent PATCH: guardrails and capability flags (intents_api_enabled, execution_intents_enabled) cannot be changed here, because at cohort scale nobody reviews the change per agent. Read the allowlist from bulk_patchable_fields on the fleet summary rather than hard-coding it. A field outside it returns 400 naming the field.\n",
+        "operationId": "bulkPatchFleet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "patch"
+                ],
+                "properties": {
+                  "patch": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Fields to set on every agent in the cohort."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Patch applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fields_applied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "agents_matched": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "agents_updated": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A field outside the bulk-patch allowlist, or an empty patch"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/apps/{appId}/fleets/{template_id}/rollout": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Roll the current template version out to its fleet",
+        "description": "Brings every agent in the cohort up to the template's current version. An agent changed outside fleet control is skipped rather than corrected, and the fields that caused the skip are recorded on it. force=true overrides that skip but still cannot carry a guardrail or a capability flag. dry_run=true reports what would happen and claims nothing, so it never blocks a real rollout. Only one rollout may run per template at a time; a second returns 409.\n",
+        "operationId": "rolloutFleet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "force": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Overwrite hand edits. Cannot carry guardrails."
+                  },
+                  "dry_run": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Report the plan without applying it."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rollout result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FleetRolloutResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "A rollout is already running for this template"
+          }
+        }
+      }
+    },
+    "/v1/platform/apps/{appId}/fleets/{template_id}/pause": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Deactivate every agent in a fleet",
+        "description": "Sets is_active=false on the whole cohort. The blast radius is the point: this exists for the moment an operator needs a thousand agents to stop at once.\n",
+        "operationId": "pauseFleet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agents paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agents_paused": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -32373,6 +32711,207 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "FleetSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "template_name": {
+            "type": "string"
+          },
+          "current_version": {
+            "type": "integer"
+          },
+          "spec_hash": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SHA-256 of the template spec. Lets a caller tell a version bump that changed nothing from one that did. Null on templates written before migration 245.\n"
+          },
+          "total_agents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version_skew": {
+            "type": "array",
+            "description": "How the cohort splits across the versions it was provisioned from.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "template_version": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "agents": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "agents_on_current_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "agents_behind": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "drifted_agents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Agents a previous rollout declined to touch."
+          },
+          "bulk_patchable_fields": {
+            "type": "array",
+            "description": "The fields bulk-patch and rollout will carry. Read this rather than hard-coding the list; it is deliberately narrower than a single-agent PATCH and may narrow further.\n",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ListFleetAgentsResponse": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FleetAgent"
+            }
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "current_version": {
+            "type": "integer"
+          }
+        }
+      },
+      "FleetAgent": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform_connection_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "provisioned_from_version": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "last_fleet_sync_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "drift_fields": {
+            "type": "array",
+            "description": "Fields a rollout skipped because they were changed outside fleet control. The standing answer to \"why is this agent behind?\".\n",
+            "items": {
+              "type": "string"
+            }
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "is_current": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FleetRolloutResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Null for a dry run, which claims no job."
+          },
+          "to_version": {
+            "type": "integer"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "total_agents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "synced": {
+            "type": "integer"
+          },
+          "already_current": {
+            "type": "integer"
+          },
+          "skipped_drifted": {
+            "type": "integer"
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "already_current",
+                    "synced",
+                    "skipped_drifted"
+                  ]
+                },
+                "agent_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "drift_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
           }
         }
       },
