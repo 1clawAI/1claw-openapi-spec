@@ -15341,6 +15341,273 @@
         }
       }
     },
+    "/v1/agents/{agent_id}/pay/prepare": {
+      "post": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Prepare an x402 payment from a 402 challenge",
+        "description": "Send the exact bytes the paywall served. The vault parses them, pins the amount that will actually be signed (not the `maxAmountRequired` ceiling), computes the digest a person will authorize, and stores the preimage so the authorize page renders from what the vault saw rather than what the caller claims. `authorization` in the response says what the payment needs next: `allow`, `require_passkey`, `require_grant`, or `deny: <reason>`.\n",
+        "operationId": "preparePayment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayPrepareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session created; digest and quote returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayPrepareResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a usable 402 challenge",
+            "or a non-USDC asset": null
+          },
+          "403": {
+            "description": "pay is not enabled for this agent"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/pay/sign": {
+      "post": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Sign a prepared x402 payment",
+        "description": "Evaluates the agent's payment policy, redeems a passkey assertion or consumes a spending grant, then signs. The daily limit is charged at signing time: a payment that is signed and then lost still consumed authority, and only a vault-verified reconciliation returns it. Returns the `X-PAYMENT` header value, never a key.\n",
+        "operationId": "signPayment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "X-Passkey-Token",
+            "in": "header",
+            "required": false,
+            "description": "A passkey assertion bound to this payment's digest, when required.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaySignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed; payment header returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaySignResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Policy refused",
+            "or the required authorization was absent": null
+          },
+          "409": {
+            "description": "ChallengeExpired. Re-fetch the resource for a fresh 402 and prepare again — re-preparing from the stored bytes would reproduce the same expired window.\n"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/pay/grants": {
+      "post": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Create a spending grant",
+        "description": "Human callers only. Requires a passkey assertion over the digest of exactly these terms, and stays within the agent's own maximum cap and window — a grant is a delegation inside the limits already set, not a way around them.\n",
+        "operationId": "createPayGrant",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "X-Passkey-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePayGrantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Grant created"
+          },
+          "403": {
+            "description": "Not a human caller",
+            "grant mode disabled": null,
+            "or terms exceed the agent's maximum": null
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/pay/{payment_id}/result": {
+      "post": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Report the outcome of a payment",
+        "description": "Best-effort reporting. Moves the audit trail forward and nothing else — `settled: false` does **not** release daily-limit headroom, and the response says `limit_released: false` so the caller need not infer it.\n",
+        "operationId": "reportPaymentResult",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayResultRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome recorded"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/pay/{payment_id}": {
+      "get": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Payment status",
+        "operationId": "getPayment",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment status"
+          }
+        }
+      }
+    },
+    "/v1/pay-sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Read a pay session (authorize page and CLI poll)",
+        "description": "Requires the token of the human the session was raised for, not an agent token and not merely a member of the same org. A session UUID is not authorization once the response can carry signing credentials.\n",
+        "operationId": "getPaySession",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote and status",
+            "rendered from the stored preimage": null
+          },
+          "403": {
+            "description": "Not a human caller",
+            "or the session was raised for someone else": null
+          }
+        }
+      }
+    },
+    "/v1/pay-grants/{grant_id}": {
+      "delete": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Revoke a spending grant",
+        "operationId": "revokePayGrant",
+        "parameters": [
+          {
+            "name": "grant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          },
+          "404": {
+            "description": "Not found",
+            "or already revoked": null
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/cards/order": {
       "post": {
         "tags": [
@@ -25943,6 +26210,171 @@
       }
     },
     "schemas": {
+      "PayPrepareRequest": {
+        "type": "object",
+        "required": [
+          "challenge_b64",
+          "method",
+          "resource_url"
+        ],
+        "properties": {
+          "challenge_b64": {
+            "type": "string",
+            "description": "The exact bytes the paywall served, base64. Sent verbatim rather than parsed by the caller: the digest a person authorizes is computed from this preimage, so anything reinterpreted first would fall outside the binding.\n"
+          },
+          "method": {
+            "type": "string",
+            "example": "GET"
+          },
+          "resource_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "description": "Reused by a caller retrying after a crash so one 402 cannot become two payments. Generated server-side when absent.\n"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "strict",
+              "session",
+              "auto"
+            ],
+            "description": "A request, not an instruction — the vault decides."
+          }
+        }
+      },
+      "PayPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payment_digest": {
+            "type": "string"
+          },
+          "sign_idempotency_key": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "valid_before": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorization": {
+            "type": "string",
+            "description": "allow | require_passkey | require_grant | deny: <reason>"
+          },
+          "short_window": {
+            "type": "boolean",
+            "description": "The paywall's window is under 30 seconds and may expire while a person is reading the authorize page.\n"
+          }
+        }
+      },
+      "PaySignRequest": {
+        "type": "object",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "strict",
+              "session",
+              "auto"
+            ]
+          },
+          "grant_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Offer a specific grant; absent means the newest live one."
+          }
+        }
+      },
+      "PaySignResponse": {
+        "type": "object",
+        "properties": {
+          "payment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payment_header": {
+            "type": "string",
+            "description": "The X-PAYMENT header value. The signature, never the key."
+          },
+          "amount_usd": {
+            "type": "string"
+          },
+          "pay_to": {
+            "type": "string"
+          },
+          "grant_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "PayResultRequest": {
+        "type": "object",
+        "properties": {
+          "http_status": {
+            "type": "integer"
+          },
+          "settled": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Null means the caller could not tell — a timeout after the header was sent, where the payment may or may not have been presented.\n"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreatePayGrantRequest": {
+        "type": "object",
+        "required": [
+          "cap_usd",
+          "ttl_secs",
+          "grant_digest"
+        ],
+        "properties": {
+          "cap_usd": {
+            "type": "string"
+          },
+          "ttl_secs": {
+            "type": "integer"
+          },
+          "allowed_paytos": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            },
+            "description": "Null means any recipient; an empty list means none. The two stay distinguishable all the way down to the digest.\n"
+          },
+          "grant_digest": {
+            "type": "string",
+            "description": "The digest the person actually asserted over. Compared against the digest of the terms being stored, so a token obtained for a small, tightly scoped grant cannot create a large open one.\n"
+          }
+        }
+      },
       "OrderCardRequest": {
         "type": "object",
         "required": [
