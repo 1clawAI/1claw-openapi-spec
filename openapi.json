@@ -17985,6 +17985,356 @@
         }
       }
     },
+    "/v1/policy-presets": {
+      "get": {
+        "tags": [
+          "Policies"
+        ],
+        "summary": "Named starting points for an agent's policy",
+        "description": "Four presets an operator can choose between without reading a policy\ndocument. Public — a description of what 1Claw offers, not tenant data.\n\nEach carries a `headline`: the one-line consequence someone should read\nbefore choosing it, in the words they would use.\n",
+        "operationId": "listPolicyPresets",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Catalogue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "presets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/policy-preset/preview": {
+      "post": {
+        "tags": [
+          "Policies"
+        ],
+        "summary": "What a preset would change",
+        "description": "Compiles a preset against this agent and reports which fields it would\n**widen** — loosen relative to what the agent can already do.\n\nWidening detection errs toward flagging: a false positive costs one extra\napproval, a false negative is a limit raised without review. Enabling a\ncapability widens; disabling does not. Raising a cap widens; setting a\nfirst cap does not, because absent means unlimited.\n",
+        "operationId": "previewPolicyPreset",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "preset"
+                ],
+                "properties": {
+                  "preset": {
+                    "type": "string",
+                    "example": "small-business-spender"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Proposal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "preset_slug": {
+                      "type": "string"
+                    },
+                    "guardrails": {
+                      "type": "object"
+                    },
+                    "action_approval_policy": {
+                      "type": "object"
+                    },
+                    "access_policy": {
+                      "type": "object"
+                    },
+                    "widens": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Fields this preset would loosen. Show these, not a generic warning."
+                    },
+                    "requires_guardrail_approval": {
+                      "type": "boolean"
+                    },
+                    "explanation": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/policy-preset": {
+      "post": {
+        "tags": [
+          "Policies"
+        ],
+        "summary": "Apply a policy preset",
+        "description": "**Applies through the agent update handler**, not by writing guardrail\ncolumns. A preset that wrote them directly would be a way around the\nguardrail widening approval flow wearing a friendlier interface.\n\nSo if the preset loosens something and your organisation gates that, you\nget the same **202 with a pending approval** you would get from editing\nthe agent by hand — not a quietly applied change. Pass `approval_id`\nonce that approval is granted.\n",
+        "operationId": "applyPolicyPreset",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "preset"
+                ],
+                "properties": {
+                  "preset": {
+                    "type": "string"
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applied"
+          },
+          "202": {
+            "description": "Queued behind a guardrail approval"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/trust": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "What a listed agent has earned",
+        "description": "Everything a publisher writes — name, description, tags — is a claim.\nThese are the parts they cannot write: whether a human reviewed the\nlisting, how many people installed it, what they rated it.\n\nPublic, because its purpose is to be read by someone deciding whether to\ninstall a stranger's agent. Only listed agents have public trust.\n\n**A listing with reports shows no badges at all.** \"Platform reviewed\"\nbeside an active complaint tells a reader the opposite of what they need.\nAn average rating appears only from three reviews — one rating is not an\naverage.\n",
+        "operationId": "getAgentTrust",
+        "security": [],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trust signals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trust": {
+                      "type": "object",
+                      "properties": {
+                        "tier": {
+                          "type": "string",
+                          "enum": [
+                            "unverified",
+                            "platform_reviewed",
+                            "identity_verified",
+                            "enterprise"
+                          ]
+                        },
+                        "install_count": {
+                          "type": "integer"
+                        },
+                        "avg_rating": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "review_count": {
+                          "type": "integer"
+                        },
+                        "badges": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "flagged_for_review": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/report": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Report a listed agent",
+        "description": "Human users only — an agent reporting another agent is a way to bury a\ncompetitor's listing at machine speed.\n\nThe response does not include the report count. Telling a reporter how\nclose a listing is to being flagged tells them how many more to file.\n",
+        "operationId": "reportAgent",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Received"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/review": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Rate an agent you have used",
+        "description": "One review per person per agent; a second replaces the first. You cannot\nreview an agent from your own organisation.\n\nComments are shown only once moderated. The rating counts either way — a\nnumber is harder to abuse than free text.\n",
+        "operationId": "reviewAgent",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "rating"
+                ],
+                "properties": {
+                  "rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recorded"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/peers": {
       "post": {
         "tags": [
