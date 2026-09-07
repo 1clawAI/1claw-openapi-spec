@@ -18060,6 +18060,208 @@
         }
       }
     },
+    "/v1/peers/{peer_id}/export": {
+      "get": {
+        "tags": [
+          "Memory"
+        ],
+        "summary": "Everything held about this person",
+        "description": "The whole behavioural profile plus the raw observations behind it. Human\nusers only, behind strong-factor re-auth — this is exactly what a stolen\nsession would want.\n\nEach fact carries `why_we_believe_this`: its provenance, including\ntombstones for observations that have since expired. An export listing\nconclusions without their basis answers only the easy half of the\nquestion.\n",
+        "operationId": "exportPeerData",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "peer": {
+                      "type": "object"
+                    },
+                    "facts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "fact_key": {
+                            "type": "string"
+                          },
+                          "fact_value": {
+                            "type": "object"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "why_we_believe_this": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            }
+                          },
+                          "corrected_by_a_human": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "raw_observations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/peers/{peer_id}/data": {
+      "delete": {
+        "tags": [
+          "Memory"
+        ],
+        "summary": "Forget this person",
+        "description": "Deletes the peer, its facts and its observations. Human users only,\nbehind strong-factor re-auth, and irreversible.\n\nReturns counts of what was removed — \"deleted\" with no numbers is not\nsomething anyone can check. The audit entry records that a deletion\nhappened and deliberately omits the identifier someone asked to have\nforgotten.\n",
+        "operationId": "deletePeerData",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    },
+                    "facts_deleted": {
+                      "type": "integer"
+                    },
+                    "observations_deleted": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/peers/{peer_id}/facts": {
+      "patch": {
+        "tags": [
+          "Memory"
+        ],
+        "summary": "Correct what the system believes",
+        "description": "Human users only. A correction **pins** the fact: the background\nprocessor will not re-derive over it, because someone correcting what a\nsystem believes about them outranks the inference that got it wrong.\n\nThe correction is appended to the fact's provenance as a `human` entry,\nso the record shows both what was inferred and that a person disagreed.\n",
+        "operationId": "editPeerFact",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "fact_key",
+                  "fact_value"
+                ],
+                "properties": {
+                  "fact_key": {
+                    "type": "string"
+                  },
+                  "fact_value": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Corrected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fact_key": {
+                      "type": "string"
+                    },
+                    "edited_by_human": {
+                      "type": "boolean"
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/peers/{peer_id}/context": {
       "get": {
         "tags": [
