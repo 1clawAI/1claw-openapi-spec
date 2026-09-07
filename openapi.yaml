@@ -11522,6 +11522,119 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/org/approval-learning/shadow-report:
+        get:
+            tags: [Organization]
+            summary: What would have been approved automatically
+            description: |
+                Every approval decision is observed, per **fingerprint bucket** — the
+                action, the amount band, whether the recipient was new, and who they
+                were. This reports the buckets a person has approved without exception,
+                and what promoting one would write into an agent's policy.
+
+                Observing is not acting. In the default `shadow` mode nothing changes who
+                gets asked; `can_promote` is false and the promote endpoint refuses.
+
+                Each suggestion carries `would_write_rule` — the actual rule, built by the
+                same function promotion uses, so the report cannot promise something
+                promotion would refuse.
+            operationId: getApprovalLearningShadowReport
+            responses:
+                "200":
+                    description: Report
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    mode: { type: string, enum: [shadow, enforce] }
+                                    threshold:
+                                        type: integer
+                                        description: Consecutive approvals in one bucket before it appears here.
+                                    can_promote: { type: boolean }
+                                    observed_buckets: { type: integer }
+                                    total_decisions: { type: integer }
+                                    suggestions:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                profile_id: { type: string, format: uuid }
+                                                action_type: { type: string }
+                                                fingerprint_bucket: { type: string, example: "refund.create|0-10|known|a@b.co" }
+                                                consecutive_approvals: { type: integer }
+                                                total_requests: { type: integer }
+                                                would_write_rule: { type: object, nullable: true }
+                                                blocked:
+                                                    type: string
+                                                    description: Present when a bound prevents promotion, saying which.
+                                                last_decision_at: { type: string, format: date-time }
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/org/approval-learning/{profile_id}/promote:
+        post:
+            tags: [Organization]
+            summary: Turn an observed pattern into a policy rule
+            description: |
+                Writes a rule into the named agent's `action_approval_policy`. Human users
+                only, and only when the organisation is in `enforce` mode.
+
+                **The rule covers only what was actually approved.** Five approved $5
+                refunds to one customer produce `{ refund.create, asks above $10, that
+                recipient }` — a $49 request does not match it and still reaches a human.
+
+                Refused when: fewer than five consecutive approvals; *any* past rejection
+                on the bucket (a long recent run must not hide a history of refusals); the
+                bucket is for a recipient never paid before; the amount band has no upper
+                edge; or the action grants or destroys authority.
+
+                `widen_to_action_type` drops the amount and recipient constraints. It is
+                never the default and should be an explicit choice in your UI, not a
+                checkbox someone skims past.
+
+                The written rule is marked `promoted_from_learning` so an operator can
+                tell it apart from one they wrote, and it replaces any existing rule for
+                the same action type — appending would leave two rules where only the
+                first ever applies.
+            operationId: promoteApprovalLearningProfile
+            parameters:
+                - name: profile_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [agent_id]
+                            properties:
+                                agent_id: { type: string, format: uuid }
+                                widen_to_action_type:
+                                    type: boolean
+                                    default: false
+            responses:
+                "200":
+                    description: Promoted
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    profile_id: { type: string, format: uuid }
+                                    agent_id: { type: string, format: uuid }
+                                    rule: { type: object }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
     /v1/peers:
         post:
             tags: [Memory]
