@@ -1,4 +1,4 @@
-# @1claw/openapi-spec (v0.59.10)
+# @1claw/openapi-spec (v0.60.0)
 
 > ⭐ **Star [1clawAI/agent-templates](https://github.com/1clawAI/agent-templates)** — ready-to-run agent templates wired to 1Claw. It is our single starred repo.
 
@@ -41,6 +41,24 @@ openapi-generator generate \
 ```typescript
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
+
+## What's in the spec (v0.60.0)
+
+Additive only — no path or parameter renames, so generated clients keep compiling.
+
+- **Fleet management** — `GET /v1/platform/apps/{appId}/fleets/{template_id}`
+  and `/agents`; `POST .../bulk-patch`, `.../rollout`, `.../pause`. Four new
+  schemas: `FleetSummaryResponse`, `ListFleetAgentsResponse`, `FleetAgent`,
+  `FleetRolloutResponse`.
+- **Two things the descriptions state deliberately**, because a client that
+  guesses either wrong causes damage at cohort scale: read
+  `bulk_patchable_fields` off the fleet summary rather than hard-coding it (it
+  excludes guardrails and capability flags and may narrow further), and expect
+  `job_id` to be `null` for a dry run.
+- **`spec_hash` on `PlatformTemplateResponse`** — distinguishes a template
+  version bump that changed nothing from one that did.
+- New nullable fields use 3.1 union types (`type: [string, "null"]`) rather
+  than the 3.0 `nullable:` keyword the rest of the file still uses.
 
 ## What's in the spec (v0.59.10)
 
