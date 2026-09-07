@@ -6823,8 +6823,17 @@ paths:
                                     fields_applied:
                                         type: array
                                         items: { type: string }
-                                    agents_matched: { type: integer, format: int64 }
-                                    agents_updated: { type: integer, format: int64 }
+                                    agents_matched:
+                                        type: integer
+                                        format: int64
+                                        description: Agents in the cohort the patch applied to.
+                                    agents_updated:
+                                        type: integer
+                                        format: int64
+                                        description: >
+                                            Distinct agents written, not writes performed. Every
+                                            field in one patch targets the same cohort, so this is
+                                            the cohort size rather than fields x agents.
                 "400":
                     description: A field outside the bulk-patch allowlist, or an empty patch
                 "404":

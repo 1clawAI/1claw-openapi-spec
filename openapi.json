@@ -10521,11 +10521,13 @@
                     },
                     "agents_matched": {
                       "type": "integer",
-                      "format": "int64"
+                      "format": "int64",
+                      "description": "Agents in the cohort the patch applied to."
                     },
                     "agents_updated": {
                       "type": "integer",
-                      "format": "int64"
+                      "format": "int64",
+                      "description": "Distinct agents written, not writes performed. Every field in one patch targets the same cohort, so this is the cohort size rather than fields x agents.\n"
                     }
                   }
                 }
