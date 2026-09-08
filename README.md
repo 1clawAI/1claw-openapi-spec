@@ -1,4 +1,4 @@
-# @1claw/openapi-spec (v0.60.0)
+# @1claw/openapi-spec (v0.61.0)
 
 > ⭐ **Star [1clawAI/agent-templates](https://github.com/1clawAI/agent-templates)** — ready-to-run agent templates wired to 1Claw. It is our single starred repo.
 
@@ -42,7 +42,7 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
-## What's in the spec (v0.60.0)
+## What's in the spec (v0.61.0)
 
 Additive only — no path or parameter renames, so generated clients keep compiling.
 

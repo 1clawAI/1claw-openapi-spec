@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.60.0"
+    version: "0.61.0"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -9896,6 +9896,30 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/agents/{agent_id}/pay/settings:
+        patch:
+            tags: [Pay]
+            summary: Set an agent's payment guardrails
+            description: >
+                Human callers only. These are the numbers every payment decision
+                is measured against — the per-payment cap, the daily limit, the
+                recipient allowlist, whether a passkey is required at all, and
+                whether the agent may hold a spending grant. An agent that could
+                set them would be setting its own ceiling.
+                Omitted fields are left alone; values can currently be set but
+                not cleared.
+            operationId: updatePaySettings
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdatePayGuardrailsRequest"
+            responses:
+                "200": { description: Updated guardrails }
+                "403": { description: Not a human caller }
     /v1/agents/{agent_id}/pay/prepare:
         post:
             tags: [Pay]
@@ -16881,6 +16905,26 @@ components:
                         $ref: "#/components/schemas/ProblemDetails"
 
     schemas:
+        UpdatePayGuardrailsRequest:
+            type: object
+            properties:
+                pay_enabled: { type: boolean }
+                pay_max_usd: { type: string, nullable: true }
+                pay_daily_limit_usd: { type: string, nullable: true }
+                pay_payto_allowlist:
+                    type: array
+                    nullable: true
+                    items: { type: string }
+                    description: >
+                        Recipients an unattended agent may pay. Null is not a
+                        wildcard — for an unattended agent it means no one.
+                pay_require_passkey:
+                    type: boolean
+                    description: Defaults true. Turning it off is what "unattended" means.
+                pay_require_approval: { type: boolean }
+                pay_grant_mode_enabled: { type: boolean }
+                pay_grant_max_usd: { type: string, nullable: true }
+                pay_grant_max_ttl_secs: { type: integer, nullable: true }
         PayPrepareRequest:
             type: object
             required: [challenge_b64, method, resource_url]
