@@ -10046,6 +10046,33 @@ paths:
             responses:
                 "200": { description: Quote and status, rendered from the stored preimage }
                 "403": { description: Not a human caller, or the session was raised for someone else }
+    /v1/pay-sessions/{session_id}/authorize:
+        post:
+            tags: [Pay]
+            summary: Authorize a pay session with a passkey assertion
+            description: >
+                Called by the authorize page after the person touches their
+                authenticator. The assertion is redeemed here against this
+                session's own payment digest and the session is marked
+                authorized; no token is handed back to be polled for, so nothing
+                worth stealing is left in the row. Requires the token of the
+                human the session was raised for.
+            operationId: authorizePaySession
+            parameters:
+                - name: session_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+                - name: X-Passkey-Token
+                  in: header
+                  required: true
+                  schema: { type: string }
+            responses:
+                "200": { description: Session authorized }
+                "403":
+                    description: >
+                        Not a human caller, the session belongs to someone else,
+                        or the assertion does not authorize this payment.
     /v1/pay-grants/{grant_id}:
         delete:
             tags: [Pay]
