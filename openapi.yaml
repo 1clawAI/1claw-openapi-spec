@@ -18083,6 +18083,47 @@ components:
             type: object
             required: [name]
             properties:
+                default_llm_provider:
+                    type: string
+                    description: Default LLM provider for automations and Shroud.
+                default_llm_model:
+                    type: string
+                    description: Default LLM model for automations and Shroud.
+                discoverable:
+                    type: boolean
+                    description: List this agent in the cross-org agent directory.
+                public_description:
+                    type: string
+                    description: Description shown on the public directory listing.
+                public_tags:
+                    type: array
+                    items:
+                        type: string
+                    description: Tags shown on the public directory listing.
+                skip_default_policy:
+                    type: boolean
+                    description: Skip creating the default access policy for this agent.
+                address_screening_policy:
+                    type: object
+                    additionalProperties: true
+                    description: Address screening policy applied to transaction recipients.
+                memory_enabled:
+                    type: boolean
+                    description: >-
+                        Enable durable key-value and semantic memory for this agent.
+                        Required before PUT /v1/agents/{agent_id}/memory/{namespace}/{key}
+                        will accept a write; without it that endpoint returns 403.
+                memory_namespace_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Namespaces this agent may use. Empty or omitted means unrestricted.
+                memory_max_entry_bytes:
+                    type: [integer, "null"]
+                    format: int32
+                    description: >-
+                        Maximum size of a single memory entry value. Null uses the
+                        platform default (64 KiB).
                 name:
                     type: string
                 description:
@@ -18323,6 +18364,70 @@ components:
         UpdateAgentRequest:
             type: object
             properties:
+                smart_account_address:
+                    type: string
+                    description: Smart account address associated with this agent.
+                smart_account_chain:
+                    type: string
+                    description: Chain name for the smart account.
+                smart_account_chain_id:
+                    type: integer
+                    format: int32
+                    description: EVM chain id for the smart account.
+                smart_account_nonce:
+                    type: string
+                    description: Smart account deployment nonce.
+                smart_account_init_data:
+                    type: object
+                    additionalProperties: true
+                    description: Smart account initialisation data.
+                message_signing_enabled:
+                    type: boolean
+                    description: Allow this agent to sign arbitrary messages.
+                eip712_domain_allowlist:
+                    type: object
+                    additionalProperties: true
+                    description: EIP-712 domains this agent may sign under.
+                eip712_default_policy:
+                    type: string
+                    description: Default policy applied to EIP-712 signing requests.
+                raw_signing_enabled:
+                    type: boolean
+                    description: Allow this agent to sign raw digests.
+                default_llm_provider:
+                    type: [string, "null"]
+                    description: Default LLM provider for automations and Shroud.
+                default_llm_model:
+                    type: [string, "null"]
+                    description: Default LLM model for automations and Shroud.
+                discoverable:
+                    type: boolean
+                    description: List this agent in the cross-org agent directory.
+                public_description:
+                    type: [string, "null"]
+                    description: Description shown on the public directory listing.
+                public_tags:
+                    type: array
+                    items:
+                        type: string
+                    description: Tags shown on the public directory listing.
+                memory_enabled:
+                    type: boolean
+                    description: >-
+                        Enable durable key-value and semantic memory for this agent.
+                        Required before PUT /v1/agents/{agent_id}/memory/{namespace}/{key}
+                        will accept a write; without it that endpoint returns 403.
+                memory_namespace_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: Namespaces this agent may use. Empty or omitted means unrestricted.
+                memory_max_entry_bytes:
+                    type: [integer, "null"]
+                    format: int32
+                    description: >-
+                        Maximum size of a single memory entry value. Null uses the
+                        platform default (64 KiB).
                 name:
                     type: string
                 scopes:
@@ -18586,6 +18691,25 @@ components:
                     created_at,
                 ]
             properties:
+                memory_enabled:
+                    type: boolean
+                    description: >-
+                        Whether durable key-value and semantic memory is enabled.
+                        Omitted when false: the server skips serializing this field
+                        unless it is true, so an absent key means disabled.
+                memory_namespace_allowlist:
+                    type: array
+                    items:
+                        type: string
+                    description: >-
+                        Namespaces this agent may use. Omitted when empty, which
+                        means unrestricted.
+                memory_max_entry_bytes:
+                    type: [integer, "null"]
+                    format: int32
+                    description: >-
+                        Maximum size of a single memory entry value. Omitted when
+                        unset, which means the platform default (64 KiB).
                 id:
                     type: string
                     format: uuid
@@ -25132,8 +25256,7 @@ components:
                 name:
                     type: string
                 public_description:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 public_tags:
                     type: array
                     items:
