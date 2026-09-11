@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.1",
+    "version": "0.61.2",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -26896,17 +26896,25 @@
       },
       "AgentTokenRequest": {
         "type": "object",
-        "required": [
-          "api_key"
-        ],
+        "description": "Exactly one credential, decided by the agent's auth_method: api_key for api_key agents, oidc_token for oidc_client_credentials agents. mTLS agents send neither and present a client certificate through the TLS terminator.",
         "properties": {
           "agent_id": {
             "type": "string",
             "format": "uuid",
-            "description": "Optional when using key-only auth (ocv_ keys auto-resolve agent)"
+            "description": "Optional for api_key agents (ocv_ keys auto-resolve from their prefix). Required for OIDC and mTLS agents, which have no key to look up by."
           },
           "api_key": {
-            "type": "string"
+            "type": "string",
+            "description": "The ocv_ key, for auth_method api_key."
+          },
+          "oidc_token": {
+            "type": "string",
+            "description": "Token minted by the agent's OIDC provider, for auth_method oidc_client_credentials. Verified against the issuer and audience on the agent record, so nothing long-lived is stored where the agent runs."
+          },
+          "dpop_jwk": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Optional DPoP public key (JWK) binding the issued JWT to a client keypair."
           }
         }
       },

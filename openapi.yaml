@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.1"
+    version: "0.61.2"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -17267,15 +17267,35 @@ components:
 
         AgentTokenRequest:
             type: object
-            required: [api_key]
+            description: >-
+                Exactly one credential, decided by the agent's auth_method:
+                api_key for api_key agents, oidc_token for
+                oidc_client_credentials agents. mTLS agents send neither and
+                present a client certificate through the TLS terminator.
             properties:
                 agent_id:
                     type: string
                     format: uuid
-                    description: Optional when using key-only auth (ocv_ keys auto-resolve agent)
+                    description: >-
+                        Optional for api_key agents (ocv_ keys auto-resolve from
+                        their prefix). Required for OIDC and mTLS agents, which
+                        have no key to look up by.
                 api_key:
                     type: string
-
+                    description: The ocv_ key, for auth_method api_key.
+                oidc_token:
+                    type: string
+                    description: >-
+                        Token minted by the agent's OIDC provider, for
+                        auth_method oidc_client_credentials. Verified against the
+                        issuer and audience on the agent record, so nothing
+                        long-lived is stored where the agent runs.
+                dpop_jwk:
+                    type: object
+                    additionalProperties: true
+                    description: >-
+                        Optional DPoP public key (JWK) binding the issued JWT to
+                        a client keypair.
         UserApiKeyTokenRequest:
             type: object
             required: [api_key]
