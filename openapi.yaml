@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.6"
+    version: "0.61.7"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -16230,6 +16230,106 @@ paths:
                     description: Unauthenticated
                 '403':
                     description: Not a human user
+    /v1/org/settings/otel-export:
+        get:
+            tags: [Observability]
+            summary: "Read the org's OTLP export configuration"
+            description: >-
+                Owner or admin, Team tier and above. Returns header *names*
+                only — the values are the customer's collector credentials and
+                never round-trip through the browser.
+            operationId: get_otel_export_config
+            responses:
+                '200':
+                    description: Current config, or null when unconfigured
+                    content:
+                        application/json:
+                            schema:
+                                nullable: true
+                                type: object
+                                properties:
+                                    enabled: { type: boolean }
+                                    endpoint: { type: string }
+                                    header_names: { type: array, items: { type: string } }
+                                    resource_attributes: { type: object, additionalProperties: { type: string } }
+                                    signal_filter:
+                                        type: array
+                                        items: { type: string, enum: [spans, metrics, logs] }
+                '401': { description: Unauthenticated }
+                '402': { description: Requires the Team plan or higher }
+                '403': { description: Not an owner or admin }
+        patch:
+            tags: [Observability]
+            summary: "Update the org's OTLP export configuration"
+            description: >-
+                Every field is optional and only present fields change. The
+                endpoint is validated *and DNS-resolved* on save: HTTPS only, no
+                embedded credentials, and refused if any resolved address is
+                private, loopback, link-local, metadata or ULA. A URL that
+                resolves to a private address is the SSRF, and it is refused
+                here rather than left in the database looking configured.
+
+
+                `headers` replaces the whole map when present and is encrypted
+                at rest under the org's key. Omit it to change other fields
+                without touching stored header values you cannot read back.
+
+
+                Transport is OTLP over HTTP with JSON encoding, posted to
+                `<endpoint>/v1/traces`, `/v1/metrics` and `/v1/logs`. What
+                leaves is exactly what the org's own dashboard stream carries —
+                signals already through the collector's redaction pass.
+            operationId: patch_otel_export_config
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                enabled: { type: boolean }
+                                endpoint: { type: string, format: uri, description: "HTTPS only." }
+                                headers:
+                                    type: object
+                                    additionalProperties: { type: string }
+                                    description: "Sent on every export request, e.g. an Authorization header. Reserved hop-by-hop names are refused."
+                                resource_attributes: { type: object, additionalProperties: { type: string } }
+                                signal_filter:
+                                    type: array
+                                    minItems: 1
+                                    items: { type: string, enum: [spans, metrics, logs] }
+            responses:
+                '200':
+                    description: The updated config, header names only
+                '400': { description: Endpoint refused (scheme, credentials, private or unresolvable host), reserved header, or enabling with no endpoint }
+                '401': { description: Unauthenticated }
+                '402': { description: Requires the Team plan or higher }
+                '403': { description: Not an owner or admin }
+    /v1/org/settings/otel-export/test:
+        post:
+            tags: [Observability]
+            summary: "Send one synthetic span to the configured endpoint"
+            description: >-
+                Re-resolves the endpoint at send time and pins the connection to
+                the resolved address, with redirects disabled. Rate-limited to 5
+                per minute per org: even a validated endpoint is an outbound
+                request the caller chose the target of.
+            operationId: test_otel_export
+            responses:
+                '200':
+                    description: The collector's HTTP status for the probe
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    endpoint: { type: string }
+                                    status: { type: integer }
+                                    ok: { type: boolean }
+                '400': { description: Not configured, or the send failed }
+                '401': { description: Unauthenticated }
+                '402': { description: Requires the Team plan or higher }
+                '403': { description: Not an owner or admin }
+                '429': { description: More than 5 test sends this minute }
     /v1/otel/metrics:
         get:
             tags: [Observability]
