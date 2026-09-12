@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.5"
+    version: "0.61.6"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -16226,6 +16226,78 @@ paths:
                                         resolved_by: { type: string, nullable: true }
                                         created_at: { type: string, format: date-time }
                                         updated_at: { type: string, format: date-time }
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Not a human user
+    /v1/otel/metrics:
+        get:
+            tags: [Observability]
+            summary: "Time-bucketed rollups from durable tables"
+            description: >-
+                Volume, denials and latency over a window. Sourced from durable
+                tables, never from in-process counters: an in-memory histogram
+                is per-replica and resets on deploy, so a 24h chart drawn from
+                one disagrees between instances and is wrong after every
+                release.
+
+
+                Every bucket in the range is returned, including empty ones. A
+                quiet hour is a zero, not a missing point — a line chart given a
+                hole joins across it as though nothing happened.
+
+
+                `step` may be widened from what was requested when the window
+                would otherwise produce more than 500 buckets. The response
+                echoes the window and step actually used, so a chart can label
+                its own resolution rather than the one it asked for.
+            operationId: get_otel_metrics
+            parameters:
+                - name: window
+                  in: query
+                  required: false
+                  description: "Lookback, e.g. `30m`, `24h`, `7d`. Default 24h, maximum 30d."
+                  schema: { type: string, default: "24h" }
+                - name: step
+                  in: query
+                  required: false
+                  description: "Bucket width. Defaults to a twenty-fourth of the window, minimum 60s."
+                  schema: { type: string }
+            responses:
+                '200':
+                    description: Bucketed metrics
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [window, buckets, total_executions, total_denials]
+                                properties:
+                                    window:
+                                        type: object
+                                        description: The window and step actually used.
+                                        properties:
+                                            window_secs: { type: integer }
+                                            step_secs: { type: integer }
+                                    buckets:
+                                        type: array
+                                        items:
+                                            type: object
+                                            required: [t, executions, denials, transactions, llm_calls]
+                                            properties:
+                                                t: { type: string, format: date-time }
+                                                executions: { type: integer }
+                                                denials: { type: integer }
+                                                transactions: { type: integer }
+                                                llm_calls: { type: integer }
+                                    latency_p50_ms:
+                                        type: number
+                                        nullable: true
+                                        description: Null when nothing in the window recorded a duration.
+                                    latency_p95_ms: { type: number, nullable: true }
+                                    total_executions: { type: integer }
+                                    total_denials: { type: integer }
+                '400':
+                    description: Unparseable window or step, window over 30d, or step larger than window
                 '401':
                     description: Unauthenticated
                 '403':
