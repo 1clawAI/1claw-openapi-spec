@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.3",
+    "version": "0.61.4",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -25108,6 +25108,204 @@
           },
           "429": {
             "description": "Too many concurrent streams for this user"
+          }
+        }
+      }
+    },
+    "/otel/v1/threats": {
+      "get": {
+        "tags": [
+          "Observability"
+        ],
+        "summary": "Durable threat register for the org, worst reach first",
+        "description": "Threats are ranked by blast radius — the size of the affected agent's topology neighbourhood (vaults + connectors + chains) — not by recency or severity alone, so the row an operator should look at first is first. Ties fall back to recency.\n\n`shadow: true` marks a threat the trust engine produced while running in recommend-only mode. Those are shown with a badge and never acted on automatically.\n\nEvidence carries trace and span ids and a note. It never contains secret values or HTTP bodies.",
+        "operationId": "list_otel_threats",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "`open` (default) returns anything not yet resolved; `all` includes resolved.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Threats, highest blast radius first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "agent_id",
+                      "class",
+                      "severity",
+                      "detected_by",
+                      "status",
+                      "shadow",
+                      "blast_radius",
+                      "blast_radius_size"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "agent_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "class": {
+                        "type": "string",
+                        "enum": [
+                          "prompt_injection",
+                          "policy_breach",
+                          "spend_anomaly",
+                          "key_exfil",
+                          "off_hours",
+                          "consensus_bypass",
+                          "trust_breach"
+                        ]
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": [
+                          "critical",
+                          "warn"
+                        ]
+                      },
+                      "detected_by": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "open",
+                          "acknowledged",
+                          "resolved"
+                        ]
+                      },
+                      "shadow": {
+                        "type": "boolean"
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "items": {
+                          "type": "object"
+                        }
+                      },
+                      "blast_radius": {
+                        "type": "object",
+                        "properties": {
+                          "vaults": {
+                            "type": "integer"
+                          },
+                          "connectors": {
+                            "type": "integer"
+                          },
+                          "chains": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "blast_radius_size": {
+                        "type": "integer",
+                        "description": "Sum of the blast radius. The sort key."
+                      },
+                      "resolved_by": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Not a human user"
+          }
+        }
+      }
+    },
+    "/otel/v1/summary": {
+      "get": {
+        "tags": [
+          "Observability"
+        ],
+        "summary": "Posture score and the counts behind it",
+        "description": "`posture_score` is the mean agent trust score, less a penalty per open critical threat scaled by the fraction of the organization that threat can reach. Scaling by fraction rather than count is what makes the number comparable between a seven-agent org and a fifty-agent one.\n\nIt returns 100 when there are no agents, and also while the trust engine is still in shadow mode and no scores exist yet — absence of data is not evidence of compromise. It never goes below 0.\n\n`top_threats` uses the same ranking as `/otel/v1/threats`, so clicking through from the summary lands on the same first row.",
+        "operationId": "get_otel_summary",
+        "responses": {
+          "200": {
+            "description": "Posture summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "posture_score",
+                    "open_threats",
+                    "open_critical",
+                    "pending_approvals",
+                    "agent_count",
+                    "top_threats"
+                  ],
+                  "properties": {
+                    "posture_score": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "open_threats": {
+                      "type": "integer"
+                    },
+                    "open_critical": {
+                      "type": "integer"
+                    },
+                    "pending_approvals": {
+                      "type": "integer"
+                    },
+                    "agent_count": {
+                      "type": "integer"
+                    },
+                    "top_threats": {
+                      "type": "array",
+                      "description": "At most five, same ranking as /otel/v1/threats.",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Not a human user"
           }
         }
       }
