@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.4"
+    version: "0.61.5"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -16118,7 +16118,7 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
-    /otel/v1/stream:
+    /v1/otel/stream:
         get:
             tags: [Observability]
             summary: "SSE stream of this org's telemetry signals"
@@ -16166,7 +16166,7 @@ paths:
                     description: Not a human user, or fixtures are not available here
                 '429':
                     description: Too many concurrent streams for this user
-    /otel/v1/threats:
+    /v1/otel/threats:
         get:
             tags: [Observability]
             summary: "Durable threat register for the org, worst reach first"
@@ -16230,7 +16230,7 @@ paths:
                     description: Unauthenticated
                 '403':
                     description: Not a human user
-    /otel/v1/summary:
+    /v1/otel/summary:
         get:
             tags: [Observability]
             summary: "Posture score and the counts behind it"
@@ -16248,7 +16248,7 @@ paths:
                 below 0.
 
 
-                `top_threats` uses the same ranking as `/otel/v1/threats`, so
+                `top_threats` uses the same ranking as `/v1/otel/threats`, so
                 clicking through from the summary lands on the same first row.
             operationId: get_otel_summary
             responses:
@@ -16267,13 +16267,13 @@ paths:
                                     agent_count: { type: integer }
                                     top_threats:
                                         type: array
-                                        description: At most five, same ranking as /otel/v1/threats.
+                                        description: At most five, same ranking as /v1/otel/threats.
                                         items: { type: object }
                 '401':
                     description: Unauthenticated
                 '403':
                     description: Not a human user
-    /otel/v1/topology:
+    /v1/otel/topology:
         get:
             tags: [Observability]
             summary: "Agent, vault, policy, connector and chain graph for the org"
