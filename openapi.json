@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.7",
+    "version": "0.61.8",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -25541,6 +25541,109 @@
           },
           "400": {
             "description": "Unparseable window or step, window over 30d, or step larger than window"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Not a human user"
+          }
+        }
+      }
+    },
+    "/v1/otel/flows": {
+      "get": {
+        "tags": [
+          "Observability"
+        ],
+        "summary": "Who actually read from which vault",
+        "description": "Reachability (the topology's policy edges) says who *could* read a vault. This says who *did*, counted from `audit_events.action = 'secret.read'` — the durable record every read already writes — grouped by agent and vault. That is what lets a Sankey ribbon's width be a count of real reads rather than a guess.\n\nAgent actors only; a human reading a secret through the dashboard is not an agent flow. Deleted agents and vaults are kept and labelled as such — a read that happened is still a read.",
+        "operationId": "get_otel_flows",
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "description": "Lookback, e.g. `1h`, `24h`, `7d`. Default 24h, maximum 30d.",
+            "schema": {
+              "type": "string",
+              "default": "24h"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read flows, highest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "window",
+                    "edges",
+                    "total_reads"
+                  ],
+                  "properties": {
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "window_secs": {
+                          "type": "integer"
+                        },
+                        "step_secs": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "edges": {
+                      "type": "array",
+                      "maxItems": 500,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "agent_id",
+                          "agent_name",
+                          "vault_id",
+                          "vault_name",
+                          "reads",
+                          "distinct_paths"
+                        ],
+                        "properties": {
+                          "agent_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "agent_name": {
+                            "type": "string"
+                          },
+                          "vault_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "vault_name": {
+                            "type": "string"
+                          },
+                          "reads": {
+                            "type": "integer",
+                            "description": "secret.read events in the window."
+                          },
+                          "distinct_paths": {
+                            "type": "integer",
+                            "description": "Distinct secret paths touched."
+                          }
+                        }
+                      }
+                    },
+                    "total_reads": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unparseable window or window over 30d"
           },
           "401": {
             "description": "Unauthenticated"
