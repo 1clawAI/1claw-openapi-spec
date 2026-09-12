@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.2"
+    version: "0.61.3"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -16118,6 +16118,136 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /otel/v1/stream:
+        get:
+            tags: [Observability]
+            summary: "SSE stream of this org's telemetry signals"
+            description: >-
+                Server-sent events carrying spans, metrics and events for the
+                caller's organization. Human users only: an agent must not be
+                able to subscribe to org-wide telemetry.
+
+
+                Every message carries an `id:` field. On reconnect, send the
+                last one back as the `Last-Event-ID` header to resume. If that
+                id has fallen out of the server's buffer, or came from another
+                replica, the stream opens with an `event: gap` message and the
+                client must refetch topology rather than assume continuity. A
+                `gap` is also emitted, without closing the connection, when a
+                subscriber falls behind.
+            operationId: stream_otel_signals
+            parameters:
+                - name: fixture
+                  in: query
+                  required: false
+                  description: >-
+                      Set to `1` to request synthetic data. Available only on
+                      deployments with fixtures enabled, or to callers in the
+                      platform organization; refused with 403 otherwise.
+                  schema:
+                      type: string
+                      enum: ["1", "true"]
+                - name: Last-Event-ID
+                  in: header
+                  required: false
+                  description: Resume after this event id.
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: An event stream
+                    content:
+                        text/event-stream:
+                            schema:
+                                type: string
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Not a human user, or fixtures are not available here
+                '429':
+                    description: Too many concurrent streams for this user
+    /otel/v1/topology:
+        get:
+            tags: [Observability]
+            summary: "Agent, vault, policy, connector and chain graph for the org"
+            description: >-
+                A snapshot of the organization's resources and how they connect.
+                Human users only.
+
+
+                Capped at 500 nodes. When the cap applies, `truncated` is true
+                and `total_nodes` reports the count before capping — a client
+                must not present a truncated graph as complete. Agents are kept
+                in preference to everything else, and edges that lose an
+                endpoint to the cap are removed.
+
+
+                Agent `status` is derived at request time, never stored, so it
+                cannot go stale.
+            operationId: get_otel_topology
+            parameters:
+                - name: fixture
+                  in: query
+                  required: false
+                  description: >-
+                      Set to `1` to request a synthetic graph. Same gating as
+                      the stream endpoint. A fixture response carries
+                      `fixture: true`.
+                  schema:
+                      type: string
+                      enum: ["1", "true"]
+            responses:
+                '200':
+                    description: Topology snapshot
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [nodes, edges, truncated, total_nodes]
+                                properties:
+                                    nodes:
+                                        type: array
+                                        items:
+                                            type: object
+                                            required: [id, kind, label]
+                                            properties:
+                                                id:
+                                                    type: string
+                                                    description: Namespaced by kind, e.g. `agent:<uuid>`.
+                                                kind:
+                                                    type: string
+                                                    enum: [agent, vault, policy, connector, chain]
+                                                label:
+                                                    type: string
+                                                status:
+                                                    type: string
+                                                    description: Agents only. Derived, not stored.
+                                                    enum: [compromised, warn, suspended, ok]
+                                    edges:
+                                        type: array
+                                        items:
+                                            type: object
+                                            required: [from, to, kind]
+                                            properties:
+                                                from:
+                                                    type: string
+                                                to:
+                                                    type: string
+                                                kind:
+                                                    type: string
+                                                    enum: [calls, grants, holds, signs]
+                                    truncated:
+                                        type: boolean
+                                    total_nodes:
+                                        type: integer
+                                        description: Node count before the cap.
+                                    fixture:
+                                        type: boolean
+                                        description: Present and true only for synthetic data.
+                '401':
+                    description: Unauthenticated
+                '403':
+                    description: Not a human user, or fixtures are not available here
     /v1/runtimes/{runtime_id}/logs/stream:
         parameters:
             - name: runtime_id
