@@ -25686,6 +25686,12 @@
                               "suspended",
                               "ok"
                             ]
+                          },
+                          "trust": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Agents only. Absent until the trust engine has scored the agent."
                           }
                         }
                       }

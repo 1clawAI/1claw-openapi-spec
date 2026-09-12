@@ -16502,6 +16502,11 @@ paths:
                                                     type: string
                                                     description: Agents only. Derived, not stored.
                                                     enum: [compromised, warn, suspended, ok]
+                                                trust:
+                                                    type: integer
+                                                    minimum: 0
+                                                    maximum: 100
+                                                    description: Agents only. Absent until the trust engine has scored the agent.
                                     edges:
                                         type: array
                                         items:
