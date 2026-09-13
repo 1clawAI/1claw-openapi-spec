@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.8",
+    "version": "0.61.9",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -25547,6 +25547,154 @@
           },
           "403": {
             "description": "Not a human user"
+          }
+        }
+      }
+    },
+    "/v1/otel/agents/{agent_id}/trust": {
+      "get": {
+        "tags": [
+          "Observability"
+        ],
+        "summary": "The breakdown behind one agent's trust score",
+        "description": "The topology carries a single 0-100 trust number per agent. This is what it is made of: each weighted component (`null` when this deployment has no source for it — not measured, not zero), a 24-hour history for a sparkline, and the agent's last audit actions. Actions and resource types only; audit `metadata` is where secret paths live and it is not returned.\n\nScores are `shadow` until the engine is promoted out of recommend-only mode; an agent the engine has not yet reached returns `score: null` and `shadow: true`.\n\nHuman users only. An agent id outside the caller's org is a 404, not a 403, so the response does not confirm the id exists.",
+        "operationId": "get_otel_agent_trust",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current score, components, history, recent actions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "agent_id",
+                    "shadow",
+                    "components",
+                    "history",
+                    "recent"
+                  ],
+                  "properties": {
+                    "agent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "score": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "nullable": true
+                    },
+                    "shadow": {
+                      "type": "boolean",
+                      "description": "True while the engine is recommend-only or the agent is unscored."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "components": {
+                      "type": "object",
+                      "description": "0-100 per component; null means no source in this deployment.",
+                      "properties": {
+                        "denial_rate": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "threat_hits": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "egress_blocks": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "spend_velocity": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "off_hours": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "consensus_bypass": {
+                          "type": "integer",
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "history": {
+                      "type": "array",
+                      "maxItems": 96,
+                      "description": "Oldest first, last 24 hours.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "at",
+                          "score"
+                        ],
+                        "properties": {
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "score": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          }
+                        }
+                      }
+                    },
+                    "recent": {
+                      "type": "array",
+                      "maxItems": 12,
+                      "description": "Newest first.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "at",
+                          "action"
+                        ],
+                        "properties": {
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "resource_type": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Not a human user"
+          },
+          "404": {
+            "description": "No such agent in the caller's organization"
           }
         }
       }
