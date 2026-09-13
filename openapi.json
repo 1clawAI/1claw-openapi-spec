@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.11",
+    "version": "0.61.12",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -5882,6 +5882,135 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/admin/agents/{agent_id}/reports/dismiss": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Dismiss every open report on a directory listing",
+        "description": "Platform admins only. Clears the listing's report flag and recounts. The review queue is a platform function — an org dismissing reports against its own agent is the abuse the queue exists to catch.\n",
+        "operationId": "adminDismissAgentReports",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reports dismissed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "dismissed": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a platform admin"
+          },
+          "404": {
+            "description": "Agent not found"
+          }
+        }
+      }
+    },
+    "/v1/admin/agents/{agent_id}/verification-tier": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Set a directory listing's verification tier",
+        "description": "Platform admins only. Unknown tiers are refused rather than demoted to `unverified`.",
+        "operationId": "adminSetAgentVerificationTier",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "tier"
+                ],
+                "properties": {
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "unverified",
+                      "platform_reviewed",
+                      "identity_verified",
+                      "enterprise"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Internal review notes",
+                    "never public": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tier set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "tier": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown tier"
+          },
+          "403": {
+            "description": "Not a platform admin"
+          },
+          "404": {
+            "description": "Agent not found"
           }
         }
       }
@@ -15467,6 +15596,89 @@
           },
           "409": {
             "description": "ChallengeExpired. Re-fetch the resource for a fresh 402 and prepare again — re-preparing from the stored bytes would reproduce the same expired window.\n"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/pay/grants/prepare": {
+      "post": {
+        "tags": [
+          "Pay"
+        ],
+        "summary": "Prepare a spending grant (step one of two)",
+        "description": "Fixes the grant terms and a server-side nonce and returns the `grant_digest` the person must assert over with a passkey (`action=x402_grant`). Then call `POST .../pay/grants` with the same terms, the digest, and the passkey token. Preparations are single-use, bound to the caller and agent, and expire after ten minutes. The nonce never leaves the server, so the digest cannot be recomputed for different terms. Human callers only; terms are validated against the agent's maximum cap and window here as well.\n",
+        "operationId": "preparePayGrant",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cap_usd",
+                  "ttl_secs"
+                ],
+                "properties": {
+                  "cap_usd": {
+                    "type": "string"
+                  },
+                  "ttl_secs": {
+                    "type": "integer"
+                  },
+                  "allowed_paytos": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The digest to assert over",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "grant_digest",
+                    "action",
+                    "expires_in_secs"
+                  ],
+                  "properties": {
+                    "grant_digest": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "x402_grant"
+                      ]
+                    },
+                    "expires_in_secs": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid terms"
+          },
+          "403": {
+            "description": "Not a human caller",
+            "grant mode disabled": null,
+            "or over the agent's maximum": null
           }
         }
       }
