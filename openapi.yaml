@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.9"
+    version: "0.61.10"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -15877,6 +15877,151 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /v1/platform/connections/{connection_id}/otel/topology:
+        get:
+            tags: [Platform, Observability]
+            summary: "Topology for one connection's agents"
+            description: >-
+                The same graph as `/v1/otel/topology`, restricted to what this
+                connection's agents reach: the agents, the policies they hold,
+                the vaults those grant, the chains they sign on and the systems
+                they call. Restricted before the 500-node cap, so a large org's
+                cap cannot cut the connection's own agents out. Walking is
+                directed (agent → policy → vault), so a vault shared with
+                another tenant's agent does not reveal that agent.
+
+
+                A `plt_` key sees one connection's agents, never the end-user's org:
+                that org may hold agents from other platforms or the user's
+                own. The set is agents attributed to the connection plus the
+                ones listed on it, constrained to the connection's org. A
+                connection that does not belong to the calling app is a 404.
+            operationId: get_platform_connection_otel_topology
+            parameters:
+                - name: connection_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                '200':
+                    description: Nodes and edges reachable from the connection's agents
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/paths/~1v1~1otel~1topology/get/responses/200/content/application~1json/schema'
+                '401': { description: Unauthenticated }
+                '403': { description: Not a plt_ key }
+                '404': { description: Connection not found for this app }
+    /v1/platform/connections/{connection_id}/otel/threats:
+        get:
+            tags: [Platform, Observability]
+            summary: "Open threats on one connection's agents"
+            description: >-
+                `/v1/otel/threats` filtered to the connection's agents, same
+                ranking (blast radius, then recency).
+
+
+                A `plt_` key sees one connection's agents, never the end-user's org:
+                that org may hold agents from other platforms or the user's
+                own. The set is agents attributed to the connection plus the
+                ones listed on it, constrained to the connection's org. A
+                connection that does not belong to the calling app is a 404.
+            operationId: get_platform_connection_otel_threats
+            parameters:
+                - name: connection_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+                - name: state
+                  in: query
+                  required: false
+                  schema:
+                      type: string
+                      enum: [open, all]
+            responses:
+                '200':
+                    description: Threats on the connection's agents, highest blast radius first
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/paths/~1v1~1otel~1threats/get/responses/200/content/application~1json/schema'
+                '401': { description: Unauthenticated }
+                '403': { description: Not a plt_ key }
+                '404': { description: Connection not found for this app }
+    /v1/platform/connections/{connection_id}/otel/summary:
+        get:
+            tags: [Platform, Observability]
+            summary: "Posture score and counts for one connection's agents"
+            description: >-
+                `/v1/otel/summary` over a smaller world: the posture score uses
+                the connection's agents' trust scores and the resources they
+                reach; threat and pending-approval counts are the connection's
+                agents' only.
+
+
+                A `plt_` key sees one connection's agents, never the end-user's org:
+                that org may hold agents from other platforms or the user's
+                own. The set is agents attributed to the connection plus the
+                ones listed on it, constrained to the connection's org. A
+                connection that does not belong to the calling app is a 404.
+            operationId: get_platform_connection_otel_summary
+            parameters:
+                - name: connection_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                '200':
+                    description: Posture and counts for the connection
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/paths/~1v1~1otel~1summary/get/responses/200/content/application~1json/schema'
+                '401': { description: Unauthenticated }
+                '403': { description: Not a plt_ key }
+                '404': { description: Connection not found for this app }
+    /v1/platform/connections/{connection_id}/otel/stream:
+        get:
+            tags: [Platform, Observability]
+            summary: "Live signal stream for one connection's agents (SSE)"
+            description: >-
+                The same protocol as `/v1/otel/stream` — `Last-Event-ID` resume,
+                `event: gap` on a stale cursor or a lagged subscriber — filtered
+                to signals whose agent is one of the connection's. Signals with
+                no agent (a human's own dashboard actions) are never emitted
+                here. The agent set is fixed at connect time; an agent added
+                later appears on the next connect.
+
+
+                Stream slots are counted per platform app (five), not per
+                connection.
+
+
+                A `plt_` key sees one connection's agents, never the end-user's org:
+                that org may hold agents from other platforms or the user's
+                own. The set is agents attributed to the connection plus the
+                ones listed on it, constrained to the connection's org. A
+                connection that does not belong to the calling app is a 404.
+            operationId: get_platform_connection_otel_stream
+            parameters:
+                - name: connection_id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+                - name: Last-Event-ID
+                  in: header
+                  required: false
+                  schema: { type: string }
+            responses:
+                '200':
+                    description: text/event-stream
+                    content:
+                        text/event-stream:
+                            schema: { type: string }
+                '401': { description: Unauthenticated }
+                '403': { description: Not a plt_ key }
+                '404': { description: Connection not found for this app }
+                '429': { description: Stream slot cap for this app reached }
     /v1/platform/connections/{connection_id}/resources:
         parameters:
             - name: connection_id
