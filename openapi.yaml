@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.10"
+    version: "0.61.11"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -15908,7 +15908,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/paths/~1v1~1otel~1topology/get/responses/200/content/application~1json/schema'
+                                $ref: '#/components/schemas/OtelTopology'
                 '401': { description: Unauthenticated }
                 '403': { description: Not a plt_ key }
                 '404': { description: Connection not found for this app }
@@ -15944,7 +15944,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/paths/~1v1~1otel~1threats/get/responses/200/content/application~1json/schema'
+                                $ref: '#/components/schemas/OtelThreatList'
                 '401': { description: Unauthenticated }
                 '403': { description: Not a plt_ key }
                 '404': { description: Connection not found for this app }
@@ -15976,7 +15976,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/paths/~1v1~1otel~1summary/get/responses/200/content/application~1json/schema'
+                                $ref: '#/components/schemas/OtelSummary'
                 '401': { description: Unauthenticated }
                 '403': { description: Not a plt_ key }
                 '404': { description: Connection not found for this app }
@@ -16344,33 +16344,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: array
-                                items:
-                                    type: object
-                                    required: [id, agent_id, class, severity, detected_by, status, shadow, blast_radius, blast_radius_size]
-                                    properties:
-                                        id: { type: string, format: uuid }
-                                        agent_id: { type: string, format: uuid }
-                                        class:
-                                            type: string
-                                            enum: [prompt_injection, policy_breach, spend_anomaly, key_exfil, off_hours, consensus_bypass, trust_breach]
-                                        severity: { type: string, enum: [critical, warn] }
-                                        detected_by: { type: string }
-                                        status: { type: string, enum: [open, acknowledged, resolved] }
-                                        shadow: { type: boolean }
-                                        evidence: { type: array, items: { type: object } }
-                                        blast_radius:
-                                            type: object
-                                            properties:
-                                                vaults: { type: integer }
-                                                connectors: { type: integer }
-                                                chains: { type: integer }
-                                        blast_radius_size:
-                                            type: integer
-                                            description: Sum of the blast radius. The sort key.
-                                        resolved_by: { type: string, nullable: true }
-                                        created_at: { type: string, format: date-time }
-                                        updated_at: { type: string, format: date-time }
+                                $ref: '#/components/schemas/OtelThreatList'
                 '401':
                     description: Unauthenticated
                 '403':
@@ -16702,18 +16676,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: object
-                                required: [posture_score, open_threats, open_critical, pending_approvals, agent_count, top_threats]
-                                properties:
-                                    posture_score: { type: integer, minimum: 0, maximum: 100 }
-                                    open_threats: { type: integer }
-                                    open_critical: { type: integer }
-                                    pending_approvals: { type: integer }
-                                    agent_count: { type: integer }
-                                    top_threats:
-                                        type: array
-                                        description: At most five, same ranking as /v1/otel/threats.
-                                        items: { type: object }
+                                $ref: '#/components/schemas/OtelSummary'
                 '401':
                     description: Unauthenticated
                 '403':
@@ -16754,53 +16717,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: object
-                                required: [nodes, edges, truncated, total_nodes]
-                                properties:
-                                    nodes:
-                                        type: array
-                                        items:
-                                            type: object
-                                            required: [id, kind, label]
-                                            properties:
-                                                id:
-                                                    type: string
-                                                    description: Namespaced by kind, e.g. `agent:<uuid>`.
-                                                kind:
-                                                    type: string
-                                                    enum: [agent, vault, policy, connector, chain]
-                                                label:
-                                                    type: string
-                                                status:
-                                                    type: string
-                                                    description: Agents only. Derived, not stored.
-                                                    enum: [compromised, warn, suspended, ok]
-                                                trust:
-                                                    type: integer
-                                                    minimum: 0
-                                                    maximum: 100
-                                                    description: Agents only. Absent until the trust engine has scored the agent.
-                                    edges:
-                                        type: array
-                                        items:
-                                            type: object
-                                            required: [from, to, kind]
-                                            properties:
-                                                from:
-                                                    type: string
-                                                to:
-                                                    type: string
-                                                kind:
-                                                    type: string
-                                                    enum: [calls, grants, holds, signs]
-                                    truncated:
-                                        type: boolean
-                                    total_nodes:
-                                        type: integer
-                                        description: Node count before the cap.
-                                    fixture:
-                                        type: boolean
-                                        description: Present and true only for synthetic data.
+                                $ref: '#/components/schemas/OtelTopology'
                 '401':
                     description: Unauthenticated
                 '403':
@@ -17592,6 +17509,95 @@ components:
                         $ref: "#/components/schemas/ProblemDetails"
 
     schemas:
+        OtelTopology:
+            type: object
+            required: [nodes, edges, truncated, total_nodes]
+            properties:
+                nodes:
+                    type: array
+                    items:
+                        type: object
+                        required: [id, kind, label]
+                        properties:
+                            id:
+                                type: string
+                                description: Namespaced by kind, e.g. `agent:<uuid>`.
+                            kind:
+                                type: string
+                                enum: [agent, vault, policy, connector, chain]
+                            label:
+                                type: string
+                            status:
+                                type: string
+                                description: Agents only. Derived, not stored.
+                                enum: [compromised, warn, suspended, ok]
+                            trust:
+                                type: integer
+                                minimum: 0
+                                maximum: 100
+                                description: Agents only. Absent until the trust engine has scored the agent.
+                edges:
+                    type: array
+                    items:
+                        type: object
+                        required: [from, to, kind]
+                        properties:
+                            from:
+                                type: string
+                            to:
+                                type: string
+                            kind:
+                                type: string
+                                enum: [calls, grants, holds, signs]
+                truncated:
+                    type: boolean
+                total_nodes:
+                    type: integer
+                    description: Node count before the cap.
+                fixture:
+                    type: boolean
+                    description: Present and true only for synthetic data.
+        OtelThreatList:
+            type: array
+            items:
+                type: object
+                required: [id, agent_id, class, severity, detected_by, status, shadow, blast_radius, blast_radius_size]
+                properties:
+                    id: { type: string, format: uuid }
+                    agent_id: { type: string, format: uuid }
+                    class:
+                        type: string
+                        enum: [prompt_injection, policy_breach, spend_anomaly, key_exfil, off_hours, consensus_bypass, trust_breach]
+                    severity: { type: string, enum: [critical, warn] }
+                    detected_by: { type: string }
+                    status: { type: string, enum: [open, acknowledged, resolved] }
+                    shadow: { type: boolean }
+                    evidence: { type: array, items: { type: object } }
+                    blast_radius:
+                        type: object
+                        properties:
+                            vaults: { type: integer }
+                            connectors: { type: integer }
+                            chains: { type: integer }
+                    blast_radius_size:
+                        type: integer
+                        description: Sum of the blast radius. The sort key.
+                    resolved_by: { type: string, nullable: true }
+                    created_at: { type: string, format: date-time }
+                    updated_at: { type: string, format: date-time }
+        OtelSummary:
+            type: object
+            required: [posture_score, open_threats, open_critical, pending_approvals, agent_count, top_threats]
+            properties:
+                posture_score: { type: integer, minimum: 0, maximum: 100 }
+                open_threats: { type: integer }
+                open_critical: { type: integer }
+                pending_approvals: { type: integer }
+                agent_count: { type: integer }
+                top_threats:
+                    type: array
+                    description: At most five, same ranking as /v1/otel/threats.
+                    items: { type: object }
         UpdatePayGuardrailsRequest:
             type: object
             properties:
