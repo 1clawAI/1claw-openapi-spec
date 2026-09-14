@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.12",
+    "version": "0.61.13",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -6011,6 +6011,55 @@
           },
           "404": {
             "description": "Agent not found"
+          }
+        }
+      }
+    },
+    "/v1/admin/kms/relevel": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Move orgs onto the KEK protection level their tier and payment call for",
+        "description": "Platform admins only. Examines up to `limit` orgs whose stored KEK level disagrees with the target (Pro earns HSM only with an active subscription; Team, Business and Enterprise keep HSM; the platform org is always software) and starts a migration for each: a new key at the right level, every secret and every org-scoped row re-wrapped, the old key released from the keep set 30 days after completion. The nightly consolidation job runs the same pass, 25 orgs at a time.",
+        "operationId": "adminKmsRelevel",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orgs examined and migrations started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "examined": {
+                      "type": "integer"
+                    },
+                    "migrations_started": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a platform admin"
           }
         }
       }

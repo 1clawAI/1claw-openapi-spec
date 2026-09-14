@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.12"
+    version: "0.61.13"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -3907,6 +3907,36 @@ paths:
                 '400': { description: Unknown tier }
                 '403': { description: Not a platform admin }
                 '404': { description: Agent not found }
+    /v1/admin/kms/relevel:
+        post:
+            tags: [Admin]
+            summary: Move orgs onto the KEK protection level their tier and payment call for
+            description: >-
+                Platform admins only. Examines up to `limit` orgs whose stored KEK
+                level disagrees with the target (Pro earns HSM only with an active
+                subscription; Team, Business and Enterprise keep HSM; the platform
+                org is always software) and starts a migration for each: a new key
+                at the right level, every secret and every org-scoped row re-wrapped,
+                the old key released from the keep set 30 days after completion.
+                The nightly consolidation job runs the same pass, 25 orgs at a time.
+            operationId: adminKmsRelevel
+            parameters:
+                - name: limit
+                  in: query
+                  required: false
+                  schema: { type: integer, minimum: 1, maximum: 500, default: 25 }
+            responses:
+                '200':
+                    description: Orgs examined and migrations started
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    examined: { type: integer }
+                                    migrations_started: { type: integer }
+                                    limit: { type: integer }
+                '403': { description: Not a platform admin }
     /v1/admin/chains:
         get:
             tags: [Chains]
