@@ -1318,6 +1318,76 @@
         }
       }
     },
+    "/v1/auth/feature-quota/consume": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Count one call against a per-user feature quota",
+        "description": "Atomic fixed-window counter for metered dashboard features (currently\n`voice_brief`, 30 calls per hour). The limit and window are defined\nserver-side; the caller only names the feature. Users only.\n",
+        "operationId": "consumeFeatureQuota",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "feature"
+                ],
+                "properties": {
+                  "feature": {
+                    "type": "string",
+                    "enum": [
+                      "voice_brief"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Whether this call is within the window's limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "allowed",
+                    "limit",
+                    "remaining",
+                    "reset_at"
+                  ],
+                  "properties": {
+                    "allowed": {
+                      "type": "boolean"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "remaining": {
+                      "type": "integer"
+                    },
+                    "reset_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/v1/auth/me": {
       "get": {
         "tags": [
