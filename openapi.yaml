@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.13"
+    version: "0.61.15"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -8683,6 +8683,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/RuntimeResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        delete:
+            tags: [Platform]
+            summary: Delete a connection runtime (plt_ scoped)
+            description: |
+                Removes a runtime the app provisioned on this connection. A running
+                runtime is stopped at the provider first and any runtime add-on
+                subscription is cancelled before the record is removed. Scoped like
+                the GET: the connection must belong to the app and list the runtime.
+                This is the cleanup path for a mis-provisioned runtime;
+                `DELETE /v1/runtimes/{id}` does not accept a plt_ key.
+            operationId: deleteConnectionRuntime
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - in: path
+                  name: runtimeId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "204":
+                    description: Runtime deleted
                 "404":
                     $ref: "#/components/responses/NotFound"
 
