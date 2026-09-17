@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.16"
+    version: "0.61.17"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -18160,6 +18160,39 @@ components:
                 mfa_method:
                     type: string
                     enum: [totp, passkey]
+                agent_id:
+                    type: string
+                    format: uuid
+                    description: Agent token exchange only — the resolved agent id.
+                vault_ids:
+                    type: array
+                    items: { type: string, format: uuid }
+                    description: Agent token exchange only — vaults the agent is bound to.
+                entitlements:
+                    $ref: "#/components/schemas/AgentEntitlements"
+
+        AgentEntitlements:
+            type: object
+            description: >-
+                Returned on agent token exchange. The flags a client needs to
+                decide which tools to offer, as of the moment the token was
+                minted. treasury_signer and has_delegations are derived from the
+                agent's treasury signer rows and active delegations and are not
+                present on the agent profile.
+            required:
+                [intents_api, execution_intents, execution_require_tee, intents_require_tee,
+                 cards, memory, shroud, discoverable, treasury_signer, has_delegations]
+            properties:
+                intents_api: { type: boolean }
+                execution_intents: { type: boolean }
+                execution_require_tee: { type: boolean }
+                intents_require_tee: { type: boolean }
+                cards: { type: boolean }
+                memory: { type: boolean }
+                shroud: { type: boolean }
+                discoverable: { type: boolean }
+                treasury_signer: { type: boolean }
+                has_delegations: { type: boolean }
 
         AgentTokenRequest:
             type: object
