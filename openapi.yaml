@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.17"
+    version: "0.61.18"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -80,6 +80,8 @@ tags:
       description: Multi-sig treasury wallets (Safe) and agent access requests
     - name: Treasury Wallets
       description: Multi-chain wallet generation for human users (replaces CDP embedded wallets)
+    - name: Key Custody
+      description: Customer-held key shares for non-custodial (threshold) signing keys
     - name: Admin
       description: Platform administration
     - name: Health
@@ -801,6 +803,13 @@ paths:
                                                     type: string
                                                 created_at:
                                                     type: string
+                                                prf_supported:
+                                                    type: boolean
+                                                    nullable: true
+                                                    description: |
+                                                        `true` — can hold a wallet share (WebAuthn PRF).
+                                                        `false` — cannot. `null` — registered before this
+                                                        was captured.
 
     /v1/auth/passkeys/{passkey_id}:
         delete:
@@ -5441,6 +5450,152 @@ paths:
     # ---------------------------------------------------------------------------
     # Treasury Wallets (multi-chain key generation for human users)
     # ---------------------------------------------------------------------------
+
+    /v1/keys/{key_id}/client-share:
+        parameters:
+            - name: key_id
+              in: path
+              required: true
+              description: A treasury wallet id or an agent signing key id owned by the caller's org
+              schema:
+                  type: string
+                  format: uuid
+        put:
+            tags: [Key Custody]
+            summary: Store the customer's wrapped share of a threshold key
+            description: |
+                Stores ciphertext the vault cannot open: the customer's share of a
+                2-party threshold signing key, wrapped in the browser under the
+                passkey's WebAuthn PRF output (`passkey_prf`, one wrap per credential)
+                or under a recovery code (`recovery_code`, one per key). The vault
+                keeps the blob and its salt and returns them only to the owning user.
+                Human users only; the passkey must have reported PRF support at
+                registration. Idempotent per (key, credential).
+            operationId: putClientKeyShare
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/PutClientShareRequest"
+            responses:
+                "201":
+                    description: Share stored
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ClientShareResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        get:
+            tags: [Key Custody]
+            summary: List the caller's wrapped shares for a key
+            description: |
+                Returns every wrap on file for this key, unopened, to the user who
+                stored them. `custody` tells you whether the key is `server` (1claw
+                holds the whole private key) or `client_tss` (threshold; neither party
+                can sign alone). Funding a `client_tss` wallet needs at least two wraps.
+            operationId: listClientKeyShares
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Wraps on file
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ClientShareListResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/keys/{key_id}/client-share/rewrap:
+        parameters:
+            - name: key_id
+              in: path
+              required: true
+              schema:
+                  type: string
+                  format: uuid
+        post:
+            tags: [Key Custody]
+            summary: Add a wrap for another credential or the recovery code
+            description: |
+                Same write as `PUT …/client-share`, for a key that already has at
+                least one wrap: the browser, holding the share in memory during a
+                passkey session, re-wraps it under a newly added passkey's PRF
+                output or under the recovery code. 409 if no wrap exists yet.
+            operationId: rewrapClientKeyShare
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/PutClientShareRequest"
+            responses:
+                "201":
+                    description: Wrap added
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ClientShareResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/keys/{key_id}/client-share/{share_id}:
+        parameters:
+            - name: key_id
+              in: path
+              required: true
+              schema:
+                  type: string
+                  format: uuid
+            - name: share_id
+              in: path
+              required: true
+              schema:
+                  type: string
+                  format: uuid
+        delete:
+            tags: [Key Custody]
+            summary: Remove one wrap
+            description: |
+                Deletes a single wrap. Wraps tied to a passkey are also removed when
+                that passkey is deleted. Removing the last wrap of a `client_tss` key
+                makes the key unrecoverable — the vault holds only its own share.
+            operationId: deleteClientKeyShare
+            security:
+                - BearerAuth: []
+            responses:
+                "204":
+                    description: Wrap removed
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
 
     /v1/treasury/wallets/generate:
         post:
@@ -20764,6 +20919,12 @@ components:
                     type: string
                     format: date-time
                     nullable: true
+                custody:
+                    type: string
+                    enum: [server, client_tss]
+                    description: |
+                        `server` — 1claw holds the whole private key and can sign alone.
+                        `client_tss` — 2-party threshold key; the customer's passkey share is required.
 
         SigningKeyListResponse:
             type: object
@@ -22537,6 +22698,12 @@ components:
                 created_at:
                     type: string
                     format: date-time
+                custody:
+                    type: string
+                    enum: [server, client_tss]
+                    description: |
+                        `server` — 1claw holds the whole private key and can sign alone.
+                        `client_tss` — 2-party threshold key; the customer's passkey share is required.
 
         TreasuryWalletListResponse:
             type: object
@@ -24912,6 +25079,84 @@ components:
                         type: string
                 name:
                     type: string
+                prf_supported:
+                    type: boolean
+                    nullable: true
+                    description: |
+                        `prf.enabled` from `credential.getClientExtensionResults()` —
+                        whether this authenticator can derive the secret that wraps a
+                        wallet share. Omit if the client did not request the extension.
+
+        PutClientShareRequest:
+            type: object
+            required: [wrap_kind, wrapped_share, salt]
+            properties:
+                wrap_kind:
+                    type: string
+                    enum: [passkey_prf, recovery_code]
+                credential_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: Required for `passkey_prf`; the passkey id from `GET /v1/auth/passkeys`.
+                wrapped_share:
+                    type: string
+                    description: Base64 ciphertext (≤ 4 KiB). Opaque to the vault.
+                salt:
+                    type: string
+                    description: Base64 PRF salt, 16–64 random bytes, one per key.
+
+        ClientShareResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                key_id:
+                    type: string
+                    format: uuid
+                key_kind:
+                    type: string
+                    enum: [agent_signing_key, treasury_wallet]
+                wrap_kind:
+                    type: string
+                    enum: [passkey_prf, recovery_code]
+                credential_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                wrapped_share:
+                    type: string
+                    description: Base64, exactly as stored.
+                salt:
+                    type: string
+                    description: Base64.
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+
+        ClientShareListResponse:
+            type: object
+            properties:
+                key_id:
+                    type: string
+                    format: uuid
+                key_kind:
+                    type: string
+                    enum: [agent_signing_key, treasury_wallet]
+                custody:
+                    type: string
+                    enum: [server, client_tss]
+                    description: |
+                        `server` — 1claw holds the whole private key and can sign alone.
+                        `client_tss` — 2-party threshold key; the customer's share is required.
+                shares:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ClientShareResponse"
 
         PasskeyRegisterCompleteResponse:
             type: object
