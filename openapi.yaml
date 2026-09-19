@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.18"
+    version: "0.61.19"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -5594,6 +5594,351 @@ paths:
                     $ref: "#/components/responses/Unauthorized"
                 "403":
                     $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/keys/tss/keygen/begin:
+        post:
+            tags: [Key Custody]
+            summary: Start a 2-party threshold key generation
+            description: |
+                Begins a distributed key generation between the vault (party 1) and the
+                caller's browser (party 2, `@1claw/tss-wasm`). The result is a
+                `custody: client_tss` treasury wallet whose private key never exists
+                anywhere: the vault keeps one FROST share, the caller keeps the other,
+                wrapped under their passkey's PRF output. Requires a passkey with
+                `prf_supported: true` and no active wallet on the chain. Chains: `solana`
+                (Ed25519). Sessions expire after 10 minutes.
+            operationId: tssKeygenBegin
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [chain]
+                            properties:
+                                chain:
+                                    type: string
+                                    enum: [solana]
+            responses:
+                "201":
+                    description: Session opened; the vault's round-1 package
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    session_id: { type: string, format: uuid }
+                                    chain: { type: string }
+                                    curve: { type: string }
+                                    server_identifier: { type: integer, example: 1 }
+                                    client_identifier: { type: integer, example: 2 }
+                                    server_round1:
+                                        type: string
+                                        description: Base64 FROST DKG round-1 package.
+                                    expires_at: { type: string, format: date-time }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/keys/tss/keygen/round2:
+        post:
+            tags: [Key Custody]
+            summary: Threshold key generation, round 2
+            operationId: tssKeygenRound2
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [session_id, client_round1]
+                            properties:
+                                session_id: { type: string, format: uuid }
+                                client_round1:
+                                    type: string
+                                    description: Base64 FROST DKG round-1 package from the browser.
+            responses:
+                "200":
+                    description: The vault's round-2 package, addressed to the caller
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    session_id: { type: string, format: uuid }
+                                    server_round2: { type: string }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/keys/tss/keygen/complete:
+        post:
+            tags: [Key Custody]
+            summary: Threshold key generation, final round
+            description: |
+                Needs `X-Passkey-Token` from a tx-assert with `action: tss_keygen` and
+                `tx_digest` = hex SHA-256 of the session id. Creates the `client_tss`
+                wallet and returns its address. The browser derives the same public key
+                package from the packages it already holds; store your share with
+                `PUT /v1/keys/{key_id}/client-share` next.
+            operationId: tssKeygenComplete
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: X-Passkey-Token
+                  in: header
+                  required: true
+                  schema: { type: string }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [session_id, client_round2]
+                            properties:
+                                session_id: { type: string, format: uuid }
+                                client_round2:
+                                    type: string
+                                    description: Base64 FROST DKG round-2 package from the browser, addressed to the vault.
+            responses:
+                "201":
+                    description: Wallet created
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    key_id: { type: string, format: uuid }
+                                    chain: { type: string }
+                                    curve: { type: string }
+                                    custody: { type: string, enum: [client_tss] }
+                                    address: { type: string }
+                                    public_key_hex: { type: string }
+                                    public_key_package: { type: string, description: Base64 FROST public key package. }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/keys/{key_id}/tss/sign/begin:
+        parameters:
+            - name: key_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Threshold signing, round 1
+            description: |
+                Needs `X-Passkey-Token` from a tx-assert with `action: tss_sign` and
+                `tx_digest` = hex SHA-256 of `message`. The message must be a decodable
+                Solana transaction message; every transfer destination in it is checked
+                against the OFAC SDN list before the vault commits. Returns the vault's
+                signing commitments; nonces are single-use and expire with the session.
+            operationId: tssSignBegin
+            security:
+                - BearerAuth: []
+            parameters:
+                - name: X-Passkey-Token
+                  in: header
+                  required: true
+                  schema: { type: string }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [message]
+                            properties:
+                                message:
+                                    type: string
+                                    description: Base64 bytes to sign (the serialised transaction message).
+            responses:
+                "201":
+                    description: Session opened
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    session_id: { type: string, format: uuid }
+                                    key_id: { type: string, format: uuid }
+                                    message_digest: { type: string }
+                                    server_commitments: { type: string }
+                                    expires_at: { type: string, format: date-time }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/keys/{key_id}/tss/sign/complete:
+        parameters:
+            - name: key_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Threshold signing, round 2 — aggregate and return the signature
+            description: |
+                The vault produces its share, verifies the caller's, aggregates, and
+                verifies the result under the group key before returning it. A bad
+                share is a `400`, never a published signature.
+            operationId: tssSignComplete
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [session_id, client_commitments, client_signature_share]
+                            properties:
+                                session_id: { type: string, format: uuid }
+                                client_commitments: { type: string }
+                                client_signature_share: { type: string }
+            responses:
+                "200":
+                    description: Signature
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    key_id: { type: string, format: uuid }
+                                    message_digest: { type: string }
+                                    signature: { type: string, description: Base64 64-byte Ed25519 signature. }
+                                    signature_hex: { type: string }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/wallets/{chain}/tss/prepare:
+        parameters:
+            - name: chain
+              in: path
+              required: true
+              schema: { type: string }
+        post:
+            tags: [Key Custody]
+            summary: Build the unsigned message for a send from a client_tss wallet
+            description: |
+                Runs wallet access, the sanctions screen and spend policies on the
+                declared destination, fetches a recent blockhash and returns the
+                unsigned transaction message. Sign it with `/v1/keys/{key_id}/tss/sign/*`
+                and submit with `…/tss/broadcast`.
+            operationId: tssTreasuryPrepare
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [to, value]
+                            properties:
+                                to: { type: string }
+                                value: { type: string, description: Major units, e.g. "0.5". }
+                                memo: { type: string }
+            responses:
+                "200":
+                    description: Unsigned message
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    key_id: { type: string, format: uuid }
+                                    chain: { type: string }
+                                    from: { type: string }
+                                    to: { type: string }
+                                    value_base_units: { type: string }
+                                    recent_blockhash: { type: string }
+                                    message: { type: string }
+                                    message_digest: { type: string }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/wallets/{chain}/tss/broadcast:
+        parameters:
+            - name: chain
+              in: path
+              required: true
+              schema: { type: string }
+        post:
+            tags: [Key Custody]
+            summary: Broadcast a threshold-signed send
+            description: |
+                Verifies the signature under the wallet's public key over exactly this
+                message, checks `to` is a transfer destination inside it, assembles the
+                transaction and submits it. Audited as `treasury_wallet.send`.
+            operationId: tssTreasuryBroadcast
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [message, signature, to, value_base_units]
+                            properties:
+                                message: { type: string }
+                                signature: { type: string }
+                                to: { type: string }
+                                value_base_units: { type: string }
+            responses:
+                "200":
+                    description: Broadcast
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletSendResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
