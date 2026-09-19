@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.28"
+    version: "0.61.29"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -23266,13 +23266,15 @@ components:
             properties:
                 tier:
                     type: string
-                    enum: [pro, business]
+                    enum: [pro, team, business]
                 interval:
                     type: string
-                    enum: [monthly, yearly]
+                    enum: [monthly, annual]
                 trial:
                     type: boolean
-                    default: true
+                    default: false
+                    deprecated: true
+                    description: Accepted and ignored — plans no longer start with a trial (2026-09-19); checkout charges on completion.
 
         TopupRequest:
             type: object
