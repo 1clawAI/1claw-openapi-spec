@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.24",
+    "version": "0.61.25",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -15947,8 +15947,8 @@
         "tags": [
           "Approvals"
         ],
-        "summary": "List pending approvals",
-        "description": "Returns approvals for the authenticated user's organization.\nHuman-only. Supports filtering by status and pagination.\n",
+        "summary": "List approvals",
+        "description": "Humans get their own approval queue. An agent caller gets only the\napprovals it created (`agent_id` = caller) — enough to recover one whose\nid was lost across a restart, never the organization's queue. Supports\nfiltering by status and pagination.\n",
         "operationId": "listApprovals",
         "parameters": [
           {
@@ -15961,7 +15961,8 @@
                 "pending",
                 "approved",
                 "rejected",
-                "expired"
+                "expired",
+                "cancelled"
               ]
             },
             "description": "Filter by approval status"
@@ -16039,6 +16040,61 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/approvals/{approval_id}/cancel": {
+      "post": {
+        "tags": [
+          "Approvals"
+        ],
+        "summary": "Cancel a pending approval (requester)",
+        "description": "Withdraws a pending approval. Callable by the agent that requested it or\nthe human it was addressed to. First answer wins: if the approval was\nalready decided or expired, the existing record is returned unchanged\n(200) rather than an error — the caller's next question is what the\nanswer was. A cancellation is delivered to webhook subscribers as\n`approval.decided` with `decision: \"cancelled\"`, and audited as\n`approval.cancelled`.\n",
+        "operationId": "cancelApproval",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The approval — `cancelled`, or the decision that landed first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -39388,7 +39444,8 @@
               "pending",
               "approved",
               "rejected",
-              "expired"
+              "expired",
+              "cancelled"
             ]
           },
           "summary": {
@@ -39454,7 +39511,8 @@
               "pending",
               "approved",
               "rejected",
-              "expired"
+              "expired",
+              "cancelled"
             ]
           },
           "expires_at": {
@@ -42311,6 +42369,19 @@
             "type": "number",
             "nullable": true
           },
+          "has_paid_addon": {
+            "type": "boolean",
+            "description": "Whether this runtime has a paid Stripe add-on (unlimited hours)."
+          },
+          "billing_kind": {
+            "type": "string",
+            "enum": [
+              "pool",
+              "included",
+              "addon"
+            ],
+            "description": "`pool` — counts against the plan's monthly runtime hours. `included` — the plan's\nfree runtime (every plan from Pro up includes one small or medium runtime, no hour\ncap, no charge). `addon` — paid Stripe subscription item (no hour cap).\n"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -42331,6 +42402,27 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RuntimeResponse"
+            }
+          },
+          "included_runtime": {
+            "type": "object",
+            "description": "The plan's included-runtime allowance (human callers only).",
+            "properties": {
+              "allowance": {
+                "type": "integer",
+                "description": "Runtimes the plan includes at no charge."
+              },
+              "used": {
+                "type": "integer",
+                "description": "Included slots currently in use."
+              },
+              "presets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Presets an included runtime may use (up to 1 vCPU / 2 GB)."
+              }
             }
           }
         }

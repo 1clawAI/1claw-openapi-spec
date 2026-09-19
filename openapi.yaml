@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.24"
+    version: "0.61.25"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -10184,10 +10184,12 @@ paths:
     /v1/approvals:
         get:
             tags: [Approvals]
-            summary: List pending approvals
+            summary: List approvals
             description: |
-                Returns approvals for the authenticated user's organization.
-                Human-only. Supports filtering by status and pagination.
+                Humans get their own approval queue. An agent caller gets only the
+                approvals it created (`agent_id` = caller) — enough to recover one whose
+                id was lost across a restart, never the organization's queue. Supports
+                filtering by status and pagination.
             operationId: listApprovals
             parameters:
                 - name: status
@@ -10195,7 +10197,7 @@ paths:
                   required: false
                   schema:
                       type: string
-                      enum: [pending, approved, rejected, expired]
+                      enum: [pending, approved, rejected, expired, cancelled]
                   description: Filter by approval status
                 - name: limit
                   in: query
@@ -10243,6 +10245,46 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/ApprovalResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/approvals/{approval_id}/cancel:
+        post:
+            tags: [Approvals]
+            summary: Cancel a pending approval (requester)
+            description: |
+                Withdraws a pending approval. Callable by the agent that requested it or
+                the human it was addressed to. First answer wins: if the approval was
+                already decided or expired, the existing record is returned unchanged
+                (200) rather than an error — the caller's next question is what the
+                answer was. A cancellation is delivered to webhook subscribers as
+                `approval.decided` with `decision: "cancelled"`, and audited as
+                `approval.cancelled`.
+            operationId: cancelApproval
+            parameters:
+                - name: approval_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                reason: { type: string, maxLength: 500 }
+            responses:
+                "200":
+                    description: The approval — `cancelled`, or the decision that landed first
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApprovalResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -25532,7 +25574,7 @@ components:
                     description: "What the action will do, as submitted."
                 status:
                     type: string
-                    enum: [pending, approved, rejected, expired]
+                    enum: [pending, approved, rejected, expired, cancelled]
                 summary:
                     type: object
                     description: Structured summary of the action requiring approval
@@ -25575,7 +25617,7 @@ components:
             properties:
                 status:
                     type: string
-                    enum: [pending, approved, rejected, expired]
+                    enum: [pending, approved, rejected, expired, cancelled]
                 expires_at:
                     type: string
                     format: date-time
@@ -27373,6 +27415,16 @@ components:
                 monthly_hours_used:
                     type: number
                     nullable: true
+                has_paid_addon:
+                    type: boolean
+                    description: Whether this runtime has a paid Stripe add-on (unlimited hours).
+                billing_kind:
+                    type: string
+                    enum: [pool, included, addon]
+                    description: |
+                        `pool` — counts against the plan's monthly runtime hours. `included` — the plan's
+                        free runtime (every plan from Pro up includes one small or medium runtime, no hour
+                        cap, no charge). `addon` — paid Stripe subscription item (no hour cap).
                 created_at:
                     type: string
                     format: date-time
@@ -27388,6 +27440,16 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/RuntimeResponse"
+                included_runtime:
+                    type: object
+                    description: The plan's included-runtime allowance (human callers only).
+                    properties:
+                        allowance: { type: integer, description: Runtimes the plan includes at no charge. }
+                        used: { type: integer, description: Included slots currently in use. }
+                        presets:
+                            type: array
+                            items: { type: string }
+                            description: Presets an included runtime may use (up to 1 vCPU / 2 GB).
 
         SlugCheckResponse:
             type: object
