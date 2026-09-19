@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.23"
+    version: "0.61.24"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6239,6 +6239,10 @@ paths:
                 is the SafeTx hash. The address is counterfactual (CREATE2) until the
                 first `execute` deploys it. Chains: base, optimism, arbitrum, polygon
                 (RIP-7212 precompile + fallback verifier), ethereum, sepolia, base-sepolia.
+                The passkey must have been registered on the domain making this
+                request (its rpId): a credential from `1claw.xyz` cannot sign on
+                `1claw.co`, so such a passkey is refused here (400) rather than
+                producing a Safe no browser here can sign for.
             operationId: createPasskeySafe
             security:
                 - BearerAuth: []
@@ -6343,20 +6347,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: object
-                                properties:
-                                    safe_id: { type: string, format: uuid }
-                                    safe_address: { type: string }
-                                    chain: { type: string }
-                                    chain_id: { type: integer }
-                                    to: { type: string }
-                                    value_wei: { type: string }
-                                    data: { type: string }
-                                    nonce: { type: integer }
-                                    deploy_required: { type: boolean }
-                                    safe_tx_hash: { type: string }
-                                    credential_id: { type: string }
-                                    rp_id: { type: string }
+                                $ref: "#/components/schemas/PasskeySafePrepare"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -6396,6 +6387,17 @@ paths:
                                 value_wei: { type: string }
                                 data: { type: string }
                                 nonce: { type: integer }
+                                operation:
+                                    type: integer
+                                    default: 0
+                                    description: |
+                                        0 = call. 1 = delegatecall, accepted only with a `grant_id` whose
+                                        prepared setup calldata this is, and only to the pinned
+                                        MultiSendCallOnly — the API cannot delegatecall arbitrary code.
+                                grant_id:
+                                    type: string
+                                    format: uuid
+                                    description: Pass back from a grant or revoke prepare; activates / revokes the grant on success.
                                 authenticator_data: { type: string, description: Base64url. }
                                 client_data_json: { type: string, description: Base64url. }
                                 signature: { type: string, description: Base64url DER ECDSA signature. }
@@ -6418,6 +6420,177 @@ paths:
                     $ref: "#/components/responses/BadRequest"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/passkey-safes/{id}/grants:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        get:
+            tags: [Key Custody]
+            summary: List agent spending grants on a passkey Safe
+            operationId: listPasskeySafeGrants
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Grants
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    grants:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/PasskeySafeGrant"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        post:
+            tags: [Key Custody]
+            summary: Prepare an agent spending grant (Allowance Module)
+            description: |
+                Gives one agent's server-custody Ethereum signing key a bounded, on-chain
+                allowance from this Safe through Safe's Allowance Module v1.0.0: one Safe
+                transaction (delegatecall into MultiSendCallOnly) that enables the module if
+                needed, adds the agent's key as a delegate and sets the allowance per reset
+                period. Returns the grant (`pending`) and the SafeTx for the owner's passkey
+                to sign; pass `operation` and `grant_id` from `prepare` to `execute`. The cap
+                is enforced by the module on-chain — 1claw holding the delegate key gives it
+                exactly the allowance and nothing more. Audited as `passkey_safe.grant_activated`.
+            operationId: createPasskeySafeGrant
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [agent_id, allowance_amount]
+                            properties:
+                                agent_id: { type: string, format: uuid }
+                                token: { type: string, description: ERC-20 contract; omit for the native token. }
+                                allowance_amount: { type: string, description: Base units, decimal string, ≤ 2^96-1. }
+                                reset_time_min: { type: integer, default: 1440, description: Reset period in minutes. }
+            responses:
+                "200":
+                    description: Grant and what to sign
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PasskeySafeGrantPrepare"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/passkey-safes/{id}/grants/{grant_id}/revoke:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+            - name: grant_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Prepare a grant revocation
+            description: |
+                Prepares `AllowanceModule.removeDelegate(delegate, true)` for the owner's
+                passkey to sign; `execute` with `grant_id` relays it and marks the grant
+                `revoked`. Audited as `passkey_safe.grant_revoked`.
+            operationId: revokePasskeySafeGrant
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Grant and what to sign
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PasskeySafeGrantPrepare"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/agents/{agent_id}/passkey-safes/{safe_id}/spend:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+            - name: safe_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Spend from a passkey-owned Safe under an active grant
+            description: |
+                Agent credential only. Runs the agent's guardrails (chains, allowlists, caps,
+                daily limits, approval policy) and the sanctions screen, reads the module's
+                current allowance and nonce, signs the Allowance Module transfer hash with the
+                agent's Ethereum signing key, and relays `executeAllowanceTransfer` from the
+                Safe owner's Ethereum treasury wallet. Above the on-chain remaining allowance
+                the request is refused before any gas is spent; the module would refuse it
+                anyway. Counts as one signature. Audited as `passkey_safe.allowance_spent`.
+            operationId: spendFromPasskeySafeGrant
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [to, amount]
+                            properties:
+                                to: { type: string }
+                                amount: { type: string, description: Base units, decimal string. }
+                                token: { type: string, description: ERC-20 contract; omit for the native token. }
+            responses:
+                "200":
+                    description: Broadcast
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    grant_id: { type: string, format: uuid }
+                                    safe_address: { type: string }
+                                    chain: { type: string }
+                                    to: { type: string }
+                                    amount: { type: string }
+                                    token_address: { type: string }
+                                    remaining_after: { type: string, description: Allowance left in this period after this transfer. }
+                                    nonce: { type: integer, description: The module's delegate nonce used. }
+                                    tx_hash: { type: string }
+                                    status: { type: string }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "402":
+                    $ref: "#/components/responses/PaymentRequired"
                 "403":
                     $ref: "#/components/responses/Forbidden"
                 "404":
@@ -26074,11 +26247,61 @@ components:
                 chain_id: { type: integer }
                 safe_address: { type: string }
                 passkey_id: { type: string, format: uuid }
+                passkey_name: { type: string, nullable: true, description: The owning passkey's name — only that credential can sign for the Safe. }
+                passkey_rp_id: { type: string, nullable: true, description: The domain the owning passkey was registered under (WebAuthn rpId); a browser on another domain cannot use it. }
                 custody: { type: string, enum: [passkey_owner] }
                 deploy_status: { type: string, enum: [pending, deployed] }
                 deploy_tx_hash: { type: string, nullable: true }
                 owner_signer: { type: string, description: The SafeWebAuthnSharedSigner address listed as the Safe's owner. }
                 created_at: { type: string, format: date-time }
+
+        PasskeySafePrepare:
+            type: object
+            properties:
+                safe_id: { type: string, format: uuid }
+                safe_address: { type: string }
+                chain: { type: string }
+                chain_id: { type: integer }
+                to: { type: string }
+                value_wei: { type: string }
+                data: { type: string }
+                nonce: { type: integer }
+                operation: { type: integer, description: Pass back to `execute` unchanged. }
+                grant_id: { type: string, format: uuid, description: Present for grant setup / revoke; pass back to `execute`. }
+                deploy_required: { type: boolean }
+                safe_tx_hash: { type: string, description: Hex SafeTx hash — the WebAuthn challenge (raw 32 bytes). }
+                credential_id: { type: string }
+                transports:
+                    type: array
+                    nullable: true
+                    items: { type: string }
+                    description: The passkey's registered transports (`internal`, `hybrid`, `usb`…) — pass as the `allowCredentials` hint so the browser asks the right authenticator.
+                passkey_name: { type: string, nullable: true }
+                rp_id: { type: string }
+
+        PasskeySafeGrant:
+            type: object
+            properties:
+                id: { type: string, format: uuid }
+                safe_id: { type: string, format: uuid }
+                agent_id: { type: string, format: uuid }
+                chain: { type: string }
+                delegate_address: { type: string, description: The agent's Ethereum signing key at grant time. }
+                token_address: { type: string, description: 0x000…0 for the native token. }
+                allowance_amount: { type: string, description: Base units per reset period. }
+                reset_time_min: { type: integer }
+                status: { type: string, enum: [pending, active, revoking, revoked] }
+                setup_tx_hash: { type: string, nullable: true }
+                revoke_tx_hash: { type: string, nullable: true }
+                created_at: { type: string, format: date-time }
+
+        PasskeySafeGrantPrepare:
+            type: object
+            properties:
+                grant:
+                    $ref: "#/components/schemas/PasskeySafeGrant"
+                prepare:
+                    $ref: "#/components/schemas/PasskeySafePrepare"
 
         ClientShareListResponse:
             type: object
