@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.19"
+    version: "0.61.20"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -5941,6 +5941,203 @@ paths:
                     $ref: "#/components/responses/Unauthorized"
                 "404":
                     $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/passkey-safes:
+        post:
+            tags: [Key Custody]
+            summary: Create a Safe owned by your passkey
+            description: |
+                An EVM Safe (v1.4.1) whose only owner is Safe's WebAuthn shared signer,
+                configured with this passkey's P-256 public key. No private key exists
+                anywhere: signing a transaction is a WebAuthn assertion whose challenge
+                is the SafeTx hash. The address is counterfactual (CREATE2) until the
+                first `execute` deploys it. Chains: base, optimism, arbitrum, polygon
+                (RIP-7212 precompile + fallback verifier), ethereum, sepolia, base-sepolia.
+            operationId: createPasskeySafe
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [chain, passkey_id]
+                            properties:
+                                chain: { type: string }
+                                passkey_id: { type: string, format: uuid }
+            responses:
+                "201":
+                    description: Safe registered (counterfactual)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PasskeySafe"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+        get:
+            tags: [Key Custody]
+            summary: List your passkey-owned Safes
+            operationId: listPasskeySafes
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Safes
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    safes:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/PasskeySafe"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /v1/treasury/passkey-safes/{id}:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        delete:
+            tags: [Key Custody]
+            summary: Forget a passkey Safe
+            description: Deactivates the record only; the Safe and its funds stay on-chain under the passkey.
+            operationId: deactivatePasskeySafe
+            security:
+                - BearerAuth: []
+            responses:
+                "204":
+                    description: Deactivated
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/passkey-safes/{id}/prepare:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Compute the SafeTx hash for a call from a passkey Safe
+            description: |
+                Runs the sanctions screen and spend policies on the call, reads the
+                Safe's on-chain nonce (0 if not yet deployed), and returns the SafeTx
+                hash — the raw 32 bytes are the WebAuthn challenge to sign with
+                `userVerification: "required"`.
+            operationId: preparePasskeySafeTx
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [to, value_wei]
+                            properties:
+                                to: { type: string }
+                                value_wei: { type: string }
+                                data: { type: string, description: Hex calldata, optional. }
+            responses:
+                "200":
+                    description: What to sign
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    safe_id: { type: string, format: uuid }
+                                    safe_address: { type: string }
+                                    chain: { type: string }
+                                    chain_id: { type: integer }
+                                    to: { type: string }
+                                    value_wei: { type: string }
+                                    data: { type: string }
+                                    nonce: { type: integer }
+                                    deploy_required: { type: boolean }
+                                    safe_tx_hash: { type: string }
+                                    credential_id: { type: string }
+                                    rp_id: { type: string }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/passkey-safes/{id}/execute:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Relay a passkey-signed Safe transaction
+            description: |
+                Recomputes the SafeTx hash, verifies the WebAuthn assertion locally
+                (this passkey, this hash, a dashboard origin, UV flag set), wraps it in
+                Safe's contract-signature format and relays `execTransaction` — deploying
+                the Safe first if needed — from your Ethereum treasury wallet, which pays
+                gas and is not an owner. Audited as `passkey_safe.executed`.
+            operationId: executePasskeySafeTx
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [to, value_wei, nonce, authenticator_data, client_data_json, signature]
+                            properties:
+                                to: { type: string }
+                                value_wei: { type: string }
+                                data: { type: string }
+                                nonce: { type: integer }
+                                authenticator_data: { type: string, description: Base64url. }
+                                client_data_json: { type: string, description: Base64url. }
+                                signature: { type: string, description: Base64url DER ECDSA signature. }
+            responses:
+                "200":
+                    description: Relayed
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    safe_id: { type: string, format: uuid }
+                                    safe_address: { type: string }
+                                    chain: { type: string }
+                                    safe_tx_hash: { type: string }
+                                    deploy_tx_hash: { type: string, nullable: true }
+                                    tx_hash: { type: string }
+                                    status: { type: string }
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
 
     /v1/treasury/wallets/generate:
         post:
@@ -25482,6 +25679,20 @@ components:
                 updated_at:
                     type: string
                     format: date-time
+
+        PasskeySafe:
+            type: object
+            properties:
+                id: { type: string, format: uuid }
+                chain: { type: string }
+                chain_id: { type: integer }
+                safe_address: { type: string }
+                passkey_id: { type: string, format: uuid }
+                custody: { type: string, enum: [passkey_owner] }
+                deploy_status: { type: string, enum: [pending, deployed] }
+                deploy_tx_hash: { type: string, nullable: true }
+                owner_signer: { type: string, description: The SafeWebAuthnSharedSigner address listed as the Safe's owner. }
+                created_at: { type: string, format: date-time }
 
         ClientShareListResponse:
             type: object
