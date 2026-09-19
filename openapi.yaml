@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.20"
+    version: "0.61.21"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -5623,6 +5623,14 @@ paths:
                                 chain:
                                     type: string
                                     enum: [solana]
+                                replace_existing:
+                                    type: boolean
+                                    default: false
+                                    description: |
+                                        Re-key ceremony: replace the active server-custody wallet on
+                                        this chain. On `complete` its balance is swept to the new
+                                        address by the old key's last signature and the old wallet is
+                                        deactivated (audit `treasury_wallet.rekeyed`).
             responses:
                 "201":
                     description: Session opened; the vault's round-1 package
@@ -5941,6 +5949,284 @@ paths:
                     $ref: "#/components/responses/Unauthorized"
                 "404":
                     $ref: "#/components/responses/NotFound"
+
+    /v1/runtimes/{runtime_id}/tss/holder:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Register the runtime's sidecar as a share holder
+            description: |
+                Called by the runtime's agent (the Shroud sidecar, at boot) with the P-256
+                public key it generated. The owner can then provision a threshold-key
+                share to this runtime, letting the agent co-sign below-cap sends
+                unattended. Re-registering replaces the key; deleting the runtime revokes
+                every share held by it.
+            operationId: registerTssHolder
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [public_key]
+                            properties:
+                                public_key: { type: string, description: Base64 SEC1 uncompressed P-256 point (65 bytes). }
+            responses:
+                "201":
+                    description: Registered
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TssHolder"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        get:
+            tags: [Key Custody]
+            summary: The runtime's registered share holder
+            operationId: getTssHolder
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Holder
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TssHolder"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/keys/{key_id}/client-share/holder:
+        parameters:
+            - name: key_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        put:
+            tags: [Key Custody]
+            summary: Provision a threshold-key share to a runtime holder
+            description: |
+                The owner's browser unlocks its share with the passkey PRF and re-wraps
+                it to the holder's P-256 key (ECIES: ephemeral point ‖ iv ‖ AES-GCM). The
+                vault stores the ciphertext unopened. The wallet must be delegated to the
+                holder's agent. Audited as `client_share.provisioned_to_runtime`.
+            operationId: provisionTssHolderShare
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [holder_id, wrapped_share, salt]
+                            properties:
+                                holder_id: { type: string, format: uuid }
+                                wrapped_share: { type: string }
+                                salt: { type: string }
+            responses:
+                "201":
+                    description: Stored
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        get:
+            tags: [Key Custody]
+            summary: The sidecar fetches the wrap made for it
+            description: Agent-only; returns the wrap whose holder was registered by the calling agent.
+            operationId: getTssHolderShare
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Wrapped share (opaque)
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    key_id: { type: string, format: uuid }
+                                    holder_id: { type: string, format: uuid }
+                                    wrap_kind: { type: string, enum: [sidecar] }
+                                    wrapped_share: { type: string }
+                                    salt: { type: string }
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/tss/prepare:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Agent declares a send from a delegated client_tss wallet
+            description: |
+                Runs the agent's guardrails (chains, allowlists, caps, daily limits,
+                approval policy) and the sanctions screen on the declared call, builds
+                the unsigned message and records it as a prepared intent. Only a
+                prepared message can enter `/tss/sign/begin`. Requires a treasury
+                delegation and a share provisioned to the agent's runtime.
+            operationId: agentTssPrepare
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [key_id, to, value]
+                            properties:
+                                key_id: { type: string, format: uuid }
+                                to: { type: string }
+                                value: { type: string, description: Major units. }
+                                memo: { type: string }
+            responses:
+                "200":
+                    description: Unsigned message
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/tss/sign/begin:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Agent threshold signing, round 1
+            description: The message must be a live prepared intent for this agent and key; its transfers are screened again.
+            operationId: agentTssSignBegin
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [key_id, message]
+                            properties:
+                                key_id: { type: string, format: uuid }
+                                message: { type: string }
+            responses:
+                "201":
+                    description: Session opened
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/tss/sign/complete:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Agent threshold signing, round 2
+            operationId: agentTssSignComplete
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [session_id, client_commitments, client_signature_share]
+                            properties:
+                                session_id: { type: string, format: uuid }
+                                client_commitments: { type: string }
+                                client_signature_share: { type: string }
+            responses:
+                "200":
+                    description: Signature
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/agents/{agent_id}/tss/broadcast:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Broadcast an agent's threshold-signed send
+            description: |
+                Verifies the signature under the wallet key, checks the message is the
+                prepared one, re-runs the agent's guardrails, records the transaction
+                (daily limits count it) and submits. Audited as `treasury_wallet.send`
+                with `via: runtime_share_holder`.
+            operationId: agentTssBroadcast
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [key_id, message, signature]
+                            properties:
+                                key_id: { type: string, format: uuid }
+                                message: { type: string }
+                                signature: { type: string }
+            responses:
+                "200":
+                    description: Broadcast
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletSendResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     /v1/treasury/passkey-safes:
         post:
@@ -25636,6 +25922,7 @@ components:
                 wrap_kind:
                     type: string
                     enum: [passkey_prf, recovery_code]
+                    description: Sidecar wraps are stored through `PUT /v1/keys/{key_id}/client-share/holder`.
                 credential_id:
                     type: string
                     format: uuid
@@ -25662,8 +25949,12 @@ components:
                     enum: [agent_signing_key, treasury_wallet]
                 wrap_kind:
                     type: string
-                    enum: [passkey_prf, recovery_code]
+                    enum: [passkey_prf, recovery_code, sidecar]
                 credential_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                holder_id:
                     type: string
                     format: uuid
                     nullable: true
@@ -25679,6 +25970,16 @@ components:
                 updated_at:
                     type: string
                     format: date-time
+
+        TssHolder:
+            type: object
+            properties:
+                holder_id: { type: string, format: uuid }
+                runtime_id: { type: string, format: uuid }
+                agent_id: { type: string, format: uuid }
+                public_key: { type: string }
+                registered_at: { type: string, format: date-time }
+                last_seen_at: { type: string, format: date-time }
 
         PasskeySafe:
             type: object
