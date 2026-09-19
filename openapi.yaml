@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.27"
+    version: "0.61.28"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -15047,6 +15047,139 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/agents/{agent_id}/event-subscriptions:
+        post:
+            tags: [Connectors]
+            summary: Subscribe to a connector event source
+            description: |
+                Pairs an installed connector binding with one of its preset's event
+                sources (see `event_sources` on `GET /v1/connectors/presets`). 1Claw
+                then polls the source through the binding — same host and path
+                allowlists, same credential, same SSRF guard — keeps the item ids it has
+                seen, and dispatches each new item as an automation event of
+                `event_type`, so an automation with `trigger_type: event` and
+                `event_filter: { "event_type": "gmail.message.received" }` reacts within
+                one poll interval instead of on a cron it has to dedupe itself.
+
+                The first poll primes the subscription: it records what already exists
+                and emits nothing, so a new subscription does not replay the inbox. At
+                most 25 new items are emitted per poll (oldest first); lists come from
+                the source's first page only. Failures back off exponentially on the
+                interval and switch the subscription off after 20 in a row.
+
+                Human users only; the agent needs Execution Intents enabled. At most 20
+                subscriptions per agent. The event payload is
+                `{ "event_type", "payload": { "subscription_id", "binding_id", "binding", "connector", "item" } }`.
+            operationId: createEventSubscription
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [binding_id, event_type]
+                            properties:
+                                binding_id: { type: string, format: uuid }
+                                event_type: { type: string, example: gmail.message.received }
+                                interval_secs:
+                                    type: integer
+                                    description: Poll interval, at least the source's `min_interval_secs` and at most 86400. Defaults to the minimum.
+            responses:
+                "201":
+                    description: Subscribed
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/EventSubscription"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    description: This binding already subscribes to that event type
+        get:
+            tags: [Connectors]
+            summary: List an agent's event subscriptions
+            operationId: listEventSubscriptions
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+            responses:
+                "200":
+                    description: Subscriptions
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    subscriptions:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/EventSubscription"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/event-subscriptions/{id}:
+        delete:
+            tags: [Connectors]
+            summary: Delete an event subscription
+            description: Human users only.
+            operationId: deleteEventSubscription
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "204":
+                    description: Deleted
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/event-subscriptions/{id}/poll:
+        post:
+            tags: [Connectors]
+            summary: Poll an event subscription now
+            description: |
+                Runs one poll immediately instead of waiting for the interval. The first
+                poll of a fresh subscription primes it; a subscription switched off by
+                repeated failures is switched back on if the poll succeeds. Human users
+                only. A failed poll returns 400 with the source's error and is recorded
+                on the subscription like a scheduled failure.
+            operationId: pollEventSubscriptionNow
+            parameters:
+                - $ref: "#/components/parameters/AgentId"
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                "200":
+                    description: Polled
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [emitted, subscription]
+                                properties:
+                                    emitted: { type: integer }
+                                    subscription:
+                                        $ref: "#/components/schemas/EventSubscription"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/agents/{agent_id}/oauth/connections:
         get:
             tags: [OAuth Connect]
@@ -25662,6 +25795,52 @@ components:
                 documentation_url: { type: string, format: uri }
                 tier_required: { type: string, example: free }
                 requires_oauth: { type: boolean }
+                event_sources:
+                    type: array
+                    description: |
+                        Events 1Claw can synthesise for this connector by polling a list
+                        endpoint through the installed binding (nanobots item 4, polling
+                        interim). Subscribe with `POST /v1/agents/{agent_id}/event-subscriptions`.
+                    items:
+                        $ref: "#/components/schemas/ConnectorEventSource"
+
+        ConnectorEventSource:
+            type: object
+            required: [event_type, description, path, items_pointer, id_pointers, min_interval_secs]
+            properties:
+                event_type: { type: string, example: gmail.message.received }
+                description: { type: string }
+                path:
+                    type: string
+                    description: Path (with query) relative to the binding's base URL, inside the preset's allowed paths.
+                items_pointer:
+                    type: string
+                    description: JSON pointer to the array of items in the response body; empty means the body is the array.
+                id_pointers:
+                    type: array
+                    items: { type: string }
+                    description: Pointers within one item whose values together identify it.
+                min_interval_secs: { type: integer, example: 60 }
+
+        EventSubscription:
+            type: object
+            required: [id, agent_id, binding_id, event_type, interval_secs, is_active, primed, next_poll_at, consecutive_errors, events_emitted, created_at]
+            properties:
+                id: { type: string, format: uuid }
+                agent_id: { type: string, format: uuid }
+                binding_id: { type: string, format: uuid }
+                event_type: { type: string, example: gmail.message.received }
+                interval_secs: { type: integer }
+                is_active: { type: boolean }
+                primed:
+                    type: boolean
+                    description: False until the first poll has recorded what already exists. That poll emits nothing.
+                next_poll_at: { type: string, format: date-time }
+                last_polled_at: { type: string, format: date-time, nullable: true }
+                last_error: { type: string, nullable: true }
+                consecutive_errors: { type: integer }
+                events_emitted: { type: integer, format: int64 }
+                created_at: { type: string, format: date-time }
 
         InstalledConnector:
             type: object
