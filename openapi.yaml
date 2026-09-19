@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.22"
+    version: "0.61.23"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -23610,6 +23610,13 @@ components:
                     description: |
                         `server` — 1claw holds the whole private key and can sign alone.
                         `client_tss` — 2-party threshold key; the customer's passkey share is required.
+                owner_wraps:
+                    type: integer
+                    description: |
+                        `client_tss` only (list responses). Wraps of the customer's share under
+                        their own credentials — passkey PRF or recovery code; runtime holder
+                        wraps are not counted. Below 2 the wallet should not be funded: one
+                        lost credential would lose the share.
 
         TreasuryWalletListResponse:
             type: object
