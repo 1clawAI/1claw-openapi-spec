@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.25"
+    version: "0.61.26"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2565,6 +2565,82 @@ paths:
             responses:
                 "204":
                     description: Agent deleted
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/agents/{agent_id}/children:
+        parameters:
+            - name: agent_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        get:
+            tags: [Agents]
+            summary: List an agent's child agents
+            operationId: listChildAgents
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Children
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentListResponse"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+        post:
+            tags: [Agents]
+            summary: Create a child agent
+            description: |
+                A cheap sub-agent under a parent. The child has its own API key, memory
+                namespaces and `action_approval_policy`; is created with a subset of the
+                parent's `vault_ids` and `scopes` (a superset is refused, not trimmed);
+                inherits the parent's vault access policies (policy lookups include the
+                parent's rows) and guardrails; does not count against the plan's agent cap
+                (capped at 50 per parent); and cannot have children of its own. Human-only.
+                Audited as `agent.child_created`.
+            operationId: createChildAgent
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [name]
+                            properties:
+                                name: { type: string, maxLength: 100 }
+                                description: { type: string }
+                                vault_ids:
+                                    type: array
+                                    items: { type: string, format: uuid }
+                                    description: Subset of the parent's vault_ids. Default the parent's.
+                                scopes:
+                                    type: array
+                                    items: { type: string }
+                                    description: Subset of the parent's scopes. Default the parent's.
+                                memory_namespace_allowlist:
+                                    type: array
+                                    items: { type: string }
+                                    description: The child's own namespaces. Default `["child:{child_id}"]`.
+                                action_approval_policy:
+                                    type: object
+                                    description: The child's own policy. Default the parent's.
+                                expires_at: { type: string, format: date-time }
+                                approval_id: { type: string, format: uuid }
+            responses:
+                "201":
+                    description: Created; `api_key` shown once
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AgentCreatedResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -12079,6 +12155,59 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/automations/{automationId}/runs/{runId}/resume:
+        post:
+            tags: [Automations]
+            summary: Resume a run parked on an approval
+            operationId: resumeAutomationRun
+            description: |
+                An `approval_request` step parks the run in `awaiting_approval` and stops the
+                clock. Deciding that approval — via the API, the one-tap email link or the
+                phone — resumes the run automatically: `approved` continues from the next
+                step, `rejected` fails the run with the reason. This route is the hand-off
+                for a decision made elsewhere: it marks the approval approved on the caller's
+                behalf and continues the run. Human-only. Idempotent — a run that is not
+                parked is returned unchanged. Later steps see the approval step's output as
+                `{status, approval_id}` and the optional `payload` as `{{resume.*}}`. A
+                parked run that nobody decides within 72 hours becomes `timed_out`.
+                Emits `automation.run.resumed`.
+            parameters:
+                - name: automationId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                - name: runId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                payload:
+                                    type: object
+                                    description: Exposed to later steps as `{{resume.*}}`.
+            responses:
+                "200":
+                    description: The run, now running (or unchanged if it was not parked)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AutomationRunResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/automations/presets:
         get:
             tags: [Automations]
@@ -20916,6 +21045,14 @@ components:
                     created_at,
                 ]
             properties:
+                agent_type:
+                    type: string
+                    enum: [standard, child]
+                    description: A `child` is a sub-agent under `parent_agent_id` that inherits its parent's policies and does not count against the plan's agent cap.
+                parent_agent_id:
+                    type: string
+                    format: uuid
+                    description: Present on child agents.
                 memory_enabled:
                     type: boolean
                     description: >-
@@ -28213,6 +28350,13 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/OAuthAppCredentialResponse"
+                platform_defaults:
+                    type: array
+                    items: { type: string }
+                    description: |
+                        Provider slugs 1Claw has its own OAuth app for. Where the organization has
+                        registered no credentials for one of these, connections use 1Claw's app;
+                        an organization credential for the same provider always wins.
 
         # -------------------------------------------------------------------
         # Key Import
