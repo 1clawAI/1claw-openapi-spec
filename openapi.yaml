@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.29"
+    version: "0.61.30"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -21757,6 +21757,25 @@ components:
                     minimum: 0
                     maximum: 365
                     description: Number of days to retain flagged request bodies for replay/investigation
+                streaming_inspection_mode:
+                    type: string
+                    enum: [rolling, holdback]
+                    description: >-
+                        How streamed LLM responses are inspected before release. `rolling` (default)
+                        releases text behind a tail buffer at least as long as the org's longest vault
+                        secret (capped at 256 bytes; longer secrets are matched by prefix); `holdback`
+                        buffers `streaming_holdback_chars` for full parity with buffered inspection.
+                        Tool-call deltas are always held until the call is complete.
+                streaming_holdback_chars:
+                    type: integer
+                    minimum: 64
+                    maximum: 65536
+                    description: Characters held back per stream in holdback mode (default 512)
+                max_concurrent_streams:
+                    type: integer
+                    minimum: 1
+                    maximum: 1000
+                    description: Open streaming responses allowed per agent key (default 20; 429 with Retry-After beyond it)
 
         UnicodeNormalizationConfig:
             type: object
