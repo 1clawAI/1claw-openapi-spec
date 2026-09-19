@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.30",
+    "version": "0.61.31",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -277,7 +277,7 @@
           "Authentication"
         ],
         "summary": "Exchange agent credentials for JWT",
-        "description": "Returns a short-lived EdDSA-signed JWT (`access_token`). Standard claims include `sub`\n(`agent:<uuid>`), `org`, `scopes`, `vault_ids`, optional `intents_api_enabled`, optional\n`shroud_enabled`, optional `llm_token_billing` / `stripe_customer_id` when org LLM billing is on.\n\nWhen **`shroud_enabled`** is true, the JWT payload may include **`shroud_config`**: a JSON object\nmirroring the agent row in Vault (same shape as `ShroudConfig` on `GET /v1/agents/{id}`).\n**Shroud** (TEE proxy) decodes this on each LLM request and runs **PolicyEngine** after the\nglobal inspection pipeline so per-agent limits and threat **block** actions apply without a\nseparate policy fetch. Re-exchange the agent token after changing `shroud_config` so the JWT\nis fresh.\n\nUser JWTs from password, API key, or device flow do **not** include `shroud_config`.\n",
+        "description": "Returns a short-lived EdDSA-signed JWT (`access_token`). Standard claims include `sub`\n(`agent:<uuid>`), `org`, `scopes`, `vault_ids`, optional `intents_api_enabled`, optional\n`shroud_enabled`, optional `llm_token_billing` / `stripe_customer_id` when org LLM billing is on.\n\nWhen **`shroud_enabled`** is true, the JWT payload may include **`shroud_config`**: a JSON object\nmirroring the agent row in Vault (same shape as `ShroudConfig` on `GET /v1/agents/{id}`).\n**Shroud** (TEE proxy) decodes this on each LLM request and runs **PolicyEngine** after the\nglobal inspection pipeline so per-agent limits and threat **block** actions apply without a\nseparate policy fetch. Re-exchange the agent token after changing `shroud_config` so the JWT\nis fresh.\n\nUser JWTs from password, API key, or device flow do **not** include `shroud_config`.\n\n**Router keys.** An `sk-shroud-v1-…` key (minted at\n`POST /v1/agents/{agent_id}/router-keys`) is exchanged key-only — send `api_key`\nalone, no `agent_id`. The token carries a `router_key` claim\n(`{id, max_concurrent_streams?, spend_cap_micro_usd?}`), lives at most **60 s**\n(revocation SLA), and is only issued for Shroud-enabled agents. Revoked keys get 401.\n",
         "operationId": "agentToken",
         "security": [],
         "requestBody": {
@@ -23741,6 +23741,136 @@
         }
       }
     },
+    "/v1/agents/{agent_id}/router-keys": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Mint a router key (sk-shroud-v1)",
+        "description": "Creates an `sk-shroud-v1-<32>` static Bearer for the Shroud gateway, mapped to this\nagent. A stock OpenAI or Anthropic SDK sends it as `Authorization: Bearer …` with\n`base_url` set to the gateway; the gateway exchanges it key-only for the agent's\ntoken. The plaintext key is returned **once**. Up to 20 live keys per agent.\nHuman users only; the agent must have `shroud_enabled: true`.\n",
+        "operationId": "createRouterKey",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRouterKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Router key created (plaintext returned once)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouterKeyCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "List router keys",
+        "description": "Every router key of the agent, live and revoked, without secrets.",
+        "operationId": "listRouterKeys",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Router keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "keys"
+                  ],
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RouterKey"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/router-keys/{key_id}": {
+      "delete": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Revoke a router key",
+        "description": "Revokes the key. The gateway stops accepting it within 60 s (router-key tokens\nlive at most that long and the gateway re-exchanges on expiry). Idempotent.\nHuman users only.\n",
+        "operationId": "revokeRouterKey",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouterKey"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/oauth/connections": {
       "get": {
         "tags": [
@@ -39807,6 +39937,103 @@
             "example": 60
           }
         }
+      },
+      "CreateRouterKeyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Shown in lists; defaults to `default`"
+          },
+          "max_concurrent_streams": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Open streaming responses this key may hold at once (gateway default 20)"
+          },
+          "spend_cap_usd": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Optional spend cap in USD, metered by the gateway"
+          }
+        }
+      },
+      "RouterKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "name",
+          "key_prefix",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "key_prefix": {
+            "type": "string",
+            "description": "First 20 characters (`sk-shroud-v1-` + 7) — enough to recognise, not to use"
+          },
+          "max_concurrent_streams": {
+            "type": "integer",
+            "nullable": true
+          },
+          "spend_cap_usd": {
+            "type": "number",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "RouterKeyCreated": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RouterKey"
+          },
+          {
+            "type": "object",
+            "required": [
+              "router_key",
+              "base_url"
+            ],
+            "properties": {
+              "router_key": {
+                "type": "string",
+                "description": "The plaintext `sk-shroud-v1-…` key. Returned once.",
+                "example": "sk-shroud-v1-Q2c5o0yQ3bHkT9m1vXz8Lw7nRp4aEf6u"
+              },
+              "base_url": {
+                "type": "string",
+                "description": "The Shroud gateway to point the SDK at",
+                "example": "https://shroud.1claw.co"
+              }
+            }
+          }
+        ]
       },
       "EventSubscription": {
         "type": "object",
