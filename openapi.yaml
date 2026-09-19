@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.21"
+    version: "0.61.22"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -16156,6 +16156,34 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /v1/agents/enroll/{pairing_id}/status:
+        parameters:
+            - name: pairing_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+            - name: poll
+              in: query
+              required: true
+              schema: { type: string }
+              description: The `poll_token` from the enrol response.
+        get:
+            tags: [Agents]
+            summary: "Public: pairing status — the agent learns the decision and collects its key once"
+            operationId: getEnrollmentStatus
+            security: []
+            responses:
+                "200":
+                    description: Status
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/EnrollmentStatusResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/agents/enroll/pending:
         get:
             tags: [Agents]
@@ -16165,6 +16193,17 @@ paths:
             responses:
                 '200':
                     description: Success
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    agent_name: { type: string }
+                                    expires_at: { type: string, format: date-time }
+                                    fingerprint:
+                                        type: string
+                                        description: Pairing only — the agent key's `SHA256:` fingerprint to verify visually.
+                                    description: { type: string }
                 '404':
                     description: Not found
     /v1/agents/{agent_id}/channels/{channel_id}/refresh-webhook:
@@ -19991,6 +20030,15 @@ components:
                 description:
                     type: string
                     description: Optional agent description
+                public_key:
+                    type: string
+                    description: |
+                        Pairing ceremony. The agent's own Ed25519 public key (`ssh-ed25519 AAAA…`
+                        or base64 of the raw 32 bytes). Its `SHA256:` fingerprint is shown to the
+                        human on the approval page for visual verification, and the agent
+                        collects its API key itself by polling
+                        `GET /v1/agents/enroll/{pairing_id}/status?poll=<poll_token>` — no key
+                        in an email, nothing to copy. `1claw agent enroll --pair` does all of this.
 
         EnrollAgentResponse:
             type: object
@@ -20008,6 +20056,36 @@ components:
                     description: |
                         Present when a pending enrollment was created and the client should show
                         this link (email flow includes it as a fallback; name-only flow requires it).
+                pairing_id:
+                    type: string
+                    format: uuid
+                    description: Pairing only.
+                fingerprint:
+                    type: string
+                    description: Pairing only. `SHA256:<base64>` of the key, as `ssh-keygen -lf` prints it. Show it to the human.
+                poll_token:
+                    type: string
+                    description: Pairing only. Presented as `?poll=` on the status endpoint. Shown once.
+                expires_at:
+                    type: string
+                    format: date-time
+
+        EnrollmentStatusResponse:
+            type: object
+            properties:
+                pairing_id: { type: string, format: uuid }
+                status:
+                    type: string
+                    enum: [pending, approved, denied, expired]
+                agent_name: { type: string }
+                fingerprint: { type: string, nullable: true }
+                agent_id: { type: string, format: uuid }
+                api_key:
+                    type: string
+                    description: Present exactly once, on the first poll after approval; the pairing is then closed.
+                vault_ids:
+                    type: array
+                    items: { type: string }
 
         # --- Agents ---
 

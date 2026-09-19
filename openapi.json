@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.21",
+    "version": "0.61.22",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -25302,6 +25302,54 @@
         }
       }
     },
+    "/v1/agents/enroll/{pairing_id}/status": {
+      "parameters": [
+        {
+          "name": "pairing_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "poll",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "The `poll_token` from the enrol response."
+        }
+      ],
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Public: pairing status — the agent learns the decision and collects its key once",
+        "operationId": "getEnrollmentStatus",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/enroll/pending": {
       "get": {
         "tags": [
@@ -25312,7 +25360,30 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent_name": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "fingerprint": {
+                      "type": "string",
+                      "description": "Pairing only — the agent key's `SHA256:` fingerprint to verify visually."
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "description": "Not found"
@@ -31344,6 +31415,10 @@
           "description": {
             "type": "string",
             "description": "Optional agent description"
+          },
+          "public_key": {
+            "type": "string",
+            "description": "Pairing ceremony. The agent's own Ed25519 public key (`ssh-ed25519 AAAA…`\nor base64 of the raw 32 bytes). Its `SHA256:` fingerprint is shown to the\nhuman on the approval page for visual verification, and the agent\ncollects its API key itself by polling\n`GET /v1/agents/enroll/{pairing_id}/status?poll=<poll_token>` — no key\nin an email, nothing to copy. `1claw agent enroll --pair` does all of this.\n"
           }
         }
       },
@@ -31363,6 +31438,62 @@
             "type": "string",
             "format": "uri",
             "description": "Present when a pending enrollment was created and the client should show\nthis link (email flow includes it as a fallback; name-only flow requires it).\n"
+          },
+          "pairing_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Pairing only."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Pairing only. `SHA256:<base64>` of the key, as `ssh-keygen -lf` prints it. Show it to the human."
+          },
+          "poll_token": {
+            "type": "string",
+            "description": "Pairing only. Presented as `?poll=` on the status endpoint. Shown once."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EnrollmentStatusResponse": {
+        "type": "object",
+        "properties": {
+          "pairing_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "denied",
+              "expired"
+            ]
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Present exactly once, on the first poll after approval; the pairing is then closed."
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
