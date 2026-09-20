@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.36"
+    version: "0.61.38"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -4281,6 +4281,40 @@ paths:
     # ---------------------------------------------------------------------------
     # Organization
     # ---------------------------------------------------------------------------
+
+    /v1/org/overview:
+        get:
+            tags: [Organization]
+            summary: System overview
+            operationId: getOrgOverview
+            description: |
+                The whole org in one call: inventory (vaults, secrets, agents, runtimes,
+                automations, bindings, policies, wallets, apps, members), activity in the last
+                `hours` (secret reads/writes, denials, executions, transactions, Shroud
+                requests/blocked/redacted/injections, automation runs, approvals, consensus,
+                risk events, API requests), spend (inference, executions, automations, credit
+                balance), health (expiring secrets, stale/suspended/unpoliced agents, failing
+                automations, errored runtimes, overdue approvals) and a 7-day trend. Human and
+                platform callers only. Backs the dashboard's Overview tab.
+            parameters:
+                - name: hours
+                  in: query
+                  schema:
+                      type: integer
+                      minimum: 1
+                      maximum: 168
+                      default: 24
+            responses:
+                "200":
+                    description: Overview
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/OrgOverview"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     /v1/org/members:
         get:
@@ -28061,6 +28095,66 @@ components:
                     format: uuid
                     description: Control-plane approval when rolling back to a wider spec.
 
+        OrgOverview:
+            type: object
+            required: [generated_at, window_hours, inventory, activity, spend, health, trend]
+            properties:
+                generated_at:
+                    type: string
+                    format: date-time
+                window_hours:
+                    type: integer
+                inventory:
+                    type: object
+                    additionalProperties:
+                        type: integer
+                    description: vaults, secrets, agents_total, agents_active, child_agents, runtimes_total, runtimes_running, automations_total, automations_active, bindings, policies, treasury_wallets, signing_keys, platform_apps, connected_apps, team_members
+                activity:
+                    type: object
+                    additionalProperties:
+                        type: integer
+                    description: audit_events, secret_reads, secret_writes, policy_denials, executions, execution_failures, transactions, transactions_failed, shroud_requests, shroud_blocked, shroud_redacted, shroud_injections, automation_runs, automation_runs_failed, automation_runs_parked, approvals_pending, approvals_decided, consensus_pending, risk_events, threats_open, api_requests
+                spend:
+                    type: object
+                    properties:
+                        inference_usd:
+                            type: number
+                        inference_tokens:
+                            type: integer
+                        execution_cost_cents:
+                            type: integer
+                        automation_cost_cents:
+                            type: integer
+                        credit_balance_micro_usd:
+                            type: integer
+                        billing_tier:
+                            type: string
+                health:
+                    type: object
+                    additionalProperties:
+                        type: integer
+                    description: secrets_expiring_7d, stale_agents, agents_without_policy, automations_failing, runtimes_errored, approvals_overdue, agents_suspended
+                trend:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            day:
+                                type: string
+                                format: date
+                            audit_events:
+                                type: integer
+                            denials:
+                                type: integer
+                            shroud_requests:
+                                type: integer
+                            shroud_blocked:
+                                type: integer
+                            automation_runs:
+                                type: integer
+                            transactions:
+                                type: integer
+
         DryRunRequest:
             type: object
             properties:
@@ -28475,6 +28569,22 @@ components:
         UpdateRuntimeRequest:
             type: object
             properties:
+                schedule:
+                    nullable: true
+                    description: |
+                        Scheduled start/stop: start the container when `start_cron` fires (IANA
+                        `timezone`, default UTC) and stop it `stop_after_secs` later (60–86400; null
+                        leaves it to the idle reconciler). `null` clears the schedule.
+                    type: object
+                    properties:
+                        start_cron:
+                            type: string
+                        timezone:
+                            type: string
+                            default: UTC
+                        stop_after_secs:
+                            type: integer
+                            nullable: true
                 name:
                     type: string
                 template:
@@ -28512,6 +28622,22 @@ components:
             type: object
             required: [id, name, agent_id, status, created_at, updated_at]
             properties:
+                image_digest:
+                    type: string
+                    nullable: true
+                    description: Resolved image (digest form when the provider reports one); runtime-minted agent tokens carry it as `runtime_image`, which access policies can require via `conditions.runtime_image_in`.
+                schedule:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+                next_scheduled_start_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                scheduled_stop_at:
+                    type: string
+                    format: date-time
+                    nullable: true
                 id:
                     type: string
                     format: uuid

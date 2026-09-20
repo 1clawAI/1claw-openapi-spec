@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.36",
+    "version": "0.61.38",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -6606,6 +6606,46 @@
         "responses": {
           "204": {
             "description": "Share declined"
+          }
+        }
+      }
+    },
+    "/v1/org/overview": {
+      "get": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "System overview",
+        "operationId": "getOrgOverview",
+        "description": "The whole org in one call: inventory (vaults, secrets, agents, runtimes,\nautomations, bindings, policies, wallets, apps, members), activity in the last\n`hours` (secret reads/writes, denials, executions, transactions, Shroud\nrequests/blocked/redacted/injections, automation runs, approvals, consensus,\nrisk events, API requests), spend (inference, executions, automations, credit\nbalance), health (expiring secrets, stale/suspended/unpoliced agents, failing\nautomations, errored runtimes, overdue approvals) and a 7-day trend. Human and\nplatform callers only. Backs the dashboard's Overview tab.\n",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Overview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -43353,6 +43393,101 @@
           }
         }
       },
+      "OrgOverview": {
+        "type": "object",
+        "required": [
+          "generated_at",
+          "window_hours",
+          "inventory",
+          "activity",
+          "spend",
+          "health",
+          "trend"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window_hours": {
+            "type": "integer"
+          },
+          "inventory": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "vaults, secrets, agents_total, agents_active, child_agents, runtimes_total, runtimes_running, automations_total, automations_active, bindings, policies, treasury_wallets, signing_keys, platform_apps, connected_apps, team_members"
+          },
+          "activity": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "audit_events, secret_reads, secret_writes, policy_denials, executions, execution_failures, transactions, transactions_failed, shroud_requests, shroud_blocked, shroud_redacted, shroud_injections, automation_runs, automation_runs_failed, automation_runs_parked, approvals_pending, approvals_decided, consensus_pending, risk_events, threats_open, api_requests"
+          },
+          "spend": {
+            "type": "object",
+            "properties": {
+              "inference_usd": {
+                "type": "number"
+              },
+              "inference_tokens": {
+                "type": "integer"
+              },
+              "execution_cost_cents": {
+                "type": "integer"
+              },
+              "automation_cost_cents": {
+                "type": "integer"
+              },
+              "credit_balance_micro_usd": {
+                "type": "integer"
+              },
+              "billing_tier": {
+                "type": "string"
+              }
+            }
+          },
+          "health": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "secrets_expiring_7d, stale_agents, agents_without_policy, automations_failing, runtimes_errored, approvals_overdue, agents_suspended"
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "audit_events": {
+                  "type": "integer"
+                },
+                "denials": {
+                  "type": "integer"
+                },
+                "shroud_requests": {
+                  "type": "integer"
+                },
+                "shroud_blocked": {
+                  "type": "integer"
+                },
+                "automation_runs": {
+                  "type": "integer"
+                },
+                "transactions": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
       "DryRunRequest": {
         "type": "object",
         "properties": {
@@ -43987,6 +44122,24 @@
       "UpdateRuntimeRequest": {
         "type": "object",
         "properties": {
+          "schedule": {
+            "nullable": true,
+            "description": "Scheduled start/stop: start the container when `start_cron` fires (IANA\n`timezone`, default UTC) and stop it `stop_after_secs` later (60–86400; null\nleaves it to the idle reconciler). `null` clears the schedule.\n",
+            "type": "object",
+            "properties": {
+              "start_cron": {
+                "type": "string"
+              },
+              "timezone": {
+                "type": "string",
+                "default": "UTC"
+              },
+              "stop_after_secs": {
+                "type": "integer",
+                "nullable": true
+              }
+            }
+          },
           "name": {
             "type": "string"
           },
@@ -44051,6 +44204,26 @@
           "updated_at"
         ],
         "properties": {
+          "image_digest": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved image (digest form when the provider reports one); runtime-minted agent tokens carry it as `runtime_image`, which access policies can require via `conditions.runtime_image_in`."
+          },
+          "schedule": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "next_scheduled_start_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scheduled_stop_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "id": {
             "type": "string",
             "format": "uuid"
