@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.35",
+    "version": "0.61.36",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -19352,6 +19352,159 @@
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/automations/dry-run": {
+      "post": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Preview an unsaved workflow spec",
+        "operationId": "dryRunAutomationSpec",
+        "description": "What a run would do, with nothing done: every step after template substitution\nagainst a simulated context, its side effect, its `on_error` policy, templates\nthat would resolve to nothing, conditions, and the budget it would hit. Step\noutputs are placeholders, so later steps' `{{steps.N.output…}}` show empty here.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DryRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DryRunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/automations/{automationId}/dry-run": {
+      "post": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Preview a run of this automation",
+        "operationId": "dryRunAutomation",
+        "description": "Same as the unsaved preview, defaulting to the automation's current spec.",
+        "parameters": [
+          {
+            "name": "automationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DryRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DryRunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/automations/{automationId}/runs/{runId}/rerun": {
+      "post": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Re-run from a step",
+        "operationId": "rerunAutomationFromStep",
+        "description": "Start a new run seeded with this run's results up to `from_step` and continue from\nthere, on the spec version the original run executed. Human-only; the original\nrun must be finished. The new run has `trigger_source: rerun` and `parent_run_id`.\n",
+        "parameters": [
+          {
+            "name": "automationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from_step": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 0,
+                    "description": "Zero-based step index to start from."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -43197,6 +43350,127 @@
             "type": "string",
             "format": "uuid",
             "description": "Control-plane approval when rolling back to a wider spec."
+          }
+        }
+      },
+      "DryRunRequest": {
+        "type": "object",
+        "properties": {
+          "workflow_spec": {
+            "description": "Spec to preview (required on the unsaved-spec route).",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Simulated trigger payload (`{{trigger.*}}`)."
+          }
+        }
+      },
+      "DryRunResponse": {
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "True when there are no warnings."
+          },
+          "error": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "parks": {
+            "type": "integer",
+            "description": "How many steps park the run."
+          },
+          "budget": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "index",
+                "type",
+                "known",
+                "resolved",
+                "effect",
+                "on_error",
+                "unresolved_templates"
+              ],
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "type": {
+                  "type": "string"
+                },
+                "known": {
+                  "type": "boolean"
+                },
+                "resolved": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The step after template substitution."
+                },
+                "skipped_by": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "effect": {
+                  "type": "string"
+                },
+                "on_error": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "max_attempts": {
+                      "type": "integer"
+                    },
+                    "backoff_secs": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "unresolved_templates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "budget_exceeded": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
           }
         }
       },
