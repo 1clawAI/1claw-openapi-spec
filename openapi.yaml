@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.31"
+    version: "0.61.32"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -10955,6 +10955,64 @@ paths:
                                         format: uri
                 "400":
                     description: Invalid request
+
+    /v1/x402/topup:
+        post:
+            tags: [Billing]
+            summary: x402 ledger top-up (agent door)
+            description: |
+                The wallet rail for Shroud (Shroud AI plan). Without `X-PAYMENT` the response is a
+                **402** quote (`x402Version`, `accepts[]` with `payTo`, `maxAmountRequired`, `resource`)
+                for `amount_usd` (default $1) of USDC on Base. With a signed EIP-3009 `X-PAYMENT`
+                the facilitator verifies it, the proof is claimed once, the payer wallet's org
+                ledger is credited in micro-USD, and the facilitator settles.
+
+                **Payment is the account.** An unknown wallet's first settled top-up provisions a
+                shadow org, one Shroud-enabled agent and one `sk-shroud-v1` router key keyed on the
+                wallet (returned once as `router_key`), after screening the wallet against the OFAC
+                SDN list (fails closed when the list is missing or stale) and the caller's region
+                against the custody geofence. Same wallet = same org on every later top-up. The
+                response always carries a ≤60 s `access_token` for the wallet's agent so the
+                gateway can serve the paid request immediately. The Shroud gateway drives this for
+                `Authorization: Bearer x402` requests and relays the quote or the result.
+            operationId: x402Topup
+            security: []
+            parameters:
+                - name: X-PAYMENT
+                  in: header
+                  required: false
+                  schema: { type: string }
+                  description: Base64 x402 payment payload (EIP-3009 USDC authorization on Base)
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                                amount_usd:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 100
+                                    description: Whole dollars to add to the ledger (default 1)
+            responses:
+                "200":
+                    description: Credited
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/X402TopupResponse"
+                "402":
+                    description: Payment required — the quote to sign, or why the payment was refused
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PaymentRequired"
+                "403":
+                    description: The wallet is sanctioned or the region is fenced; no account is opened
+                "503":
+                    description: The sanctions list is unavailable (fails closed)
 
     /v1/oauth/token:
         post:
@@ -23430,6 +23488,11 @@ components:
                     type: string
                 credit_balance_cents:
                     type: integer
+                    description: Derived (rounded down); the ledger unit is micro-USD
+                credit_balance_micro_usd:
+                    type: integer
+                    format: int64
+                    description: The ledger value. One inspected Shroud request costs 5,000 micro-USD ($0.005).
                 credit_balance_usd:
                     type: string
                 overage_method:
@@ -23586,8 +23649,14 @@ components:
             properties:
                 balance_cents:
                     type: integer
+                    description: Derived (rounded down); the ledger unit is micro-USD
+                balance_micro_usd:
+                    type: integer
+                    format: int64
+                    description: The ledger value (1 = $0.000001)
                 balance_usd:
                     type: string
+                    description: Dollars at the ledger's precision (e.g. "4.995"), never fewer than two decimals
                 expiring_within_90_days:
                     type: object
                     properties:
@@ -25981,6 +26050,26 @@ components:
                           type: string
                           description: The Shroud gateway to point the SDK at
                           example: https://shroud.1claw.co
+
+        X402TopupResponse:
+            type: object
+            required: [wallet, org_id, agent_id, credited_micro_usd, balance_micro_usd, balance_usd, access_token, expires_in, base_url, provisioned]
+            properties:
+                wallet: { type: string, description: Payer address (lower-case) }
+                org_id: { type: string, format: uuid }
+                agent_id: { type: string, format: uuid }
+                credited_micro_usd: { type: integer, format: int64 }
+                balance_micro_usd: { type: integer, format: int64 }
+                balance_usd: { type: string }
+                router_key:
+                    type: string
+                    description: Present only on the top-up that provisioned the account (or re-minted a lost key). Shown once.
+                access_token:
+                    type: string
+                    description: A ≤60 s agent token for the wallet's agent (carries the `router_key` claim)
+                expires_in: { type: integer }
+                base_url: { type: string, description: The Shroud gateway }
+                provisioned: { type: boolean, description: True when this top-up created the account }
 
         EventSubscription:
             type: object

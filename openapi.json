@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.31",
+    "version": "0.61.32",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -17217,6 +17217,75 @@
           },
           "400": {
             "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/v1/x402/topup": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "x402 ledger top-up (agent door)",
+        "description": "The wallet rail for Shroud (Shroud AI plan). Without `X-PAYMENT` the response is a\n**402** quote (`x402Version`, `accepts[]` with `payTo`, `maxAmountRequired`, `resource`)\nfor `amount_usd` (default $1) of USDC on Base. With a signed EIP-3009 `X-PAYMENT`\nthe facilitator verifies it, the proof is claimed once, the payer wallet's org\nledger is credited in micro-USD, and the facilitator settles.\n\n**Payment is the account.** An unknown wallet's first settled top-up provisions a\nshadow org, one Shroud-enabled agent and one `sk-shroud-v1` router key keyed on the\nwallet (returned once as `router_key`), after screening the wallet against the OFAC\nSDN list (fails closed when the list is missing or stale) and the caller's region\nagainst the custody geofence. Same wallet = same org on every later top-up. The\nresponse always carries a ≤60 s `access_token` for the wallet's agent so the\ngateway can serve the paid request immediately. The Shroud gateway drives this for\n`Authorization: Bearer x402` requests and relays the quote or the result.\n",
+        "operationId": "x402Topup",
+        "security": [],
+        "parameters": [
+          {
+            "name": "X-PAYMENT",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Base64 x402 payment payload (EIP-3009 USDC authorization on Base)"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "amount_usd": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Whole dollars to add to the ledger (default 1)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/X402TopupResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — the quote to sign, or why the payment was refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRequired"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The wallet is sanctioned or the region is fenced; no account is opened"
+          },
+          "503": {
+            "description": "The sanctions list is unavailable (fails closed)"
           }
         }
       }
@@ -36090,7 +36159,13 @@
             "type": "string"
           },
           "credit_balance_cents": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Derived (rounded down); the ledger unit is micro-USD"
+          },
+          "credit_balance_micro_usd": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The ledger value. One inspected Shroud request costs 5,000 micro-USD ($0.005)."
           },
           "credit_balance_usd": {
             "type": "string"
@@ -36313,10 +36388,17 @@
         "type": "object",
         "properties": {
           "balance_cents": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Derived (rounded down); the ledger unit is micro-USD"
+          },
+          "balance_micro_usd": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The ledger value (1 = $0.000001)"
           },
           "balance_usd": {
-            "type": "string"
+            "type": "string",
+            "description": "Dollars at the ledger's precision (e.g. \"4.995\"), never fewer than two decimals"
           },
           "expiring_within_90_days": {
             "type": "object",
@@ -40034,6 +40116,65 @@
             }
           }
         ]
+      },
+      "X402TopupResponse": {
+        "type": "object",
+        "required": [
+          "wallet",
+          "org_id",
+          "agent_id",
+          "credited_micro_usd",
+          "balance_micro_usd",
+          "balance_usd",
+          "access_token",
+          "expires_in",
+          "base_url",
+          "provisioned"
+        ],
+        "properties": {
+          "wallet": {
+            "type": "string",
+            "description": "Payer address (lower-case)"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "credited_micro_usd": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "balance_micro_usd": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "balance_usd": {
+            "type": "string"
+          },
+          "router_key": {
+            "type": "string",
+            "description": "Present only on the top-up that provisioned the account (or re-minted a lost key). Shown once."
+          },
+          "access_token": {
+            "type": "string",
+            "description": "A ≤60 s agent token for the wallet's agent (carries the `router_key` claim)"
+          },
+          "expires_in": {
+            "type": "integer"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "The Shroud gateway"
+          },
+          "provisioned": {
+            "type": "boolean",
+            "description": "True when this top-up created the account"
+          }
+        }
       },
       "EventSubscription": {
         "type": "object",
