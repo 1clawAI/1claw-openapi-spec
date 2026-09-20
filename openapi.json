@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.34",
+    "version": "0.61.35",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -18839,6 +18839,7 @@
         ],
         "summary": "Trigger automation",
         "operationId": "triggerAutomation",
+        "description": "Start a run now. With an `idempotency_key` (body or `Idempotency-Key` header) the\nsame key returns the run already started for it (200) rather than a second run\n(201). `input` is exposed to steps as `{{trigger.*}}`.\n",
         "parameters": [
           {
             "name": "automationId",
@@ -18850,9 +18851,29 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerAutomationRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Automation triggered",
+            "description": "An earlier run with the same idempotency key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRunResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Run started",
             "content": {
               "application/json": {
                 "schema": {
@@ -19251,6 +19272,173 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AutomationRunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/automations/{automationId}/runs/{runId}/callback/{token}": {
+      "post": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Continue a run parked on awaiting_callback",
+        "operationId": "automationRunCallback",
+        "security": [],
+        "description": "Public, authenticated by the per-run token. A spec with an `awaiting_callback`\nstep gets the token at run start as `{{run.callback_url}}` / `{{run.callback_token}}`;\nan earlier step hands the URL to the external system, the step parks the run\n(`awaiting_callback`, up to its `timeout_secs`), and this POST continues it. The\nJSON body becomes `{{resume.*}}`. 409 when the run is not (yet) parked on a\ncallback; 401 for a wrong token.\n",
+        "parameters": [
+          {
+            "name": "automationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The run, continuing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/automations/{automationId}/versions": {
+      "get": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "List spec versions",
+        "operationId": "listAutomationVersions",
+        "description": "Every `workflow_spec` the automation has had, newest first. Version 1 is the\nspec it was created with; every update that changes the spec publishes the\nnext one. Runs record the version they executed.\n",
+        "parameters": [
+          {
+            "name": "automationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationVersionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/automations/{automationId}/versions/{version}/rollback": {
+      "post": {
+        "tags": [
+          "Automations"
+        ],
+        "summary": "Roll back to an earlier spec version",
+        "operationId": "rollbackAutomationVersion",
+        "description": "Publishes the chosen version's spec as a new version and makes it current.\nHuman-only. A rollback that widens what the automation can do relative to the\nlive spec goes through the `automation.widen` control-plane consensus gate,\nlike an edit would.\n",
+        "parameters": [
+          {
+            "name": "automationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollbackAutomationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The automation with the rolled-back spec current",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationResponse"
                 }
               }
             }
@@ -42891,6 +43079,139 @@
           },
           "is_active": {
             "type": "boolean"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Control-plane approval authorising a widening change (adding a step that\nmoves funds or reaches the network, raising or removing a `budget` cap).\nRequired only when the org's consensus policy gates `automation.widen`.\n"
+          },
+          "version_note": {
+            "type": "string",
+            "description": "Note recorded on the new spec version."
+          },
+          "webhook_signature": {
+            "nullable": true,
+            "description": "Inbound signature scheme for a webhook-triggered automation. `stripe`\n(`Stripe-Signature: t=…,v1=…` over `<t>.<body>`), `github`\n(`X-Hub-Signature-256: sha256=…` over the body) or `hmac_sha256`\n(`<header>: <hex|base64>` over the body). The secret is stored encrypted\nand never returned; `null` removes the scheme. With a scheme set, an\nunsigned or mis-signed delivery starts nothing.\n",
+            "type": "object",
+            "properties": {
+              "scheme": {
+                "type": "string",
+                "enum": [
+                  "stripe",
+                  "github",
+                  "hmac_sha256"
+                ]
+              },
+              "secret": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 512
+              },
+              "header": {
+                "type": "string",
+                "description": "Header carrying the signature (defaults per scheme)."
+              },
+              "tolerance_secs": {
+                "type": "integer",
+                "default": 300,
+                "description": "Timestamp tolerance for schemes that carry one (stripe)."
+              }
+            }
+          }
+        }
+      },
+      "AutomationVersionResponse": {
+        "type": "object",
+        "required": [
+          "version",
+          "spec_hash",
+          "workflow_spec",
+          "created_by_type",
+          "created_at",
+          "current"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer"
+          },
+          "spec_hash": {
+            "type": "string",
+            "description": "SHA-256 of the canonical (sorted-key) JSON of the spec."
+          },
+          "workflow_spec": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
+          },
+          "created_by_type": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AutomationVersionListResponse": {
+        "type": "object",
+        "required": [
+          "current_version",
+          "versions"
+        ],
+        "properties": {
+          "current_version": {
+            "type": "integer"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationVersionResponse"
+            }
+          }
+        }
+      },
+      "RollbackAutomationRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Control-plane approval when rolling back to a wider spec."
+          }
+        }
+      },
+      "TriggerAutomationRequest": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Exposed to steps as `{{trigger.*}}`."
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Same key twice for one automation returns the existing run (200) instead\nof starting a second (201). `Idempotency-Key` header is equivalent.\n"
           }
         }
       },
@@ -43003,6 +43324,15 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "spec_version": {
+            "type": "integer",
+            "description": "Current `automation_versions` version."
+          },
+          "webhook_signature_scheme": {
+            "type": "string",
+            "nullable": true,
+            "description": "Inbound signature scheme name, never the secret."
           }
         }
       },
@@ -43135,11 +43465,57 @@
             "enum": [
               "running",
               "success",
+              "completed_with_skips",
               "failed",
               "timed_out",
               "cancelled",
-              "awaiting_approval"
+              "awaiting_approval",
+              "waiting",
+              "awaiting_callback"
+            ],
+            "description": "`awaiting_approval`, `waiting` (a `wait_until` park) and `awaiting_callback`\nare parked states: the run's clock is stopped and it continues when the\napproval is decided, the wake time passes, or the callback URL is posted to.\n"
+          },
+          "paused_reason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "approval",
+              "wait_until",
+              "callback"
             ]
+          },
+          "paused_at_step": {
+            "type": "integer",
+            "nullable": true
+          },
+          "paused_approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "paused_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "paused_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "spec_version": {
+            "type": "integer",
+            "nullable": true
+          },
+          "idempotency_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "parent_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Set when a `call_automation` step started this run."
           },
           "step_results": {
             "nullable": true
