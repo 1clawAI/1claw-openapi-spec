@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.32",
+    "version": "0.61.33",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -23940,6 +23940,130 @@
         }
       }
     },
+    "/v1/agents/{agent_id}/tool-bindings": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Create a secret → tool binding (rehydration policy)",
+        "description": "Authorises the enclave to rehydrate the `⟦sk:…⟧` placeholder for `secret_path`\ninto `tool_name` at `arg_path` — and only when the call's destination host is one\nof `destination_hosts`. Redaction replaces vault secrets in prompts with\ndeterministic placeholders the model can place but never read; a placeholder is\nsubstituted back only inside an authorised tool-call argument, at the moment the\nenclave performs the call (`execution_mode: \"tee\"`). No binding, wrong argument,\nwrong host, bad checksum or an unknown tag is a 403 at execution time. Human users\nonly; up to 200 per agent.\n",
+        "operationId": "createToolBinding",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateToolBindingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretToolBinding"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "A binding for this secret, tool and argument already exists"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "List secret → tool bindings",
+        "operationId": "listToolBindings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bindings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "bindings"
+                  ],
+                  "properties": {
+                    "bindings": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SecretToolBinding"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/agents/{agent_id}/tool-bindings/{binding_id}": {
+      "delete": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Delete a secret → tool binding",
+        "operationId": "deleteToolBinding",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "binding_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/agents/{agent_id}/oauth/connections": {
       "get": {
         "tags": [
@@ -40116,6 +40240,89 @@
             }
           }
         ]
+      },
+      "CreateToolBindingRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "secret_path",
+          "tool_name",
+          "destination_hosts"
+        ],
+        "properties": {
+          "secret_path": {
+            "type": "string",
+            "description": "Vault path of the secret the placeholder stands for"
+          },
+          "tool_name": {
+            "type": "string",
+            "description": "Tool the binding applies to (`http_request`, `run_sql`, …) or `*`"
+          },
+          "arg_path": {
+            "type": "string",
+            "description": "JSON pointer into the tool's arguments (`/headers/Authorization`, `/body/*`) or `*` (default)"
+          },
+          "destination_hosts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "string"
+            },
+            "description": "Hosts the rehydrated call may reach (`api.stripe.com`, `*.googleapis.com`); required"
+          }
+        }
+      },
+      "SecretToolBinding": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "agent_id",
+          "secret_path",
+          "tool_name",
+          "arg_path",
+          "destination_hosts",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "secret_path": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "arg_path": {
+            "type": "string"
+          },
+          "destination_hosts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "X402TopupResponse": {
         "type": "object",
