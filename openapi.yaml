@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.33"
+    version: "0.61.34"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -11008,7 +11008,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/PaymentRequired"
+                                $ref: "#/components/schemas/PaymentRequirement"
                 "403":
                     description: The wallet is sanctioned or the region is fenced; no account is opened
                 "503":
