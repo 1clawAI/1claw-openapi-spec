@@ -4556,6 +4556,65 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/OnboardingProvisionResponse"
 
+    /v1/onboarding/guided/status:
+        get:
+            tags: [Organization]
+            summary: Guided onboarding eligibility + status
+            description: |
+                Whether this org is in the guided-onboarding rollout cohort, plus the
+                same welcome-bundle progress fields `GET /v1/org/onboarding/status`
+                reports. `eligible` decides whether the dashboard's redirect sends a
+                new, still-unprovisioned user to the guided flow or the existing
+                MCP-connect flow.
+            operationId: getGuidedOnboardingStatus
+            responses:
+                "200":
+                    description: Guided onboarding status
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GuidedOnboardingStatus"
+
+    /v1/onboarding/guided/trial/setup-intent:
+        post:
+            tags: [Organization]
+            summary: Start a card-on-file trial runtime setup
+            description: |
+                Creates a Stripe SetupIntent for the org's customer so the guided
+                onboarding wizard can collect a card with Stripe.js — no charge unless
+                the trial runtime is kept past its trial window.
+            operationId: createTrialSetupIntent
+            responses:
+                "200":
+                    description: SetupIntent client secret
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TrialSetupIntentResponse"
+
+    /v1/onboarding/guided/trial/runtime:
+        post:
+            tags: [Organization]
+            summary: Create a card-gated trial runtime
+            description: |
+                Verifies the given SetupIntent succeeded, then delegates to the same
+                runtime-creation logic `POST /v1/runtimes` uses. Only reachable once
+                the guided onboarding wizard has a confirmed SetupIntent for the org.
+            operationId: createTrialRuntime
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateTrialRuntimeRequest"
+            responses:
+                "201":
+                    description: Created runtime
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+
     /v1/org/status:
         get:
             tags: [Organization]
@@ -24051,6 +24110,13 @@ components:
                         if the org has one. Same field and meaning as on `POST /v1/agents`:
                         the first call returns 202 with the approval to collect, and the
                         retry passes its id here.
+                guided:
+                    type: boolean
+                    default: false
+                    description: |
+                        Seeds `getting-started/**` instead of `examples/**` in the shared
+                        `default` vault — the guided onboarding wizard's own sample content,
+                        kept distinguishable from the MCP-connect developer flow's.
 
         OnboardingProvisionResponse:
             type: object
@@ -24067,6 +24133,45 @@ components:
                 mcp_stdio_config:
                     type: object
                 verify_prompt:
+                    type: string
+
+        GuidedOnboardingStatus:
+            allOf:
+                - type: object
+                  required: [eligible]
+                  properties:
+                      eligible:
+                          type: boolean
+                          description: |
+                              Whether this org is in the guided-onboarding rollout cohort —
+                              decides whether the dashboard redirects a new user here or to
+                              the MCP-connect flow.
+                - $ref: "#/components/schemas/OnboardingStatus"
+
+        TrialSetupIntentResponse:
+            type: object
+            required: [client_secret, publishable_key]
+            properties:
+                client_secret:
+                    type: string
+                publishable_key:
+                    type: string
+
+        CreateTrialRuntimeRequest:
+            type: object
+            required: [setup_intent_id, agent_id, template, name]
+            properties:
+                setup_intent_id:
+                    type: string
+                agent_id:
+                    type: string
+                    format: uuid
+                template:
+                    type: string
+                preset:
+                    type: string
+                    description: Defaults to CreateRuntimeRequest's own default ("small") when omitted.
+                name:
                     type: string
 
         AgentKeysVaultResponse:
