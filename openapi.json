@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.39",
+    "version": "0.61.40",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -78,6 +78,10 @@
     {
       "name": "Organization",
       "description": "Org membership and roles"
+    },
+    {
+      "name": "Spend",
+      "description": "AI spend — inference cost per agent, provider and model, against budgets and caps"
     },
     {
       "name": "Billing",
@@ -6606,6 +6610,301 @@
         "responses": {
           "204": {
             "description": "Share declined"
+          }
+        }
+      }
+    },
+    "/v1/spend/ai": {
+      "get": {
+        "tags": [
+          "Spend"
+        ],
+        "summary": "AI spend",
+        "operationId": "getAiSpend",
+        "description": "Inference spend for the org over a window (default the last 30 days):\ntotals with the previous equal-length window for comparison, a time series\nby provider, and breakdowns by provider, by model and by agent — each agent\nwith its `shroud_config` daily budget, today's spend against it and the\nrequests Shroud blocked for budget. `limits` carries router-key spend caps,\nthe credit balance and 1Claw's inspection fees for the window (a separate\nnumber from provider cost). Every request is priced at ingest from the\nprice card (`GET /v1/spend/ai/prices`); a request whose provider has no\ncard is counted as unpriced, not free. Human and platform callers only.\nBacks the dashboard's Spend tab; the same numbers reach an org's own\ncollector as OTEL metrics `ai.cost_usd`, `ai.tokens.input`, `ai.tokens.output`.\n",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "default": "day"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Spend",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSpend"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/spend/ai/export.csv": {
+      "get": {
+        "tags": [
+          "Spend"
+        ],
+        "summary": "AI spend as CSV",
+        "operationId": "exportAiSpendCsv",
+        "description": "One row per agent × provider × model in the window (same filters as `GET /v1/spend/ai`).",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/spend/ai/prices": {
+      "get": {
+        "tags": [
+          "Spend"
+        ],
+        "summary": "LLM price card",
+        "operationId": "listLlmPrices",
+        "description": "The global price card (public list prices per million tokens) plus this\norg's overrides. Matching: an org row beats a global row; among those the\nlongest `model_pattern` wins; a pattern ending in `%` is a prefix match.\n",
+        "responses": {
+          "200": {
+            "description": "Prices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "prices"
+                  ],
+                  "properties": {
+                    "prices": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LlmModelPrice"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Spend"
+        ],
+        "summary": "Set an org price override",
+        "operationId": "upsertLlmPrice",
+        "description": "Owner/admin. Upserts one override for this org; future requests are priced with it (history is not rewritten).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "provider",
+                  "model_pattern",
+                  "input_usd_per_mtok",
+                  "output_usd_per_mtok"
+                ],
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "example": "anthropic"
+                  },
+                  "model_pattern": {
+                    "type": "string",
+                    "example": "claude-sonnet-5%"
+                  },
+                  "input_usd_per_mtok": {
+                    "type": "number",
+                    "example": 3
+                  },
+                  "output_usd_per_mtok": {
+                    "type": "number",
+                    "example": 15
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The override",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelPrice"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/spend/ai/prices/{id}": {
+      "delete": {
+        "tags": [
+          "Spend"
+        ],
+        "summary": "Remove an org price override",
+        "operationId": "deleteLlmPrice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/spend/ai/reprice": {
+      "post": {
+        "tags": [
+          "Spend"
+        ],
+        "summary": "Price the org's unpriced requests",
+        "operationId": "repriceAiSpend",
+        "description": "Owner/admin. Re-runs the price card over rows that had no price when they arrived (after adding a card for that provider). Already-priced rows are untouched.",
+        "responses": {
+          "200": {
+            "description": "Count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "repriced": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -43638,6 +43937,398 @@
             "type": "string",
             "format": "uuid",
             "description": "Control-plane approval when rolling back to a wider spec."
+          }
+        }
+      },
+      "LlmModelPrice": {
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "model_pattern",
+          "input_micro_usd_per_mtok",
+          "output_micro_usd_per_mtok",
+          "source",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null for a global row."
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model_pattern": {
+            "type": "string"
+          },
+          "input_micro_usd_per_mtok": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "output_micro_usd_per_mtok": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AiSpendTotals": {
+        "type": "object",
+        "properties": {
+          "cost_usd": {
+            "type": "number"
+          },
+          "tokens_input": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tokens_output": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "blocked": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unpriced_requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "agents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "models": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "avg_cost_per_day": {
+            "type": "number"
+          },
+          "cost_per_request": {
+            "type": "number"
+          },
+          "cost_per_mtok": {
+            "type": "number"
+          }
+        }
+      },
+      "AiSpend": {
+        "type": "object",
+        "required": [
+          "window",
+          "totals",
+          "previous",
+          "series",
+          "by_provider",
+          "by_model",
+          "by_agent",
+          "limits",
+          "generated_at"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "to": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "interval": {
+                "type": "string"
+              },
+              "previous_from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "previous_to": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "days": {
+                "type": "number"
+              }
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AiSpendTotals"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/AiSpendTotals"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "cost_usd": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "requests": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "by_provider": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "cost_usd": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "requests": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "previous_cost_usd": {
+                  "type": "number"
+                },
+                "share_pct": {
+                  "type": "number"
+                },
+                "trend_pct": {
+                  "type": "number",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "by_model": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "cost_usd": {
+                  "type": "number"
+                },
+                "tokens_input": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "tokens_output": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "requests": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "previous_cost_usd": {
+                  "type": "number"
+                },
+                "priced": {
+                  "type": "boolean"
+                },
+                "share_pct": {
+                  "type": "number"
+                },
+                "trend_pct": {
+                  "type": "number",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "by_agent": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "agent_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "agent_name": {
+                  "type": "string"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "cost_usd": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "requests": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "blocked": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "top_model": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "top_provider": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "previous_cost_usd": {
+                  "type": "number"
+                },
+                "last_request_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "daily_budget_usd": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "today_cost_usd": {
+                  "type": "number"
+                },
+                "blocked_by_budget": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "max_tokens_per_request": {
+                  "type": "integer",
+                  "format": "int64",
+                  "nullable": true
+                },
+                "max_requests_per_day": {
+                  "type": "integer",
+                  "format": "int64",
+                  "nullable": true
+                },
+                "share_pct": {
+                  "type": "number"
+                },
+                "trend_pct": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "budget_used_pct": {
+                  "type": "number",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "agents_with_daily_budget": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "agents_over_80pct": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "agents_at_cap": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "blocked_by_budget": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "router_keys": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "agent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "agent_name": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "spent_usd": {
+                      "type": "number"
+                    },
+                    "cap_usd": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "last_used_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              },
+              "credit_balance_usd": {
+                "type": "number"
+              },
+              "inspection_fees_usd": {
+                "type": "number"
+              },
+              "billing_tier": {
+                "type": "string"
+              }
+            }
           }
         }
       },
