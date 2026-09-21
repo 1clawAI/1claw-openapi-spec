@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.38"
+    version: "0.61.39"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -18985,6 +18985,173 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /v1/runtimes/provision:
+        post:
+            tags: [Runtimes]
+            summary: Provision an agent and its runtime in one call
+            operationId: provisionRuntime
+            description: |
+                Creates (or reuses) the agent, its keys and default-vault grant, the runtime, and
+                starts it. Each step runs the same code as the individual endpoints, so the
+                `agent.create` consensus gate, plan caps, image allowlist and included-slot logic
+                apply exactly as one click at a time. Human-only. The new agent's API key is
+                returned once.
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [name, agent]
+                            properties:
+                                name:
+                                    type: string
+                                template:
+                                    type: string
+                                preset:
+                                    type: string
+                                    default: small
+                                agent:
+                                    type: object
+                                    description: Either `id` (existing) or `name` (create).
+                                    properties:
+                                        id:
+                                            type: string
+                                            format: uuid
+                                        name:
+                                            type: string
+                                        description:
+                                            type: string
+                                env_public:
+                                    type: object
+                                    additionalProperties:
+                                        type: string
+                                expose_http:
+                                    type: boolean
+                                source_repo:
+                                    type: string
+                                startup_command:
+                                    type: string
+                                environment:
+                                    type: string
+                                start:
+                                    type: boolean
+                                    default: true
+                                approval_id:
+                                    type: string
+                                    format: uuid
+            responses:
+                "201":
+                    description: Provisioned
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [runtime, agent_id, started]
+                                properties:
+                                    runtime:
+                                        $ref: "#/components/schemas/RuntimeResponse"
+                                    agent_id:
+                                        type: string
+                                        format: uuid
+                                    agent_api_key:
+                                        type: string
+                                        description: Only when the agent was created here; shown once.
+                                    vault_id:
+                                        type: string
+                                        format: uuid
+                                    started:
+                                        type: boolean
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/runtimes/{runtime_id}/env/resolved:
+        get:
+            tags: [Runtimes]
+            summary: The environment the container is started with
+            operationId: getRuntimeResolvedEnv
+            description: |
+                Every variable, its source (`platform`, `env_public`, `vault_env`, `agent`,
+                `secret`) and which wins on a name collision. Vault-derived values and the minted
+                agent token are named, never shown. Human-only; nothing is minted.
+            parameters:
+                - name: runtime_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Resolved environment
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    runtime_id:
+                                        type: string
+                                        format: uuid
+                                    environment:
+                                        type: string
+                                    restart_required_for_changes:
+                                        type: boolean
+                                    entries:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                key:
+                                                    type: string
+                                                source:
+                                                    type: string
+                                                    enum: [platform, env_public, vault_env, agent, secret]
+                                                value:
+                                                    type: string
+                                                masked:
+                                                    type: boolean
+                                                overrides:
+                                                    type: string
+                                                    nullable: true
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/runtimes/{runtime_id}/rollback:
+        post:
+            tags: [Runtimes]
+            summary: Roll back to the previous image and restart
+            operationId: rollbackRuntime
+            description: |
+                Starts the runtime again on `previous_image_digest` (recorded at each start whose
+                resolved image differed). The image must still pass the allowlist. 409 when no
+                previous image is recorded.
+            parameters:
+                - name: runtime_id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            responses:
+                "200":
+                    description: Restarting on the previous image
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RuntimeResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
     /v1/runtimes/{runtime_id}/rebuild:
         parameters:
             - name: runtime_id
@@ -28622,6 +28789,9 @@ components:
             type: object
             required: [id, name, agent_id, status, created_at, updated_at]
             properties:
+                previous_image_digest:
+                    type: string
+                    nullable: true
                 image_digest:
                     type: string
                     nullable: true
