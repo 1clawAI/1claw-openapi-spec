@@ -37208,6 +37208,11 @@
           },
           "name": {
             "type": "string"
+          },
+          "always_on": {
+            "type": "boolean",
+            "default": false,
+            "description": "Keeps the runtime running indefinitely instead of auto-stopping after the\ndefault idle window (maps to `idle_timeout_secs: 0`).\n"
           }
         }
       },
