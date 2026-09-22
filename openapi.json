@@ -2911,7 +2911,7 @@
             "x402"
           ],
           "pricingMode": "fixed",
-          "price": "0.0075"
+          "price": "0.0225"
         },
         "parameters": [
           {
@@ -2964,7 +2964,7 @@
             "x402"
           ],
           "pricingMode": "fixed",
-          "price": "0.0015"
+          "price": "0.0045"
         },
         "parameters": [
           {
@@ -4116,7 +4116,8 @@
           "protocols": [
             "x402"
           ],
-          "pricingMode": "quote"
+          "pricingMode": "fixed",
+          "price": "0.225"
         },
         "description": "Replay protection: send an optional **Idempotency-Key** header (e.g. UUID or opaque string).\nDuplicate requests with the same key within 24 hours return the cached transaction response\n(no second sign/broadcast). Omit the header for non-idempotent submissions.\n",
         "operationId": "submitTransaction",
@@ -4287,7 +4288,8 @@
           "protocols": [
             "x402"
           ],
-          "pricingMode": "quote"
+          "pricingMode": "fixed",
+          "price": "0.225"
         },
         "parameters": [
           {
@@ -4342,7 +4344,7 @@
             "x402"
           ],
           "pricingMode": "fixed",
-          "price": "0.075"
+          "price": "0.225"
         },
         "parameters": [
           {
@@ -4397,7 +4399,7 @@
             "x402"
           ],
           "pricingMode": "fixed",
-          "price": "0.075"
+          "price": "0.225"
         },
         "parameters": [
           {
@@ -6407,7 +6409,7 @@
             "x402"
           ],
           "pricingMode": "fixed",
-          "price": "0.003"
+          "price": "0.009"
         },
         "parameters": [
           {
@@ -6466,7 +6468,7 @@
             "x402"
           ],
           "pricingMode": "fixed",
-          "price": "0.0015"
+          "price": "0.0045"
         },
         "parameters": [
           {
@@ -8014,7 +8016,7 @@
             "x402"
           ],
           "pricingMode": "fixed",
-          "price": "0.0008"
+          "price": "0.0024"
         },
         "parameters": [
           {

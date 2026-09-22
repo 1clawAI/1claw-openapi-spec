@@ -1979,7 +1979,7 @@ paths:
             x-payment-info:
                 protocols: [x402]
                 pricingMode: fixed
-                price: "0.0075"
+                price: "0.0225"
             parameters:
                 - $ref: "#/components/parameters/VaultId"
                 - $ref: "#/components/parameters/SecretPath"
@@ -2009,7 +2009,7 @@ paths:
             x-payment-info:
                 protocols: [x402]
                 pricingMode: fixed
-                price: "0.0015"
+                price: "0.0045"
             parameters:
                 - $ref: "#/components/parameters/VaultId"
                 - $ref: "#/components/parameters/SecretPath"
@@ -2734,7 +2734,8 @@ paths:
                 mode: paid
             x-payment-info:
                 protocols: [x402]
-                pricingMode: quote
+                pricingMode: fixed
+                price: "0.225"
             description: |
                 Replay protection: send an optional **Idempotency-Key** header (e.g. UUID or opaque string).
                 Duplicate requests with the same key within 24 hours return the cached transaction response
@@ -2845,7 +2846,8 @@ paths:
                 mode: paid
             x-payment-info:
                 protocols: [x402]
-                pricingMode: quote
+                pricingMode: fixed
+                price: "0.225"
             parameters:
                 - $ref: "#/components/parameters/AgentId"
             requestBody:
@@ -2878,7 +2880,7 @@ paths:
             x-payment-info:
                 protocols: [x402]
                 pricingMode: fixed
-                price: "0.075"
+                price: "0.225"
             parameters:
                 - $ref: "#/components/parameters/AgentId"
             requestBody:
@@ -2911,7 +2913,7 @@ paths:
             x-payment-info:
                 protocols: [x402]
                 pricingMode: fixed
-                price: "0.075"
+                price: "0.225"
             parameters:
                 - $ref: "#/components/parameters/AgentId"
             requestBody:
@@ -4151,7 +4153,7 @@ paths:
             x-payment-info:
                 protocols: [x402]
                 pricingMode: fixed
-                price: "0.003"
+                price: "0.009"
             parameters:
                 - name: secret_id
                   in: path
@@ -4188,7 +4190,7 @@ paths:
             x-payment-info:
                 protocols: [x402]
                 pricingMode: fixed
-                price: "0.0015"
+                price: "0.0045"
             parameters:
                 - name: share_id
                   in: path
@@ -5200,7 +5202,7 @@ paths:
             x-payment-info:
                 protocols: [x402]
                 pricingMode: fixed
-                price: "0.0008"
+                price: "0.0024"
             parameters:
                 - name: resource_id
                   in: query
