@@ -7071,6 +7071,38 @@
         }
       }
     },
+    "/v1/onboarding/guided/ask": {
+      "post": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Ask the guided onboarding assistant a question",
+        "description": "Scoped, one-shot Q&A for the guided wizard's \"have a question?\" panel.\nNot tied to an agent (many questions arrive before one exists yet) and\nnot persisted as a conversation. The system prompt is fixed server-side\nand refuses anything outside vaults/policies/runtimes/billing/channels —\nnever client-suppliable. Billed like any other Shroud LLM call: the\ncaller's own bearer token is forwarded so usage attributes to their org.\n",
+        "operationId": "guidedOnboardingAsk",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuidedAskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assistant's answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuidedAskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/onboarding/guided/trial/setup-intent": {
       "post": {
         "tags": [
@@ -37167,6 +37199,33 @@
             "$ref": "#/components/schemas/OnboardingStatus"
           }
         ]
+      },
+      "GuidedAskRequest": {
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "step": {
+            "type": "integer",
+            "description": "Accepted but not yet used to tailor the answer; reserved for later."
+          }
+        }
+      },
+      "GuidedAskResponse": {
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string"
+          }
+        }
       },
       "TrialSetupIntentResponse": {
         "type": "object",
