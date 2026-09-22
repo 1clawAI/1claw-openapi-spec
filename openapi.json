@@ -37213,6 +37213,10 @@
             "type": "boolean",
             "default": false,
             "description": "Keeps the runtime running indefinitely instead of auto-stopping after the\ndefault idle window (maps to `idle_timeout_secs: 0`).\n"
+          },
+          "env_public": {
+            "type": "object",
+            "description": "Non-secret runtime config — in practice just `LLM_PROVIDER`/`LLM_MODEL`\nfrom the guided flow's model-choice step. Rejected if any key looks\nsecret-shaped (same `validate_env_public` the canonical runtime API uses).\n"
           }
         }
       },

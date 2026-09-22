@@ -24179,6 +24179,12 @@ components:
                     description: |
                         Keeps the runtime running indefinitely instead of auto-stopping after the
                         default idle window (maps to `idle_timeout_secs: 0`).
+                env_public:
+                    type: object
+                    description: |
+                        Non-secret runtime config — in practice just `LLM_PROVIDER`/`LLM_MODEL`
+                        from the guided flow's model-choice step. Rejected if any key looks
+                        secret-shaped (same `validate_env_public` the canonical runtime API uses).
 
         AgentKeysVaultResponse:
             type: object
