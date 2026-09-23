@@ -142,6 +142,8 @@ tags:
       description: MFA/passkey/password recovery escape hatch with admin approval
     - name: Shamir KEK
       description: Shamir secret-sharing for org-level Key Encryption Keys
+    - name: Agent Tools
+      description: Utility tools an agent calls directly on its own token (web search, etc.)
 
 # =============================================================================
 # PATHS
@@ -11717,6 +11719,106 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/admin/stats/growth-timeseries:
+        get:
+            tags: [Admin]
+            summary: Time-bucketed usage series for one adoption/usage vertical (admin only)
+            description: >
+                Gap-filled counts (24h → hourly, 7d/30d/90d → daily, 365d → weekly)
+                for one of 15 adoption/usage verticals, plus a period-over-period
+                delta. Backs both the live admin analytics dashboard and the
+                weekly investor report — same source, two surfaces.
+            operationId: adminGrowthTimeseries
+            parameters:
+                - name: vertical
+                  in: query
+                  required: true
+                  schema:
+                      type: string
+                      enum:
+                          - signups_orgs
+                          - signups_users
+                          - subscriptions_new
+                          - subscriptions_churned
+                          - shroud_usage
+                          - shroud_security
+                          - intents_execution
+                          - intents_transactions
+                          - vault_usage
+                          - runtime_usage
+                          - memory_usage
+                          - automations
+                          - embedded_wallets_created
+                          - embedded_wallets_used
+                          - platform_api
+                - name: period
+                  in: query
+                  schema:
+                      type: string
+                      enum: [24h, 7d, 30d, 90d, 365d]
+                      default: 30d
+            responses:
+                "200":
+                    description: Time-bucketed series for the requested vertical
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/GrowthTimeseriesResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/admin/stats/retention:
+        get:
+            tags: [Admin]
+            summary: Logo retention over a trailing window (admin only)
+            description: >
+                Percentage of organizations older than `window_days` that showed
+                any platform activity (usage_events) in the trailing
+                `window_days` — a simple, defensible retention proxy, not a full
+                cohort matrix.
+            operationId: adminRetention
+            parameters:
+                - name: window_days
+                  in: query
+                  schema:
+                      type: integer
+                      default: 30
+                      minimum: 1
+                      maximum: 365
+            responses:
+                "200":
+                    description: Retention over the requested window
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/RetentionResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/admin/llm-prices:
+        get:
+            tags: [Admin]
+            summary: Global LLM price card (admin only)
+            description: The platform-wide price card with no org-level overrides applied — see `/v1/spend/ai/prices` for the org-resolved view.
+            operationId: adminListLlmPrices
+            responses:
+                "200":
+                    description: Prices
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [prices]
+                                properties:
+                                    prices:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/LlmModelPrice"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
     /v1/agents/{agent_id}/pay/settings:
         patch:
             tags: [Pay]
@@ -17986,6 +18088,47 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /v1/tools/web-search:
+        post:
+            tags: [Agent Tools]
+            summary: Platform-default web search fallback
+            description: >
+                Called on the agent's own token (not a Shroud-internal callback).
+                Used by the runtime `web_search` tool when an agent has no
+                BRAVE_API_KEY/TAVILY_API_KEY/SERP_API_KEY/ONECLAW_WEB_SEARCH_BINDING
+                of its own — proxies to a shared, platform-provided Brave Search
+                key under a hard monthly platform-wide cap.
+            operationId: agentWebSearch
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [query]
+                            properties:
+                                query:
+                                    type: string
+                                    maxLength: 500
+                                num_results:
+                                    type: integer
+                                    default: 5
+            responses:
+                "200":
+                    description: Search results
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/WebSearchResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    description: Called on a non-agent token
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
+
     /v1/memory/shared-namespaces:
         get:
             tags: [Memory]
@@ -32067,3 +32210,81 @@ components:
             properties:
                 valid:
                     type: boolean
+
+        GrowthCountBucket:
+            type: object
+            required: [bucket, count]
+            properties:
+                bucket:
+                    type: string
+                    format: date-time
+                count:
+                    type: integer
+
+        GrowthTimeseriesResponse:
+            type: object
+            required: [vertical, period, bucket_unit, points, total, prior_total]
+            properties:
+                vertical:
+                    type: string
+                period:
+                    type: string
+                bucket_unit:
+                    type: string
+                    enum: [hour, day, week]
+                points:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/GrowthCountBucket"
+                total:
+                    type: integer
+                prior_total:
+                    type: integer
+                delta_pct:
+                    type: number
+                    nullable: true
+                    description: Null when both the current and prior totals are 0.
+                notes:
+                    type: string
+                    nullable: true
+                    description: >
+                        A known limitation worth surfacing for this vertical (e.g.
+                        a source table with no org_id to exclude test-fixture
+                        activity from). Null for the clean verticals.
+
+        RetentionResponse:
+            type: object
+            required: [window_days, cohort_orgs, retained_orgs]
+            properties:
+                window_days:
+                    type: integer
+                cohort_orgs:
+                    type: integer
+                retained_orgs:
+                    type: integer
+                retention_pct:
+                    type: number
+                    nullable: true
+                    description: Null when there is no cohort yet (platform younger than the window).
+
+        WebSearchResult:
+            type: object
+            required: [title, url, snippet]
+            properties:
+                title:
+                    type: string
+                url:
+                    type: string
+                snippet:
+                    type: string
+
+        WebSearchResponse:
+            type: object
+            required: [results, provider]
+            properties:
+                results:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/WebSearchResult"
+                provider:
+                    type: string
