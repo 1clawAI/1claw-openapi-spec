@@ -1186,8 +1186,10 @@
                             "type": "string"
                           },
                           "prf_supported": {
-                            "type": "boolean",
-                            "nullable": true,
+                            "type": [
+                              "boolean",
+                              "null"
+                            ],
                             "description": "`true` — can hold a wallet share (WebAuthn PRF).\n`false` — cannot. `null` — registered before this\nwas captured.\n"
                           }
                         }
@@ -6192,10 +6194,11 @@
                     ]
                   },
                   "notes": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Internal review notes",
-                    "never public": null
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Internal review notes, never public"
                   }
                 }
               }
@@ -7195,9 +7198,11 @@
                       ]
                     },
                     "frozen_at": {
-                      "type": "string",
-                      "format": "date-time",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
                     }
                   }
                 }
@@ -7548,31 +7553,6 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/v1/org/env-vars/{id}": {
-      "delete": {
-        "tags": [
-          "Organization"
-        ],
-        "summary": "Delete org shared environment variable",
-        "operationId": "deleteOrgEnvVar",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Deleted"
           }
         }
       }
@@ -9711,8 +9691,7 @@
                   },
                   "value": {
                     "type": "string",
-                    "description": "Major units",
-                    "e.g. \"0.5\".": null
+                    "description": "Major units, e.g. \"0.5\"."
                   },
                   "memo": {
                     "type": "string"
@@ -10533,8 +10512,7 @@
                   },
                   "data": {
                     "type": "string",
-                    "description": "Hex calldata",
-                    "optional.": null
+                    "description": "Hex calldata, optional."
                   }
                 }
               }
@@ -10667,8 +10645,10 @@
                       "type": "string"
                     },
                     "deploy_tx_hash": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "tx_hash": {
                       "type": "string"
@@ -10782,9 +10762,7 @@
                   },
                   "allowance_amount": {
                     "type": "string",
-                    "description": "Base units",
-                    "decimal string": null,
-                    "≤ 2^96-1.": null
+                    "description": "Base units, decimal string, ≤ 2^96-1."
                   },
                   "reset_time_min": {
                     "type": "integer",
@@ -10927,8 +10905,7 @@
                   },
                   "amount": {
                     "type": "string",
-                    "description": "Base units",
-                    "decimal string.": null
+                    "description": "Base units, decimal string."
                   },
                   "token": {
                     "type": "string",
@@ -11569,10 +11546,12 @@
                   "type": "object",
                   "properties": {
                     "policy": {
-                      "nullable": true,
-                      "allOf": [
+                      "oneOf": [
                         {
                           "$ref": "#/components/schemas/SpendPolicyResponse"
+                        },
+                        {
+                          "type": "null"
                         }
                       ]
                     }
@@ -12811,9 +12790,11 @@
                 "type": "object",
                 "properties": {
                   "api_key_expires_at": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "format": "date-time",
-                    "nullable": true,
                     "description": "Optional expiration for the new key."
                   }
                 }
@@ -12837,9 +12818,11 @@
                       "type": "string"
                     },
                     "api_key_expires_at": {
-                      "type": "string",
-                      "format": "date-time",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
                     }
                   }
                 }
@@ -13169,8 +13152,10 @@
                     "type": "string"
                   },
                   "description": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "spec": {
                     "type": "object",
@@ -14317,9 +14302,11 @@
                             "format": "date-time"
                           },
                           "details": {
-                            "type": "object",
-                            "additionalProperties": true,
-                            "nullable": true
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": true
                           }
                         }
                       }
@@ -18151,8 +18138,14 @@
                   "type": "object",
                   "properties": {
                     "verdict": {
-                      "$ref": "#/components/schemas/RiskVerdict",
-                      "nullable": true
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/RiskVerdict"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   }
                 }
@@ -18625,8 +18618,7 @@
             }
           },
           "400": {
-            "description": "Not a usable 402 challenge",
-            "or a non-USDC asset": null
+            "description": "Not a usable 402 challenge, or a non-USDC asset"
           },
           "403": {
             "description": "pay is not enabled for this agent"
@@ -18678,8 +18670,7 @@
             }
           },
           "403": {
-            "description": "Policy refused",
-            "or the required authorization was absent": null
+            "description": "Policy refused, or the required authorization was absent"
           },
           "409": {
             "description": "ChallengeExpired. Re-fetch the resource for a fresh 402 and prepare again — re-preparing from the stored bytes would reproduce the same expired window.\n"
@@ -18718,11 +18709,13 @@
                     "type": "integer"
                   },
                   "allowed_paytos": {
-                    "type": "array",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
                     "items": {
                       "type": "string"
-                    },
-                    "nullable": true
+                    }
                   }
                 }
               }
@@ -18763,9 +18756,7 @@
             "description": "Invalid terms"
           },
           "403": {
-            "description": "Not a human caller",
-            "grant mode disabled": null,
-            "or over the agent's maximum": null
+            "description": "Not a human caller, grant mode disabled, or over the agent's maximum"
           }
         }
       }
@@ -18806,9 +18797,7 @@
             "description": "Grant created"
           },
           "403": {
-            "description": "Not a human caller",
-            "grant mode disabled": null,
-            "or terms exceed the agent's maximum": null
+            "description": "Not a human caller, grant mode disabled, or terms exceed the agent's maximum"
           }
         }
       }
@@ -18901,12 +18890,10 @@
         ],
         "responses": {
           "200": {
-            "description": "Quote and status",
-            "rendered from the stored preimage": null
+            "description": "Quote and status, rendered from the stored preimage"
           },
           "403": {
-            "description": "Not a human caller",
-            "or the session was raised for someone else": null
+            "description": "Not a human caller, or the session was raised for someone else"
           }
         }
       }
@@ -18971,8 +18958,7 @@
             "description": "Revoked"
           },
           "404": {
-            "description": "Not found",
-            "or already revoked": null
+            "description": "Not found, or already revoked"
           }
         }
       }
@@ -21891,12 +21877,16 @@
                       "type": "boolean"
                     },
                     "message": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "error": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
@@ -22268,8 +22258,10 @@
                             "type": "integer"
                           },
                           "would_write_rule": {
-                            "type": "object",
-                            "nullable": true
+                            "type": [
+                              "object",
+                              "null"
+                            ]
                           },
                           "blocked": {
                             "type": "string",
@@ -23118,8 +23110,10 @@
                           "type": "integer"
                         },
                         "avg_rating": {
-                          "type": "number",
-                          "nullable": true
+                          "type": [
+                            "number",
+                            "null"
+                          ]
                         },
                         "review_count": {
                           "type": "integer"
@@ -23368,8 +23362,10 @@
                             "type": "object"
                           },
                           "confidence": {
-                            "type": "string",
-                            "nullable": true
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "why_we_believe_this": {
                             "type": "array",
@@ -23834,8 +23830,10 @@
                   ],
                   "properties": {
                     "likelihood": {
-                      "type": "number",
-                      "nullable": true,
+                      "type": [
+                        "number",
+                        "null"
+                      ],
                       "description": "Absent when there is no comparable history."
                     },
                     "reasoning": {
@@ -24542,8 +24540,10 @@
                       "type": "string"
                     },
                     "authorization_url": {
-                      "type": "string",
-                      "nullable": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "description": "Absent for connectors that use a pasted API key rather than OAuth."
                     },
                     "next_step": {
@@ -29656,8 +29656,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "nullable": true,
-                  "type": "object",
+                  "type": [
+                    "object",
+                    "null"
+                  ],
                   "properties": {
                     "enabled": {
                       "type": "boolean"
@@ -29760,11 +29762,7 @@
             "description": "The updated config, header names only"
           },
           "400": {
-            "description": "Endpoint refused (scheme",
-            "credentials": null,
-            "private or unresolvable host)": null,
-            "reserved header": null,
-            "or enabling with no endpoint": null
+            "description": "Endpoint refused (scheme, credentials, private or unresolvable host), reserved header, or enabling with no endpoint"
           },
           "401": {
             "description": "Unauthenticated"
@@ -29809,8 +29807,7 @@
             }
           },
           "400": {
-            "description": "Not configured",
-            "or the send failed": null
+            "description": "Not configured, or the send failed"
           },
           "401": {
             "description": "Unauthenticated"
@@ -29914,13 +29911,17 @@
                       }
                     },
                     "latency_p50_ms": {
-                      "type": "number",
-                      "nullable": true,
+                      "type": [
+                        "number",
+                        "null"
+                      ],
                       "description": "Null when nothing in the window recorded a duration."
                     },
                     "latency_p95_ms": {
-                      "type": "number",
-                      "nullable": true
+                      "type": [
+                        "number",
+                        "null"
+                      ]
                     },
                     "total_executions": {
                       "type": "integer"
@@ -29984,47 +29985,63 @@
                       "format": "uuid"
                     },
                     "score": {
-                      "type": "integer",
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
                       "minimum": 0,
-                      "maximum": 100,
-                      "nullable": true
+                      "maximum": 100
                     },
                     "shadow": {
                       "type": "boolean",
                       "description": "True while the engine is recommend-only or the agent is unscored."
                     },
                     "updated_at": {
-                      "type": "string",
-                      "format": "date-time",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
                     },
                     "components": {
                       "type": "object",
                       "description": "0-100 per component; null means no source in this deployment.",
                       "properties": {
                         "denial_rate": {
-                          "type": "integer",
-                          "nullable": true
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         },
                         "threat_hits": {
-                          "type": "integer",
-                          "nullable": true
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         },
                         "egress_blocks": {
-                          "type": "integer",
-                          "nullable": true
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         },
                         "spend_velocity": {
-                          "type": "integer",
-                          "nullable": true
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         },
                         "off_hours": {
-                          "type": "integer",
-                          "nullable": true
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         },
                         "consensus_bypass": {
-                          "type": "integer",
-                          "nullable": true
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
                         }
                       }
                     },
@@ -30070,8 +30087,10 @@
                             "type": "string"
                           },
                           "resource_type": {
-                            "type": "string",
-                            "nullable": true
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         }
                       }
@@ -30519,8 +30538,10 @@
                             "type": "boolean"
                           },
                           "overrides": {
-                            "type": "string",
-                            "nullable": true
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         }
                       }
@@ -30833,8 +30854,10 @@
                             "type": "boolean"
                           },
                           "license": {
-                            "type": "string",
-                            "nullable": true,
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "description": "SPDX id, or null when the agent is proprietary"
                           },
                           "requires_vendor_subscription": {
@@ -30842,8 +30865,10 @@
                             "description": "Whether the agent needs a paid account with its vendor. Independent of licence — the Codex CLI is Apache-2.0 and still requires a ChatGPT plan."
                           },
                           "vendor_credential_env": {
-                            "type": "string",
-                            "nullable": true
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         }
                       }
@@ -31006,22 +31031,30 @@
                             "type": "string"
                           },
                           "platform": {
-                            "type": "string",
-                            "nullable": true
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "bridge_version": {
-                            "type": "string",
-                            "nullable": true
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "last_seen_at": {
-                            "type": "string",
-                            "format": "date-time",
-                            "nullable": true
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
                           },
                           "revoked_at": {
-                            "type": "string",
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "format": "date-time",
-                            "nullable": true,
                             "description": "Set once revoked. A revoked credential stops resolving."
                           },
                           "created_at": {
@@ -31916,8 +31949,10 @@
               "description": "Sum of the blast radius. The sort key."
             },
             "resolved_by": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "created_at": {
               "type": "string",
@@ -31974,16 +32009,22 @@
             "type": "boolean"
           },
           "pay_max_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pay_daily_limit_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pay_payto_allowlist": {
-            "type": "array",
-            "nullable": true,
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string"
             },
@@ -32000,12 +32041,16 @@
             "type": "boolean"
           },
           "pay_grant_max_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "pay_grant_max_ttl_secs": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         }
       },
@@ -32062,9 +32107,11 @@
             "additionalProperties": true
           },
           "valid_before": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "expires_at": {
             "type": "string",
@@ -32123,9 +32170,11 @@
             "type": "string"
           },
           "grant_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -32136,13 +32185,17 @@
             "type": "integer"
           },
           "settled": {
-            "type": "boolean",
-            "nullable": true,
+            "type": [
+              "boolean",
+              "null"
+            ],
             "description": "Null means the caller could not tell — a timeout after the header was sent, where the payment may or may not have been presented.\n"
           },
           "error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -32161,8 +32214,10 @@
             "type": "integer"
           },
           "allowed_paytos": {
-            "type": "array",
-            "nullable": true,
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string"
             },
@@ -32223,9 +32278,11 @@
             "format": "uuid"
           },
           "agent_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "issuer": {
             "type": "string",
@@ -32368,14 +32425,18 @@
             "type": "integer"
           },
           "reveal_expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "void_after": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -33843,8 +33904,10 @@
             "type": "string"
           },
           "fingerprint": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "agent_id": {
             "type": "string",
@@ -33980,8 +34043,10 @@
             }
           },
           "token_ttl_seconds": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Per-agent token TTL in seconds (overrides global default)"
           },
           "vault_ids": {
@@ -34061,13 +34126,17 @@
             "description": "Per-chain guardrail overrides. Keys are signing chains (ethereum, bitcoin, solana, xrp, cardano, tron).\nEach value may include max_value, daily_limit, to_allowlist, token_allowlist, max_per_day,\noverhead_budget, max_ata_creates_per_day, max_fee_per_gas_gwei, max_gas_limit,\ngas_daily_budget_native (UTC-day cumulative EVM gas estimate in native units).\nStrictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.\n"
           },
           "tx_max_per_day": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Max transactions per UTC calendar day. Null = unlimited."
           },
           "tx_overhead_budget": {
-            "type": "object",
-            "nullable": true,
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": {
               "type": "string"
             },
@@ -34109,15 +34178,19 @@
             "description": "When true, card orders route through the human approval queue before x402 payment."
           },
           "tx_approval_policy": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "Graduated transaction approval policy (HITL thresholds). Separate from hard guardrails."
           },
           "action_approval_policy": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "Which business actions this agent must ask a human about, and above what\namount. `{}` means no per-action rules.\n\nShape: `{ \"default_mode\": \"deny|approve|allow\", \"rules\": [ { \"action_type\":\n\"refund.create\", \"mode\": \"approve\", \"require_for_amount_above_usd\": \"50\",\n\"summary_template\": \"Refund {{amount_usd}} to {{customer_email}}\" } ] }`.\n\nA rule can only raise the bar. Editing this is classified as a guardrail\nwidening, so it routes through the same approval flow as loosening a\ntransaction limit. Malformed rules are rejected on write rather than\nignored at request time.\n"
           },
           "typed_data_policy": {
@@ -34142,28 +34215,38 @@
             "description": "Block unlimited ERC-20 approvals (max uint256 / setApprovalForAll)."
           },
           "tx_per_recipient_max_per_day": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Max transactions to the same recipient address per UTC day."
           },
           "tx_per_recipient_daily_limit": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Max native-unit spend to the same recipient per UTC day."
           },
           "new_recipient_cap_native": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Cap on first-time recipient spend in native units."
           },
           "tx_max_value_usd": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Per-transaction USD cap (requires price oracle)."
           },
           "tx_daily_limit_usd": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Rolling 24h USD spend cap (requires price oracle)."
           },
           "raw_signing_policy": {
@@ -34192,9 +34275,11 @@
             "description": "Allow EIP-7702 (tx type 4) set-code transactions."
           },
           "api_key_expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "description": "Optional expiration time for the agent's API key."
           },
           "environment": {
@@ -34361,8 +34446,10 @@
             }
           },
           "token_ttl_seconds": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "vault_ids": {
             "type": "array",
@@ -34379,8 +34466,10 @@
             "$ref": "#/components/schemas/ShroudConfig"
           },
           "system_prompt": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Default system prompt for agent chat (null clears)."
           },
           "execution_intents_enabled": {
@@ -34401,13 +34490,17 @@
             "description": "When true, execute requests must arrive via TEE and all direct secret reads are blocked (Pro+ only)"
           },
           "tx_max_per_day": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Max transactions per UTC calendar day. Null = unlimited."
           },
           "tx_overhead_budget": {
-            "type": "object",
-            "nullable": true,
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": {
               "type": "string"
             },
@@ -34425,13 +34518,17 @@
             "description": "Whether this agent may order payment cards (x402 card ordering). Pro+ tier."
           },
           "card_max_order_usd": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Maximum USD amount for a single card order. null clears."
           },
           "card_daily_limit_usd": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Maximum cumulative USD spent ordering cards per rolling 24h window. null clears."
           },
           "card_payto_allowlist": {
@@ -34450,33 +34547,41 @@
             "description": "When true, card orders route through the human approval queue before x402 payment."
           },
           "tx_approval_policy": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "Graduated transaction approval policy (HITL thresholds)."
           },
           "action_approval_policy": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "Which business actions this agent must ask a human about, and above what\namount. `{}` means no per-action rules.\n\nShape: `{ \"default_mode\": \"deny|approve|allow\", \"rules\": [ { \"action_type\":\n\"refund.create\", \"mode\": \"approve\", \"require_for_amount_above_usd\": \"50\",\n\"summary_template\": \"Refund {{amount_usd}} to {{customer_email}}\" } ] }`.\n\nA rule can only raise the bar. Editing this is classified as a guardrail\nwidening, so it routes through the same approval flow as loosening a\ntransaction limit. Malformed rules are rejected on write rather than\nignored at request time.\n"
           },
           "typed_data_policy": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "deny",
               "approve"
             ],
-            "nullable": true,
             "description": "EIP-712 escalation policy."
           },
           "simulation_failure_policy": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "deny",
               "approve"
             ],
-            "nullable": true,
             "description": "Simulation failure escalation policy."
           },
           "tx_block_unlimited_approvals": {
@@ -34484,28 +34589,38 @@
             "description": "Block unlimited ERC-20 approvals (max uint256 / setApprovalForAll)."
           },
           "tx_per_recipient_max_per_day": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Max transactions to the same recipient per UTC day. Null clears."
           },
           "tx_per_recipient_daily_limit": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Max native spend to same recipient per UTC day. Null clears."
           },
           "new_recipient_cap_native": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "First-time recipient native cap. Null clears."
           },
           "tx_max_value_usd": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Per-tx USD cap. Null clears."
           },
           "tx_daily_limit_usd": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Rolling 24h USD spend cap. Null clears."
           },
           "raw_signing_policy": {
@@ -34547,10 +34662,12 @@
             "description": "Allowlist of `aud` values the federation token-exchange may issue\ntokens for (e.g. `[\"https://api.anthropic.com\"]`). Empty array\nblocks all federation requests (zero-trust default).\n"
           },
           "federated_token_ttl_seconds": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 60,
             "maximum": 3600,
-            "nullable": true,
             "description": "Per-agent TTL override for federation tokens (seconds). NULL falls\nback to the global default (`ONECLAW_JWT_FEDERATED_TOKEN_EXPIRY_SECS`).\nHard-capped at 3600 seconds.\n"
           },
           "tx_token_allowlist": {
@@ -34578,14 +34695,18 @@
             "description": "Per-chain guardrail overrides. Keys are signing chains (ethereum, bitcoin, solana, xrp, cardano, tron).\nEach value may include max_value, daily_limit, to_allowlist, token_allowlist (legacy *_eth keys accepted),\nmax_fee_per_gas_gwei, max_gas_limit, gas_daily_budget_native (UTC-day cumulative EVM gas in native units).\nStrictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.\n"
           },
           "api_key_expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "description": "Optional expiration time for the agent's API key. Set to null to clear."
           },
           "environment": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Named environment for this agent (production, preview, development, or custom)."
           },
           "environment_locked": {
@@ -34727,8 +34848,10 @@
             }
           },
           "token_ttl_seconds": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "vault_ids": {
             "type": "array",
@@ -34786,13 +34909,17 @@
             "description": "When true, execute requests must arrive via TEE and all direct secret reads are blocked (Pro+ only)"
           },
           "tx_max_per_day": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Max transactions per UTC calendar day. Null = unlimited."
           },
           "tx_overhead_budget": {
-            "type": "object",
-            "nullable": true,
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": {
               "type": "string"
             },
@@ -34833,56 +34960,74 @@
             "description": "When true, card orders route through the human approval queue before x402 payment."
           },
           "tx_approval_policy": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "Graduated transaction approval policy (HITL thresholds)."
           },
           "action_approval_policy": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "Which business actions this agent must ask a human about, and above what\namount. `{}` means no per-action rules.\n\nShape: `{ \"default_mode\": \"deny|approve|allow\", \"rules\": [ { \"action_type\":\n\"refund.create\", \"mode\": \"approve\", \"require_for_amount_above_usd\": \"50\",\n\"summary_template\": \"Refund {{amount_usd}} to {{customer_email}}\" } ] }`.\n\nA rule can only raise the bar. Editing this is classified as a guardrail\nwidening, so it routes through the same approval flow as loosening a\ntransaction limit. Malformed rules are rejected on write rather than\nignored at request time.\n"
           },
           "typed_data_policy": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "deny",
               "approve"
-            ],
-            "nullable": true
+            ]
           },
           "simulation_failure_policy": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "deny",
               "approve"
-            ],
-            "nullable": true
+            ]
           },
           "tx_block_unlimited_approvals": {
             "type": "boolean",
             "description": "Block unlimited ERC-20 approvals."
           },
           "tx_per_recipient_max_per_day": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "tx_per_recipient_daily_limit": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "new_recipient_cap_native": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tx_max_value_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tx_daily_limit_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "raw_signing_policy": {
             "type": "string",
@@ -34893,9 +35038,11 @@
             ]
           },
           "personal_sign_policy": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "allow_erc4337": {
             "type": "boolean"
@@ -34931,8 +35078,10 @@
             "description": "Allowlist of audience URIs the agent may federate to."
           },
           "federated_token_ttl_seconds": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Per-agent TTL override for federation tokens (60..=3600)."
           },
           "signing_chains": {
@@ -34996,14 +35145,18 @@
             "description": "Per-chain-family daily spend in native major units (keys: evm, bitcoin, solana, xrp, cardano, tron)."
           },
           "api_key_expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "description": "Optional expiration time for the agent's API key."
           },
           "evm_address": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Agent's Ethereum EOA address (used as Safe signer for smart accounts and Intents API)."
           },
           "created_at": {
@@ -35026,8 +35179,10 @@
             }
           },
           "environment": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Named environment this agent belongs to (production, preview, development, or custom)."
           },
           "environment_locked": {
@@ -35089,8 +35244,10 @@
             "type": "boolean"
           },
           "logo_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -35150,8 +35307,10 @@
             "default": true
           },
           "logo_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -36201,8 +36360,10 @@
             "type": "string"
           },
           "address": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "key_version": {
             "type": "integer"
@@ -36215,9 +36376,11 @@
             "format": "date-time"
           },
           "rotated_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "custody": {
             "type": "string",
@@ -36308,8 +36471,10 @@
             "description": "Agent memory, off by default. Until this field existed a\nplatform app had no way to turn it on: a bootstrap template\naccepted `memory_enabled` in its spec and never read it, so\nthe capability was reachable only from the end user's own\ndashboard. Templates now honour the flag too.\n"
           },
           "system_prompt": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -36330,8 +36495,10 @@
             "type": "boolean"
           },
           "system_prompt": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -36518,9 +36685,11 @@
             "type": "boolean"
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -36562,8 +36731,10 @@
             }
           },
           "max_daily_delegations": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "max_depth": {
             "type": "integer"
@@ -36587,9 +36758,11 @@
             "format": "uuid"
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "created_at": {
             "type": "string",
@@ -36766,28 +36939,40 @@
             "type": "string"
           },
           "signature": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "signed_tx": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tx_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "message_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "typed_data_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tx_type": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         }
       },
@@ -36826,8 +37011,10 @@
             ]
           },
           "signed_tx": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Raw signed transaction hex. On GET list and GET by id, this property is omitted by default (absent from the response). Pass `include_signed_tx=true` on those endpoints to include it. Always present on the initial POST submit response.\n"
           },
           "tx_hash": {
@@ -37332,9 +37519,11 @@
             "type": "boolean"
           },
           "default_vault_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -37756,21 +37945,27 @@
         "description": "Metered line from Stripe upcoming invoice (usage detail when available).",
         "properties": {
           "description": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "amount_cents": {
             "type": "integer",
             "format": "int64"
           },
           "quantity": {
-            "type": "number",
-            "nullable": true,
+            "type": [
+              "number",
+              "null"
+            ],
             "description": "Billed usage units when Stripe returns quantity (e.g. tokens)."
           },
           "price_nickname": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -37779,14 +37974,18 @@
         "description": "Accrued LLM charges for the current Stripe subscription period (upcoming invoice).",
         "properties": {
           "period_start": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "period_end": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "accrued_usage_cents": {
             "type": "integer",
@@ -38034,9 +38233,11 @@
             "description": "Total events examined"
           },
           "broken_at_event_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "nullable": true,
             "description": "First event where chain integrity broke (null if valid)"
           },
           "scheme": {
@@ -38096,9 +38297,15 @@
             "description": "GCE metadata identity JWT (verify against Google public keys)"
           },
           "confidential_claims": {
-            "nullable": true,
             "description": "Confidential Computing claims extracted from the identity JWT",
-            "$ref": "#/components/schemas/ConfidentialClaims"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConfidentialClaims"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "verification": {
             "type": "object",
@@ -38121,8 +38328,10 @@
         }
       },
       "ConfidentialClaims": {
-        "type": "object",
-        "nullable": true,
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "secboot": {
             "type": "boolean",
@@ -38708,19 +38917,25 @@
             "type": "string"
           },
           "data_hex": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "operation": {
             "type": "integer"
           },
           "safe_tx_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "nonce": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -38737,18 +38952,24 @@
             "type": "integer"
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "executed_tx_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "executed_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "signatures": {
             "type": "array",
@@ -39256,15 +39477,19 @@
                   "type": "string"
                 },
                 "symbol": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "balance": {
                   "type": "string"
                 },
                 "decimals": {
-                  "type": "integer",
-                  "nullable": true
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
                 }
               }
             }
@@ -39647,13 +39872,17 @@
             "default": "silent"
           },
           "max_connected_users": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "api_key_expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "description": "Optional expiration time for the platform API key."
           }
         }
@@ -39706,21 +39935,27 @@
             ]
           },
           "max_connected_users": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "is_active": {
             "type": "boolean"
           },
           "api_key_expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "description": "Optional expiration time for the platform API key. Set to null to clear."
           },
           "siwe_domain": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Hostname allowed in SIWE messages for wallet sign-in (EIP-4361)."
           }
         }
@@ -39805,23 +40040,31 @@
             "type": "string"
           },
           "logo_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "api_key_prefix": {
             "type": "string"
           },
           "oidc_jwks_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "oidc_issuer": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "oidc_audience": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Expected audience claim for OIDC token validation"
           },
           "redirect_uris": {
@@ -39831,8 +40074,10 @@
             }
           },
           "webhook_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "is_active": {
             "type": "boolean"
@@ -39844,27 +40089,35 @@
             "type": "string"
           },
           "max_connected_users": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "connected_users": {
             "type": "integer"
           },
           "api_key_expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "description": "When the platform API key expires."
           },
           "api_key_rotated_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "description": "When the platform API key was last rotated."
           },
           "siwe_domain": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Hostname allowed in SIWE messages for wallet sign-in (EIP-4361)."
           },
           "created_at": {
@@ -40515,9 +40768,11 @@
             "format": "date-time"
           },
           "claimed_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -40563,14 +40818,18 @@
             "type": "object",
             "properties": {
               "vault_id": {
-                "type": "string",
-                "format": "uuid",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
               },
               "agent_id": {
-                "type": "string",
-                "format": "uuid",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
               },
               "agent_ids": {
                 "type": "array",
@@ -40595,13 +40854,17 @@
                 "description": "Chains with provisioned signing keys"
               },
               "agent_api_key": {
-                "type": "string",
-                "nullable": true,
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "description": "One-time agent API key (ocv_ prefix). Store securely — not retrievable later."
               },
               "agent_evm_address": {
-                "type": "string",
-                "nullable": true,
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "description": "EOA address when provision_eoa is true in the template"
               },
               "signing_keys": {
@@ -40699,12 +40962,16 @@
                   "type": "string"
                 },
                 "logo_url": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "category": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "listing_tags": {
                   "type": "array",
@@ -40719,8 +40986,10 @@
                   }
                 },
                 "pricing_summary": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               }
             }
@@ -40833,9 +41102,11 @@
             }
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "created_at": {
             "type": "string",
@@ -40893,8 +41164,10 @@
             "type": "string"
           },
           "app_logo_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "auth_mode": {
             "type": "string"
@@ -40926,8 +41199,10 @@
             "type": "boolean"
           },
           "return_to": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -40956,8 +41231,10 @@
             }
           },
           "return_to": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "dashboard_url": {
             "type": "string"
@@ -41048,9 +41325,11 @@
             "type": "boolean"
           },
           "last_used_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "created_at": {
             "type": "string",
@@ -41314,8 +41593,10 @@
             "type": "string"
           },
           "display_name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "profile": {
             "type": "object",
@@ -41358,8 +41639,10 @@
             "additionalProperties": true
           },
           "confidence": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "0..1, capped below certainty — no history makes the next decision certain."
           },
           "provenance": {
@@ -41405,14 +41688,18 @@
             ]
           },
           "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "agent_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "config": {
             "type": "object",
@@ -41465,8 +41752,10 @@
             "example": "communication"
           },
           "provider_slug": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "`oauth_providers.slug`, or null when the connector uses a pasted API key."
           },
           "oauth_scopes": {
@@ -41604,26 +41893,34 @@
             "description": "First 20 characters (`sk-shroud-v1-` + 7) — enough to recognise, not to use"
           },
           "max_concurrent_streams": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "spend_cap_usd": {
-            "type": "number",
-            "nullable": true
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
           },
           "last_used_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "revoked_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -41726,9 +42023,11 @@
             }
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "created_at": {
             "type": "string",
@@ -41842,13 +42141,17 @@
             "format": "date-time"
           },
           "last_polled_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "last_error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "consecutive_errors": {
             "type": "integer"
@@ -41886,8 +42189,10 @@
             "type": "string"
           },
           "display_name": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Null if the preset has since been retired from the catalogue."
           },
           "is_active": {
@@ -41935,9 +42240,11 @@
             "format": "uuid"
           },
           "agent_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "action": {
             "type": "string"
@@ -41955,10 +42262,12 @@
             "description": "The tier actually enforced. Authoritative."
           },
           "declared_risk_tier": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 1,
             "maximum": 3,
-            "nullable": true,
             "description": "What the caller asked for, when it asked for anything."
           },
           "declared_below_floor": {
@@ -41966,8 +42275,10 @@
             "description": "The caller asked for a lower tier than policy required."
           },
           "human_summary": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Plain-language line sent to SMS, push and email."
           },
           "payload": {
@@ -41989,27 +42300,37 @@
             "description": "Structured summary of the action requiring approval"
           },
           "reason": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "decision_reason": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "decided_by": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "decided_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "created_at": {
             "type": "string",
@@ -42052,9 +42373,11 @@
             ]
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -42110,28 +42433,38 @@
             "$ref": "#/components/schemas/GuardrailReasonCode"
           },
           "limit": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "current": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "attempted": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "approval_available": {
             "type": "boolean",
             "default": false
           },
           "retry_after_seconds": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "detail": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -42173,8 +42506,10 @@
             "format": "email"
           },
           "wallet_address": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Ethereum address if auto_provision_chains included an EVM chain"
           }
         }
@@ -42196,9 +42531,11 @@
             "type": "string"
           },
           "app_logo_url": {
-            "type": "string",
-            "format": "uri",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
           },
           "scopes": {
             "type": "array",
@@ -42238,13 +42575,17 @@
             "description": "Token lifetime in seconds"
           },
           "refresh_token": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Refresh token for obtaining new access tokens (when offline_access scope was granted)"
           },
           "id_token": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "OIDC ID token (when openid scope was granted)"
           },
           "scope": {
@@ -42268,12 +42609,16 @@
             "format": "email"
           },
           "name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "wallet_address": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -42423,13 +42768,17 @@
             "type": "string"
           },
           "provisioned_tier": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Billing tier granted to the end-user org when billing_model is platform_pays\n(from template plan at bootstrap). Null when not provisioned.\n"
           },
           "wallet_address": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "vault_ids": {
             "type": "array",
@@ -42460,9 +42809,11 @@
             }
           },
           "claimed_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "claim": {
             "$ref": "#/components/schemas/ClaimStatusResponse"
@@ -42484,9 +42835,11 @@
             ]
           },
           "redeemed_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -42572,13 +42925,17 @@
             "type": "string"
           },
           "last_value_raw": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "last_checked_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -42651,9 +43008,11 @@
             "format": "date-time"
           },
           "connection_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -42661,12 +43020,12 @@
         "type": "object",
         "properties": {
           "allowance_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
-          "remaining_usd": {
-            "nullable": true
-          },
+          "remaining_usd": {},
           "message": {
             "type": "string"
           }
@@ -42689,9 +43048,11 @@
             "format": "uuid"
           },
           "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "to_allowlist": {
             "type": "array",
@@ -42706,12 +43067,16 @@
             }
           },
           "max_value_per_tx_eth": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "daily_limit_eth": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "allowed_chains": {
             "type": "array",
@@ -42726,33 +43091,47 @@
             }
           },
           "max_transactions_per_day": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "inference_allowance_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "inference_reserved_pct": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "inference_hard_stop": {
-            "type": "boolean",
-            "nullable": true
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "inference_allowance_mode": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "max_request_cost_usd": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "human_factor_auth": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "created_at": {
             "type": "string",
@@ -42797,8 +43176,10 @@
             "type": "object",
             "properties": {
               "require_passkey_above_usd": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "require_passkey_for_new_recipient": {
                 "type": "boolean"
@@ -42918,8 +43299,10 @@
             "type": "string"
           },
           "prf_supported": {
-            "type": "boolean",
-            "nullable": true,
+            "type": [
+              "boolean",
+              "null"
+            ],
             "description": "`prf.enabled` from `credential.getClientExtensionResults()` —\nwhether this authenticator can derive the secret that wraps a\nwallet share. Omit if the client did not request the extension.\n"
           }
         }
@@ -42941,9 +43324,11 @@
             "description": "Sidecar wraps are stored through `PUT /v1/keys/{key_id}/client-share/holder`."
           },
           "credential_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "nullable": true,
             "description": "Required for `passkey_prf`; the passkey id from `GET /v1/auth/passkeys`."
           },
           "wrapped_share": {
@@ -42983,14 +43368,18 @@
             ]
           },
           "credential_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "holder_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "wrapped_share": {
             "type": "string",
@@ -43059,13 +43448,17 @@
             "format": "uuid"
           },
           "passkey_name": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "The owning passkey's name — only that credential can sign for the Safe."
           },
           "passkey_rp_id": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "The domain the owning passkey was registered under (WebAuthn rpId); a browser on another domain cannot use it."
           },
           "custody": {
@@ -43082,8 +43475,10 @@
             ]
           },
           "deploy_tx_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "owner_signer": {
             "type": "string",
@@ -43143,16 +43538,20 @@
             "type": "string"
           },
           "transports": {
-            "type": "array",
-            "nullable": true,
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string"
             },
             "description": "The passkey's registered transports (`internal`, `hybrid`, `usb`…) — pass as the `allowCredentials` hint so the browser asks the right authenticator."
           },
           "passkey_name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "rp_id": {
             "type": "string"
@@ -43202,12 +43601,16 @@
             ]
           },
           "setup_tx_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "revoke_tx_hash": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -43443,44 +43846,64 @@
             "description": "Risk event type (e.g. first_seen, geo_velocity, honeytoken_access)"
           },
           "ip": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "asn": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "asn_org": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "country_code": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "region": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "city": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "latitude": {
-            "type": "number",
-            "nullable": true
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "longitude": {
-            "type": "number",
-            "nullable": true
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "user_agent": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "severity": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Computed severity at event time (low, medium, high, critical)"
           },
           "payload": {
@@ -43633,16 +44056,20 @@
             "format": "date-time"
           },
           "notes": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "triggered_count": {
             "type": "integer"
           },
           "last_triggered_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -43909,23 +44336,29 @@
             "description": "Whether a credential is stored for this binding. The value itself is never returned."
           },
           "credential_source_type": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "inline",
               "vault_ref"
             ],
-            "nullable": true,
             "description": "How the credential is sourced — inline (HSM-encrypted copy) or vault_ref (live pointer)."
           },
           "credential_vault_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "nullable": true,
             "description": "For vault_ref credentials — the vault containing the referenced secret."
           },
           "credential_path": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "For vault_ref credentials — the secret path in the referenced vault."
           },
           "created_at": {
@@ -43952,8 +44385,10 @@
             "type": "integer"
           },
           "error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -44024,9 +44459,11 @@
             ]
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -44048,14 +44485,18 @@
             "format": "uuid"
           },
           "tx_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -44076,13 +44517,17 @@
             "type": "string"
           },
           "result": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "duration_ms": {
             "type": "integer"
@@ -44136,25 +44581,33 @@
             "type": "string"
           },
           "request_summary": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "result_summary": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "error_message": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "duration_ms": {
             "type": "integer"
           },
           "cost_cents": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "redactions_applied": {
             "type": "integer"
@@ -44204,9 +44657,11 @@
             "example": "UTC"
           },
           "event_filter": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "workflow_spec": {
             "description": "Workflow steps. Accepts a bare array `[...]` or\n`{ \"steps\": [...] }` (dashboard / preset shape).\nSupported step types: get_secret, put_secret, http_request,\nrotate_secret, notify_human, ai_generate, memory_get,\nmemory_put, memory_search, notify, approval_request,\ncondition, execute_binding.\n",
@@ -44275,16 +44730,20 @@
             "type": "string"
           },
           "cron_expr": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "timezone": {
             "type": "string"
           },
           "event_filter": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "workflow_spec": {
             "oneOf": [
@@ -44314,9 +44773,11 @@
             "description": "Note recorded on the new spec version."
           },
           "webhook_signature": {
-            "nullable": true,
             "description": "Inbound signature scheme for a webhook-triggered automation. `stripe`\n(`Stripe-Signature: t=…,v1=…` over `<t>.<body>`), `github`\n(`X-Hub-Signature-256: sha256=…` over the body) or `hmac_sha256`\n(`<header>: <hex|base64>` over the body). The secret is stored encrypted\nand never returned; `null` removes the scheme. With a scheme set, an\nunsigned or mis-signed delivery starts nothing.\n",
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "scheme": {
                 "type": "string",
@@ -44381,8 +44842,10 @@
             "type": "string"
           },
           "note": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -44441,9 +44904,11 @@
             "format": "uuid"
           },
           "org_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "nullable": true,
             "description": "Null for a global row."
           },
           "provider": {
@@ -44621,8 +45086,10 @@
                   "type": "number"
                 },
                 "trend_pct": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               }
             }
@@ -44663,8 +45130,10 @@
                   "type": "number"
                 },
                 "trend_pct": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               }
             }
@@ -44700,24 +45169,32 @@
                   "format": "int64"
                 },
                 "top_model": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "top_provider": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "previous_cost_usd": {
                   "type": "number"
                 },
                 "last_request_at": {
-                  "type": "string",
-                  "format": "date-time",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
                 },
                 "daily_budget_usd": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 },
                 "today_cost_usd": {
                   "type": "number"
@@ -44727,25 +45204,33 @@
                   "format": "int64"
                 },
                 "max_tokens_per_request": {
-                  "type": "integer",
-                  "format": "int64",
-                  "nullable": true
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int64"
                 },
                 "max_requests_per_day": {
-                  "type": "integer",
-                  "format": "int64",
-                  "nullable": true
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int64"
                 },
                 "share_pct": {
                   "type": "number"
                 },
                 "trend_pct": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 },
                 "budget_used_pct": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               }
             }
@@ -44792,13 +45277,17 @@
                       "type": "number"
                     },
                     "cap_usd": {
-                      "type": "number",
-                      "nullable": true
+                      "type": [
+                        "number",
+                        "null"
+                      ]
                     },
                     "last_used_at": {
-                      "type": "string",
-                      "format": "date-time",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
                     }
                   }
                 }
@@ -44982,8 +45471,10 @@
                   "type": "integer"
                 },
                 "name": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "type": {
                   "type": "string"
@@ -44997,8 +45488,10 @@
                   "description": "The step after template substitution."
                 },
                 "skipped_by": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "effect": {
                   "type": "string"
@@ -45024,8 +45517,10 @@
                   }
                 },
                 "budget_exceeded": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               }
             }
@@ -45082,16 +45577,20 @@
             ]
           },
           "cron_expr": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "timezone": {
             "type": "string"
           },
           "event_filter": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
           },
           "workflow_spec": {
             "oneOf": [
@@ -45112,33 +45611,45 @@
             "type": "boolean"
           },
           "last_run_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "next_run_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "last_run_status": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Status of the most recent run (enriched list field)"
           },
           "total_runs": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Total runs in the last 30 days (enriched list field)"
           },
           "success_rate": {
-            "type": "number",
-            "nullable": true,
+            "type": [
+              "number",
+              "null"
+            ],
             "description": "Success rate percentage (enriched list field)"
           },
           "agent_name": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Resolved agent display name (enriched list field)"
           },
           "created_by_type": {
@@ -45162,8 +45673,10 @@
             "description": "Current `automation_versions` version."
           },
           "webhook_signature_scheme": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Inbound signature scheme name, never the secret."
           }
         }
@@ -45241,13 +45754,17 @@
             }
           },
           "runtime_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "runtime_status": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "cli_hint": {
             "type": "string"
@@ -45308,8 +45825,10 @@
             "description": "`awaiting_approval`, `waiting` (a `wait_until` park) and `awaiting_callback`\nare parked states: the run's clock is stopped and it continues when the\napproval is decided, the wake time passes, or the callback URL is posted to.\n"
           },
           "paused_reason": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "approval",
               "wait_until",
@@ -45317,53 +45836,71 @@
             ]
           },
           "paused_at_step": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "paused_approval_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "paused_until": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "paused_expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "spec_version": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "idempotency_key": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "parent_run_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "nullable": true,
             "description": "Set when a `call_automation` step started this run."
           },
-          "step_results": {
-            "nullable": true
-          },
+          "step_results": {},
           "error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "trigger_source": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "context": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "JSONB context passed between workflow steps"
           },
           "started_at": {
@@ -45371,9 +45908,11 @@
             "format": "date-time"
           },
           "finished_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "tokens_used": {
             "type": "integer"
@@ -45421,8 +45960,10 @@
                   "type": "string"
                 },
                 "cron_expr": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "workflow_spec": {
                   "type": "object",
@@ -45546,9 +46087,11 @@
         "type": "object",
         "properties": {
           "schedule": {
-            "nullable": true,
             "description": "Scheduled start/stop: start the container when `start_cron` fires (IANA\n`timezone`, default UTC) and stop it `stop_after_secs` later (60–86400; null\nleaves it to the idle reconciler). `null` clears the schedule.\n",
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "start_cron": {
                 "type": "string"
@@ -45558,8 +46101,10 @@
                 "default": "UTC"
               },
               "stop_after_secs": {
-                "type": "integer",
-                "nullable": true
+                "type": [
+                  "integer",
+                  "null"
+                ]
               }
             }
           },
@@ -45628,28 +46173,38 @@
         ],
         "properties": {
           "previous_image_digest": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "image_digest": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Resolved image (digest form when the provider reports one); runtime-minted agent tokens carry it as `runtime_image`, which access policies can require via `conditions.runtime_image_in`."
           },
           "schedule": {
-            "type": "object",
-            "nullable": true,
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true
           },
           "next_scheduled_start_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "scheduled_stop_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "id": {
             "type": "string",
@@ -45663,16 +46218,22 @@
             "format": "uuid"
           },
           "template": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "preset": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "provider": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -45686,49 +46247,67 @@
             ]
           },
           "image": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "environment": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Vault environment for env var resolution"
           },
           "env_public": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": {
               "type": "string"
-            },
-            "nullable": true
+            }
           },
           "idle_timeout_secs": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "expose_http": {
-            "type": "boolean",
-            "nullable": true
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "slug": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "public_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "http_port": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "inbound_auth": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "api_key",
               "jwt",
               "public"
-            ],
-            "nullable": true
+            ]
           },
           "shell_access_enabled": {
             "type": "boolean"
@@ -45740,8 +46319,10 @@
             "type": "integer"
           },
           "monthly_hours_used": {
-            "type": "number",
-            "nullable": true
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "has_paid_addon": {
             "type": "boolean",
@@ -45815,8 +46396,10 @@
             "type": "string"
           },
           "reason": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -45936,9 +46519,11 @@
             "format": "date-time"
           },
           "ttl_expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -45952,8 +46537,10 @@
             "type": "string"
           },
           "ttl_seconds": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         }
       },
@@ -46047,8 +46634,10 @@
             "type": "string"
           },
           "description": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "capabilities": {
             "type": "array",
@@ -46057,12 +46646,16 @@
             }
           },
           "a2a_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "mcp_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tags": {
             "type": "array",
@@ -46087,8 +46680,10 @@
             "type": "string"
           },
           "description": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tags": {
             "type": "array",
@@ -46103,16 +46698,22 @@
             }
           },
           "a2a_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "mcp_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "org_name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -46173,12 +46774,16 @@
             }
           },
           "a2a_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "mcp_url": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "intents_api_enabled": {
             "type": "boolean"
@@ -46514,9 +47119,11 @@
             "type": "boolean"
           },
           "config": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": true,
-            "nullable": true,
             "description": "Channel-specific configuration JSON. May include:\n- sender_allowlist (array of strings): restrict which external senders can trigger the agent\n- auto_respond_enabled (boolean): whether the agent auto-responds to inbound messages\n"
           },
           "slash_commands_enabled": {
@@ -46528,9 +47135,11 @@
             "description": "Whether voice message transcription is enabled"
           },
           "unified_conversation_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "nullable": true,
             "description": "ID linking this channel to a unified cross-platform conversation"
           },
           "is_home_platform": {
@@ -46538,11 +47147,13 @@
             "description": "Whether this is the agent's home platform channel"
           },
           "sender_allowlist": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string"
             },
-            "nullable": true,
             "description": "List of allowed sender IDs for auto-respond"
           },
           "auto_respond_enabled": {
@@ -46628,18 +47239,24 @@
             "description": "Whether this message was a voice message"
           },
           "voice_file_id": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Telegram voice file ID"
           },
           "voice_duration_secs": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Duration of voice message in seconds"
           },
           "transcription_status": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "pending",
               "completed",
@@ -46716,20 +47333,24 @@
             }
           },
           "extra_auth_params": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": {
               "type": "string"
-            },
-            "nullable": true
+            }
           },
           "requires_app_credentials": {
             "type": "boolean",
             "description": "Whether custom app credentials are required (vs. shared 1Claw app)"
           },
           "documentation_url": {
-            "type": "string",
-            "format": "uri",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
           }
         }
       },
@@ -46864,9 +47485,11 @@
             "type": "string"
           },
           "redirect_uri": {
-            "type": "string",
-            "format": "uri",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
           },
           "created_at": {
             "type": "string",
@@ -47443,9 +48066,11 @@
             ]
           },
           "approval_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "created_at": {
             "type": "string",
@@ -48861,8 +49486,10 @@
             "type": "string"
           },
           "nonce": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -48887,27 +49514,35 @@
             }
           },
           "git_branch": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sensitive": {
             "type": "boolean"
           },
           "comment": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "value": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Null for sensitive vars in list responses"
           },
           "version": {
             "type": "integer"
           },
           "created_by": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -49001,8 +49636,10 @@
             "type": "string"
           },
           "git_branch": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "resolved_at": {
             "type": "string",
@@ -49021,15 +49658,19 @@
             "type": "string"
           },
           "description": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "is_builtin": {
             "type": "boolean"
           },
           "copied_from": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "is_detached": {
             "type": "boolean"
@@ -49079,12 +49720,16 @@
             "type": "boolean"
           },
           "comment": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "value": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "version": {
             "type": "integer"
@@ -49174,9 +49819,11 @@
             "description": "Policy scope — org-wide, platform app, or single wallet"
           },
           "scope_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "nullable": true,
             "description": "Wallet or platform app UUID when scope_type is not org"
           },
           "principal_type": {
@@ -49253,9 +49900,11 @@
             "type": "string"
           },
           "scope_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "principal_type": {
             "type": "string"
@@ -49285,12 +49934,16 @@
             }
           },
           "max_value_per_tx_eth": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "daily_limit_eth": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "conditions": {
             "type": "object"
@@ -49299,9 +49952,11 @@
             "type": "boolean"
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "created_by": {
             "type": "string",
@@ -49403,8 +50058,10 @@
             ]
           },
           "recovery_code": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "One-time recovery code (only present for certain recovery types)"
           }
         }
@@ -49564,24 +50221,34 @@
             "type": "boolean"
           },
           "kek_id": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "threshold": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "total_shares": {
-            "type": "integer",
-            "nullable": true
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "custody_mode": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "custodians": {
-            "type": "array",
-            "nullable": true,
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "object",
               "properties": {
@@ -49596,9 +50263,11 @@
             }
           },
           "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -49728,13 +50397,17 @@
             "type": "integer"
           },
           "delta_pct": {
-            "type": "number",
-            "nullable": true,
+            "type": [
+              "number",
+              "null"
+            ],
             "description": "Null when both the current and prior totals are 0."
           },
           "notes": {
-            "type": "string",
-            "nullable": true,
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "A known limitation worth surfacing for this vertical (e.g. a source table with no org_id to exclude test-fixture activity from). Null for the clean verticals.\n"
           }
         }
@@ -49757,8 +50430,10 @@
             "type": "integer"
           },
           "retention_pct": {
-            "type": "number",
-            "nullable": true,
+            "type": [
+              "number",
+              "null"
+            ],
             "description": "Null when there is no cohort yet (platform younger than the window)."
           }
         }

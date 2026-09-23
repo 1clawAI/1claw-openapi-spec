@@ -814,8 +814,7 @@ paths:
                                                 created_at:
                                                     type: string
                                                 prf_supported:
-                                                    type: boolean
-                                                    nullable: true
+                                                    type: [boolean, "null"]
                                                     description: |
                                                         `true` — can hold a wallet share (WebAuthn PRF).
                                                         `false` — cannot. `null` — registered before this
@@ -4027,7 +4026,7 @@ paths:
                             required: [tier]
                             properties:
                                 tier: { type: string, enum: [unverified, platform_reviewed, identity_verified, enterprise] }
-                                notes: { type: string, nullable: true, description: Internal review notes, never public }
+                                notes: { type: [string, "null"], description: 'Internal review notes, never public' }
             responses:
                 '200':
                     description: Tier set
@@ -4667,9 +4666,8 @@ paths:
                                         type: string
                                         enum: [active, frozen]
                                     frozen_at:
-                                        type: string
+                                        type: [string, "null"]
                                         format: date-time
-                                        nullable: true
                 "403":
                     description: Forbidden
 
@@ -4886,22 +4884,6 @@ paths:
                                 $ref: "#/components/schemas/OrgEnvVar"
                 "404":
                     $ref: "#/components/responses/NotFound"
-
-    /v1/org/env-vars/{id}:
-        delete:
-            tags: [Organization]
-            summary: Delete org shared environment variable
-            operationId: deleteOrgEnvVar
-            parameters:
-                - name: id
-                  in: path
-                  required: true
-                  schema:
-                      type: string
-                      format: uuid
-            responses:
-                "204":
-                    description: Deleted
 
     /v1/org/env-vars/{id}/link:
         post:
@@ -6254,7 +6236,7 @@ paths:
                             required: [to, value]
                             properties:
                                 to: { type: string }
-                                value: { type: string, description: Major units, e.g. "0.5". }
+                                value: { type: string, description: 'Major units, e.g. "0.5".' }
                                 memo: { type: string }
             responses:
                 "200":
@@ -6713,7 +6695,7 @@ paths:
                             properties:
                                 to: { type: string }
                                 value_wei: { type: string }
-                                data: { type: string, description: Hex calldata, optional. }
+                                data: { type: string, description: 'Hex calldata, optional.' }
             responses:
                 "200":
                     description: What to sign
@@ -6786,7 +6768,7 @@ paths:
                                     safe_address: { type: string }
                                     chain: { type: string }
                                     safe_tx_hash: { type: string }
-                                    deploy_tx_hash: { type: string, nullable: true }
+                                    deploy_tx_hash: { type: [string, "null"] }
                                     tx_hash: { type: string }
                                     status: { type: string }
                 "400":
@@ -6853,7 +6835,7 @@ paths:
                             properties:
                                 agent_id: { type: string, format: uuid }
                                 token: { type: string, description: ERC-20 contract; omit for the native token. }
-                                allowance_amount: { type: string, description: Base units, decimal string, ≤ 2^96-1. }
+                                allowance_amount: { type: string, description: 'Base units, decimal string, ≤ 2^96-1.' }
                                 reset_time_min: { type: integer, default: 1440, description: Reset period in minutes. }
             responses:
                 "200":
@@ -6938,7 +6920,7 @@ paths:
                             required: [to, amount]
                             properties:
                                 to: { type: string }
-                                amount: { type: string, description: Base units, decimal string. }
+                                amount: { type: string, description: 'Base units, decimal string.' }
                                 token: { type: string, description: ERC-20 contract; omit for the native token. }
             responses:
                 "200":
@@ -7348,9 +7330,9 @@ paths:
                                 type: object
                                 properties:
                                     policy:
-                                        nullable: true
-                                        allOf:
+                                        oneOf:
                                             - $ref: "#/components/schemas/SpendPolicyResponse"
+                                            - type: "null"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
 
@@ -8127,9 +8109,8 @@ paths:
                             type: object
                             properties:
                                 api_key_expires_at:
-                                    type: string
+                                    type: [string, "null"]
                                     format: date-time
-                                    nullable: true
                                     description: Optional expiration for the new key.
             responses:
                 "200":
@@ -8145,9 +8126,8 @@ paths:
                                     api_key_prefix:
                                         type: string
                                     api_key_expires_at:
-                                        type: string
+                                        type: [string, "null"]
                                         format: date-time
-                                        nullable: true
                 "403":
                     description: Only human users can rotate platform keys
 
@@ -8349,8 +8329,7 @@ paths:
                                 name:
                                     type: string
                                 description:
-                                    type: string
-                                    nullable: true
+                                    type: [string, "null"]
                                 spec:
                                     type: object
                                     additionalProperties: true
@@ -9075,9 +9054,8 @@ paths:
                                                     type: string
                                                     format: date-time
                                                 details:
-                                                    type: object
+                                                    type: [object, "null"]
                                                     additionalProperties: true
-                                                    nullable: true
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -11560,8 +11538,9 @@ paths:
                                 type: object
                                 properties:
                                     verdict:
-                                        $ref: "#/components/schemas/RiskVerdict"
-                                        nullable: true
+                                        oneOf:
+                                            - $ref: "#/components/schemas/RiskVerdict"
+                                            - type: "null"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "404":
@@ -11871,7 +11850,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/PayPrepareResponse"
-                "400": { description: Not a usable 402 challenge, or a non-USDC asset }
+                "400": { description: 'Not a usable 402 challenge, or a non-USDC asset' }
                 "403": { description: pay is not enabled for this agent }
     /v1/agents/{agent_id}/pay/sign:
         post:
@@ -11906,7 +11885,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/PaySignResponse"
-                "403": { description: Policy refused, or the required authorization was absent }
+                "403": { description: 'Policy refused, or the required authorization was absent' }
                 "409":
                     description: >
                         ChallengeExpired. Re-fetch the resource for a fresh 402 and
@@ -11939,9 +11918,8 @@ paths:
                                 cap_usd: { type: string }
                                 ttl_secs: { type: integer }
                                 allowed_paytos:
-                                    type: array
+                                    type: [array, "null"]
                                     items: { type: string }
-                                    nullable: true
             responses:
                 '200':
                     description: The digest to assert over
@@ -11955,7 +11933,7 @@ paths:
                                     action: { type: string, enum: [x402_grant] }
                                     expires_in_secs: { type: integer }
                 '400': { description: Invalid terms }
-                '403': { description: Not a human caller, grant mode disabled, or over the agent's maximum }
+                '403': { description: 'Not a human caller, grant mode disabled, or over the agent''s maximum' }
     /v1/agents/{agent_id}/pay/grants:
         post:
             tags: [Pay]
@@ -11981,7 +11959,7 @@ paths:
                             $ref: "#/components/schemas/CreatePayGrantRequest"
             responses:
                 "200": { description: Grant created }
-                "403": { description: Not a human caller, grant mode disabled, or terms exceed the agent's maximum }
+                "403": { description: 'Not a human caller, grant mode disabled, or terms exceed the agent''s maximum' }
     /v1/agents/{agent_id}/pay/{payment_id}/result:
         post:
             tags: [Pay]
@@ -12035,8 +12013,8 @@ paths:
                   required: true
                   schema: { type: string, format: uuid }
             responses:
-                "200": { description: Quote and status, rendered from the stored preimage }
-                "403": { description: Not a human caller, or the session was raised for someone else }
+                "200": { description: 'Quote and status, rendered from the stored preimage' }
+                "403": { description: 'Not a human caller, or the session was raised for someone else' }
     /v1/pay-sessions/{session_id}/authorize:
         post:
             tags: [Pay]
@@ -12076,7 +12054,7 @@ paths:
                   schema: { type: string, format: uuid }
             responses:
                 "200": { description: Revoked }
-                "404": { description: Not found, or already revoked }
+                "404": { description: 'Not found, or already revoked' }
     /v1/agents/{agent_id}/cards/order:
         post:
             tags: [Payment Cards]
@@ -13996,11 +13974,9 @@ paths:
                                     success:
                                         type: boolean
                                     message:
-                                        type: string
-                                        nullable: true
+                                        type: [string, "null"]
                                     error:
-                                        type: string
-                                        nullable: true
+                                        type: [string, "null"]
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "404":
@@ -14284,7 +14260,7 @@ paths:
                                                 fingerprint_bucket: { type: string, example: "refund.create|0-10|known|a@b.co" }
                                                 consecutive_approvals: { type: integer }
                                                 total_requests: { type: integer }
-                                                would_write_rule: { type: object, nullable: true }
+                                                would_write_rule: { type: [object, "null"] }
                                                 blocked:
                                                     type: string
                                                     description: Present when a bound prevents promotion, saying which.
@@ -14781,7 +14757,7 @@ paths:
                                         properties:
                                             tier: { type: string, enum: [unverified, platform_reviewed, identity_verified, enterprise] }
                                             install_count: { type: integer }
-                                            avg_rating: { type: number, nullable: true }
+                                            avg_rating: { type: [number, "null"] }
                                             review_count: { type: integer }
                                             badges: { type: array, items: { type: string } }
                                             flagged_for_review: { type: boolean }
@@ -14936,7 +14912,7 @@ paths:
                                             properties:
                                                 fact_key: { type: string }
                                                 fact_value: { type: object }
-                                                confidence: { type: string, nullable: true }
+                                                confidence: { type: [string, "null"] }
                                                 why_we_believe_this: { type: array, items: { type: object } }
                                                 corrected_by_a_human: { type: boolean }
                                     raw_observations: { type: array, items: { type: object } }
@@ -15240,8 +15216,7 @@ paths:
                                 required: [reasoning, suggest_auto]
                                 properties:
                                     likelihood:
-                                        type: number
-                                        nullable: true
+                                        type: [number, "null"]
                                         description: Absent when there is no comparable history.
                                     reasoning: { type: string }
                                     suggest_auto:
@@ -15733,8 +15708,7 @@ paths:
                                     binding_name: { type: string }
                                     preset_slug: { type: string }
                                     authorization_url:
-                                        type: string
-                                        nullable: true
+                                        type: [string, "null"]
                                         description: Absent for connectors that use a pasted API key rather than OAuth.
                                     next_step:
                                         type: string
@@ -19020,8 +18994,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                nullable: true
-                                type: object
+                                type: [object, "null"]
                                 properties:
                                     enabled: { type: boolean }
                                     endpoint: { type: string }
@@ -19075,7 +19048,7 @@ paths:
             responses:
                 '200':
                     description: The updated config, header names only
-                '400': { description: Endpoint refused (scheme, credentials, private or unresolvable host), reserved header, or enabling with no endpoint }
+                '400': { description: 'Endpoint refused (scheme, credentials, private or unresolvable host), reserved header, or enabling with no endpoint' }
                 '401': { description: Unauthenticated }
                 '402': { description: Requires the Team plan or higher }
                 '403': { description: Not an owner or admin }
@@ -19100,7 +19073,7 @@ paths:
                                     endpoint: { type: string }
                                     status: { type: integer }
                                     ok: { type: boolean }
-                '400': { description: Not configured, or the send failed }
+                '400': { description: 'Not configured, or the send failed' }
                 '401': { description: Unauthenticated }
                 '402': { description: Requires the Team plan or higher }
                 '403': { description: Not an owner or admin }
@@ -19165,10 +19138,9 @@ paths:
                                                 transactions: { type: integer }
                                                 llm_calls: { type: integer }
                                     latency_p50_ms:
-                                        type: number
-                                        nullable: true
+                                        type: [number, "null"]
                                         description: Null when nothing in the window recorded a duration.
-                                    latency_p95_ms: { type: number, nullable: true }
+                                    latency_p95_ms: { type: [number, "null"] }
                                     total_executions: { type: integer }
                                     total_denials: { type: integer }
                 '400':
@@ -19213,19 +19185,19 @@ paths:
                                 required: [agent_id, shadow, components, history, recent]
                                 properties:
                                     agent_id: { type: string, format: uuid }
-                                    score: { type: integer, minimum: 0, maximum: 100, nullable: true }
+                                    score: { type: [integer, "null"], minimum: 0, maximum: 100 }
                                     shadow: { type: boolean, description: "True while the engine is recommend-only or the agent is unscored." }
-                                    updated_at: { type: string, format: date-time, nullable: true }
+                                    updated_at: { type: [string, "null"], format: date-time }
                                     components:
                                         type: object
                                         description: "0-100 per component; null means no source in this deployment."
                                         properties:
-                                            denial_rate: { type: integer, nullable: true }
-                                            threat_hits: { type: integer, nullable: true }
-                                            egress_blocks: { type: integer, nullable: true }
-                                            spend_velocity: { type: integer, nullable: true }
-                                            off_hours: { type: integer, nullable: true }
-                                            consensus_bypass: { type: integer, nullable: true }
+                                            denial_rate: { type: [integer, "null"] }
+                                            threat_hits: { type: [integer, "null"] }
+                                            egress_blocks: { type: [integer, "null"] }
+                                            spend_velocity: { type: [integer, "null"] }
+                                            off_hours: { type: [integer, "null"] }
+                                            consensus_bypass: { type: [integer, "null"] }
                                     history:
                                         type: array
                                         maxItems: 96
@@ -19246,7 +19218,7 @@ paths:
                                             properties:
                                                 at: { type: string, format: date-time }
                                                 action: { type: string }
-                                                resource_type: { type: string, nullable: true }
+                                                resource_type: { type: [string, "null"] }
                 '401': { description: Unauthenticated }
                 '403': { description: Not a human user }
                 '404': { description: No such agent in the caller's organization }
@@ -19548,8 +19520,7 @@ paths:
                                                 masked:
                                                     type: boolean
                                                 overrides:
-                                                    type: string
-                                                    nullable: true
+                                                    type: [string, "null"]
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "404":
@@ -19748,15 +19719,13 @@ paths:
                                                 chat_capable:
                                                     type: boolean
                                                 license:
-                                                    type: string
-                                                    nullable: true
+                                                    type: [string, "null"]
                                                     description: SPDX id, or null when the agent is proprietary
                                                 requires_vendor_subscription:
                                                     type: boolean
                                                     description: Whether the agent needs a paid account with its vendor. Independent of licence — the Codex CLI is Apache-2.0 and still requires a ChatGPT plan.
                                                 vendor_credential_env:
-                                                    type: string
-                                                    nullable: true
+                                                    type: [string, "null"]
                 '401':
                     description: Unauthenticated
     /v1/automations/step-types:
@@ -19856,19 +19825,15 @@ paths:
                                                 label:
                                                     type: string
                                                 platform:
-                                                    type: string
-                                                    nullable: true
+                                                    type: [string, "null"]
                                                 bridge_version:
-                                                    type: string
-                                                    nullable: true
+                                                    type: [string, "null"]
                                                 last_seen_at:
-                                                    type: string
+                                                    type: [string, "null"]
                                                     format: date-time
-                                                    nullable: true
                                                 revoked_at:
-                                                    type: string
+                                                    type: [string, "null"]
                                                     format: date-time
-                                                    nullable: true
                                                     description: Set once revoked. A revoked credential stops resolving.
                                                 created_at:
                                                     type: string
@@ -20405,7 +20370,7 @@ components:
                     blast_radius_size:
                         type: integer
                         description: Sum of the blast radius. The sort key.
-                    resolved_by: { type: string, nullable: true }
+                    resolved_by: { type: [string, "null"] }
                     created_at: { type: string, format: date-time }
                     updated_at: { type: string, format: date-time }
         OtelSummary:
@@ -20425,11 +20390,10 @@ components:
             type: object
             properties:
                 pay_enabled: { type: boolean }
-                pay_max_usd: { type: string, nullable: true }
-                pay_daily_limit_usd: { type: string, nullable: true }
+                pay_max_usd: { type: [string, "null"] }
+                pay_daily_limit_usd: { type: [string, "null"] }
                 pay_payto_allowlist:
-                    type: array
-                    nullable: true
+                    type: [array, "null"]
                     items: { type: string }
                     description: >
                         Recipients an unattended agent may pay. Null is not a
@@ -20439,8 +20403,8 @@ components:
                     description: Defaults true. Turning it off is what "unattended" means.
                 pay_require_approval: { type: boolean }
                 pay_grant_mode_enabled: { type: boolean }
-                pay_grant_max_usd: { type: string, nullable: true }
-                pay_grant_max_ttl_secs: { type: integer, nullable: true }
+                pay_grant_max_usd: { type: [string, "null"] }
+                pay_grant_max_ttl_secs: { type: [integer, "null"] }
         PayPrepareRequest:
             type: object
             required: [challenge_b64, method, resource_url]
@@ -20470,7 +20434,7 @@ components:
                 payment_digest: { type: string }
                 sign_idempotency_key: { type: string }
                 quote: { type: object, additionalProperties: true }
-                valid_before: { type: string, format: date-time, nullable: true }
+                valid_before: { type: [string, "null"], format: date-time }
                 expires_at: { type: string, format: date-time }
                 authorization:
                     type: string
@@ -20499,19 +20463,18 @@ components:
                     description: The X-PAYMENT header value. The signature, never the key.
                 amount_usd: { type: string }
                 pay_to: { type: string }
-                grant_id: { type: string, format: uuid, nullable: true }
+                grant_id: { type: [string, "null"], format: uuid }
         PayResultRequest:
             type: object
             properties:
                 http_status: { type: integer }
                 settled:
-                    type: boolean
-                    nullable: true
+                    type: [boolean, "null"]
                     description: >
                         Null means the caller could not tell — a timeout after the
                         header was sent, where the payment may or may not have
                         been presented.
-                error: { type: string, nullable: true }
+                error: { type: [string, "null"] }
         CreatePayGrantRequest:
             type: object
             required: [cap_usd, ttl_secs, grant_digest]
@@ -20519,8 +20482,7 @@ components:
                 cap_usd: { type: string }
                 ttl_secs: { type: integer }
                 allowed_paytos:
-                    type: array
-                    nullable: true
+                    type: [array, "null"]
                     items: { type: string }
                     description: >
                         Null means any recipient; an empty list means none. The two
@@ -20558,9 +20520,8 @@ components:
                     type: string
                     format: uuid
                 agent_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 issuer:
                     type: string
                     enum: [laso, manual]
@@ -20644,13 +20605,11 @@ components:
                 max_reveals:
                     type: integer
                 reveal_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 void_after:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
         ImportCardRequest:
             type: object
             required: [pan, cvv, exp_month, exp_year]
@@ -21676,7 +21635,7 @@ components:
                     type: string
                     enum: [pending, approved, denied, expired]
                 agent_name: { type: string }
-                fingerprint: { type: string, nullable: true }
+                fingerprint: { type: [string, "null"] }
                 agent_id: { type: string, format: uuid }
                 api_key:
                     type: string
@@ -21774,8 +21733,7 @@ components:
                     items:
                         type: string
                 token_ttl_seconds:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Per-agent token TTL in seconds (overrides global default)
                 vault_ids:
                     type: array
@@ -21841,12 +21799,10 @@ components:
                         gas_daily_budget_native (UTC-day cumulative EVM gas estimate in native units).
                         Strictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.
                 tx_max_per_day:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Max transactions per UTC calendar day. Null = unlimited.
                 tx_overhead_budget:
-                    type: object
-                    nullable: true
+                    type: [object, "null"]
                     additionalProperties:
                         type: string
                     description: Per-chain daily overhead budget in native units (e.g. {"solana":"0.5","xrp":"100"}).
@@ -21877,14 +21833,12 @@ components:
                     default: true
                     description: When true, card orders route through the human approval queue before x402 payment.
                 tx_approval_policy:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: Graduated transaction approval policy (HITL thresholds). Separate from hard guardrails.
                 action_approval_policy:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: |
                         Which business actions this agent must ask a human about, and above what
                         amount. `{}` means no per-action rules.
@@ -21910,24 +21864,19 @@ components:
                     default: false
                     description: Block unlimited ERC-20 approvals (max uint256 / setApprovalForAll).
                 tx_per_recipient_max_per_day:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Max transactions to the same recipient address per UTC day.
                 tx_per_recipient_daily_limit:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Max native-unit spend to the same recipient per UTC day.
                 new_recipient_cap_native:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Cap on first-time recipient spend in native units.
                 tx_max_value_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Per-transaction USD cap (requires price oracle).
                 tx_daily_limit_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Rolling 24h USD spend cap (requires price oracle).
                 raw_signing_policy:
                     type: string
@@ -21947,9 +21896,8 @@ components:
                     default: false
                     description: Allow EIP-7702 (tx type 4) set-code transactions.
                 api_key_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                     description: Optional expiration time for the agent's API key.
                 environment:
                     type: string
@@ -22072,8 +22020,7 @@ components:
                     items:
                         type: string
                 token_ttl_seconds:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 vault_ids:
                     type: array
                     items:
@@ -22085,8 +22032,7 @@ components:
                 shroud_config:
                     $ref: "#/components/schemas/ShroudConfig"
                 system_prompt:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Default system prompt for agent chat (null clears).
                 execution_intents_enabled:
                     type: boolean
@@ -22102,12 +22048,10 @@ components:
                     type: boolean
                     description: When true, execute requests must arrive via TEE and all direct secret reads are blocked (Pro+ only)
                 tx_max_per_day:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Max transactions per UTC calendar day. Null = unlimited.
                 tx_overhead_budget:
-                    type: object
-                    nullable: true
+                    type: [object, "null"]
                     additionalProperties:
                         type: string
                     description: Per-chain daily overhead budget in native units.
@@ -22120,12 +22064,10 @@ components:
                     type: boolean
                     description: Whether this agent may order payment cards (x402 card ordering). Pro+ tier.
                 card_max_order_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Maximum USD amount for a single card order. null clears.
                 card_daily_limit_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Maximum cumulative USD spent ordering cards per rolling 24h window. null clears.
                 card_payto_allowlist:
                     type: array
@@ -22139,14 +22081,12 @@ components:
                     type: boolean
                     description: When true, card orders route through the human approval queue before x402 payment.
                 tx_approval_policy:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: Graduated transaction approval policy (HITL thresholds).
                 action_approval_policy:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: |
                         Which business actions this agent must ask a human about, and above what
                         amount. `{}` means no per-action rules.
@@ -22160,37 +22100,30 @@ components:
                         transaction limit. Malformed rules are rejected on write rather than
                         ignored at request time.
                 typed_data_policy:
-                    type: string
+                    type: [string, "null"]
                     enum: [deny, approve]
-                    nullable: true
                     description: EIP-712 escalation policy.
                 simulation_failure_policy:
-                    type: string
+                    type: [string, "null"]
                     enum: [deny, approve]
-                    nullable: true
                     description: Simulation failure escalation policy.
                 tx_block_unlimited_approvals:
                     type: boolean
                     description: Block unlimited ERC-20 approvals (max uint256 / setApprovalForAll).
                 tx_per_recipient_max_per_day:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Max transactions to the same recipient per UTC day. Null clears.
                 tx_per_recipient_daily_limit:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Max native spend to same recipient per UTC day. Null clears.
                 new_recipient_cap_native:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: First-time recipient native cap. Null clears.
                 tx_max_value_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Per-tx USD cap. Null clears.
                 tx_daily_limit_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Rolling 24h USD spend cap. Null clears.
                 raw_signing_policy:
                     type: string
@@ -22225,10 +22158,9 @@ components:
                         tokens for (e.g. `["https://api.anthropic.com"]`). Empty array
                         blocks all federation requests (zero-trust default).
                 federated_token_ttl_seconds:
-                    type: integer
+                    type: [integer, "null"]
                     minimum: 60
                     maximum: 3600
-                    nullable: true
                     description: |
                         Per-agent TTL override for federation tokens (seconds). NULL falls
                         back to the global default (`ONECLAW_JWT_FEDERATED_TOKEN_EXPIRY_SECS`).
@@ -22256,13 +22188,11 @@ components:
                         max_fee_per_gas_gwei, max_gas_limit, gas_daily_budget_native (UTC-day cumulative EVM gas in native units).
                         Strictest of global and per-chain limits wins. Daily limits apply per chain family spend, not cross-chain totals.
                 api_key_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                     description: Optional expiration time for the agent's API key. Set to null to clear.
                 environment:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Named environment for this agent (production, preview, development, or custom).
                 environment_locked:
                     type: boolean
@@ -22374,8 +22304,7 @@ components:
                     items:
                         type: string
                 token_ttl_seconds:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 vault_ids:
                     type: array
                     items:
@@ -22418,12 +22347,10 @@ components:
                     type: boolean
                     description: When true, execute requests must arrive via TEE and all direct secret reads are blocked (Pro+ only)
                 tx_max_per_day:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Max transactions per UTC calendar day. Null = unlimited.
                 tx_overhead_budget:
-                    type: object
-                    nullable: true
+                    type: [object, "null"]
                     additionalProperties:
                         type: string
                     description: Per-chain daily overhead budget in native units.
@@ -22453,14 +22380,12 @@ components:
                     type: boolean
                     description: When true, card orders route through the human approval queue before x402 payment.
                 tx_approval_policy:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: Graduated transaction approval policy (HITL thresholds).
                 action_approval_policy:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: |
                         Which business actions this agent must ask a human about, and above what
                         amount. `{}` means no per-action rules.
@@ -22474,38 +22399,30 @@ components:
                         transaction limit. Malformed rules are rejected on write rather than
                         ignored at request time.
                 typed_data_policy:
-                    type: string
+                    type: [string, "null"]
                     enum: [deny, approve]
-                    nullable: true
                 simulation_failure_policy:
-                    type: string
+                    type: [string, "null"]
                     enum: [deny, approve]
-                    nullable: true
                 tx_block_unlimited_approvals:
                     type: boolean
                     description: Block unlimited ERC-20 approvals.
                 tx_per_recipient_max_per_day:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 tx_per_recipient_daily_limit:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 new_recipient_cap_native:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 tx_max_value_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 tx_daily_limit_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 raw_signing_policy:
                     type: string
                     enum: [allow, deny, approve]
                 personal_sign_policy:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 allow_erc4337:
                     type: boolean
                 allow_eip7702:
@@ -22533,8 +22450,7 @@ components:
                         format: uri
                     description: Allowlist of audience URIs the agent may federate to.
                 federated_token_ttl_seconds:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Per-agent TTL override for federation tokens (60..=3600).
                 signing_chains:
                     type: array
@@ -22582,13 +22498,11 @@ components:
                         type: string
                     description: 'Per-chain-family daily spend in native major units (keys: evm, bitcoin, solana, xrp, cardano, tron).'
                 api_key_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                     description: Optional expiration time for the agent's API key.
                 evm_address:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Agent's Ethereum EOA address (used as Safe signer for smart accounts and Intents API).
                 created_at:
                     type: string
@@ -22605,8 +22519,7 @@ components:
                     items:
                         $ref: "#/components/schemas/AgentSmartAccountResponse"
                 environment:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Named environment this agent belongs to (production, preview, development, or custom).
                 environment_locked:
                     type: boolean
@@ -22645,8 +22558,7 @@ components:
                 is_verified:
                     type: boolean
                 logo_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 created_at:
                     type: string
                     format: date-time
@@ -22684,8 +22596,7 @@ components:
                     type: boolean
                     default: true
                 logo_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         AgentSmartAccountResponse:
             type: object
@@ -23437,8 +23348,7 @@ components:
                 public_key:
                     type: string
                 address:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 key_version:
                     type: integer
                 is_active:
@@ -23447,9 +23357,8 @@ components:
                     type: string
                     format: date-time
                 rotated_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 custody:
                     type: string
                     enum: [server, client_tss]
@@ -23521,8 +23430,7 @@ components:
                         the capability was reachable only from the end user's own
                         dashboard. Templates now honour the flag too.
                 system_prompt:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         PatchConnectionAgentResponse:
             type: object
@@ -23537,8 +23445,7 @@ components:
                 memory_enabled:
                     type: boolean
                 system_prompt:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         # Bankr Dynamic Key Vending
         LeaseBankrKeyRequest:
@@ -23672,9 +23579,8 @@ components:
                 is_active:
                     type: boolean
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         DelegationResponse:
             type: object
@@ -23704,8 +23610,7 @@ components:
                     items:
                         type: string
                 max_daily_delegations:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 max_depth:
                     type: integer
                 guardrails:
@@ -23719,9 +23624,8 @@ components:
                     type: string
                     format: uuid
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 created_at:
                     type: string
                     format: date-time
@@ -23868,23 +23772,17 @@ components:
                 from:
                     type: string
                 signature:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 signed_tx:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 tx_hash:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 message_hash:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 typed_data_hash:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 tx_type:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
 
         TransactionResponse:
             type: object
@@ -23908,8 +23806,7 @@ components:
                     enum:
                         [pending, signed, sign_only, broadcast, failed, simulation_failed]
                 signed_tx:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: >
                         Raw signed transaction hex. On GET list and GET by id, this property is omitted by default (absent from the response). Pass `include_signed_tx=true` on those endpoints to include it. Always present on the initial POST submit response.
                 tx_hash:
@@ -24262,9 +24159,8 @@ components:
                 welcome_bundle_complete:
                     type: boolean
                 default_vault_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
 
         OnboardingProvisionRequest:
             type: object
@@ -24561,31 +24457,26 @@ components:
             description: Metered line from Stripe upcoming invoice (usage detail when available).
             properties:
                 description:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 amount_cents:
                     type: integer
                     format: int64
                 quantity:
-                    type: number
-                    nullable: true
+                    type: [number, "null"]
                     description: Billed usage units when Stripe returns quantity (e.g. tokens).
                 price_nickname:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         LlmBillingCycleUsage:
             type: object
             description: Accrued LLM charges for the current Stripe subscription period (upcoming invoice).
             properties:
                 period_start:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 period_end:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 accrued_usage_cents:
                     type: integer
                     format: int64
@@ -24757,9 +24648,8 @@ components:
                     type: integer
                     description: Total events examined
                 broken_at_event_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: First event where chain integrity broke (null if valid)
                 scheme:
                     type: object
@@ -24801,9 +24691,10 @@ components:
                     type: string
                     description: GCE metadata identity JWT (verify against Google public keys)
                 confidential_claims:
-                    nullable: true
                     description: Confidential Computing claims extracted from the identity JWT
-                    $ref: "#/components/schemas/ConfidentialClaims"
+                    oneOf:
+                        - $ref: "#/components/schemas/ConfidentialClaims"
+                        - type: "null"
                 verification:
                     type: object
                     properties:
@@ -24818,8 +24709,7 @@ components:
                             type: string
 
         ConfidentialClaims:
-            type: object
-            nullable: true
+            type: [object, "null"]
             properties:
                 secboot:
                     type: boolean
@@ -25222,32 +25112,26 @@ components:
                 value_wei:
                     type: string
                 data_hex:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 operation:
                     type: integer
                 safe_tx_hash:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 nonce:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 status:
                     type: string
                     enum: [pending, approved, executing, executed, rejected, expired]
                 threshold:
                     type: integer
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 executed_tx_hash:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 executed_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 signatures:
                     type: array
                     items:
@@ -25586,13 +25470,11 @@ components:
                             contract_address:
                                 type: string
                             symbol:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
                             balance:
                                 type: string
                             decimals:
-                                type: integer
-                                nullable: true
+                                type: [integer, "null"]
 
         # --- x402 ---
 
@@ -25864,12 +25746,10 @@ components:
                     enum: [silent, user_signin, configurable]
                     default: silent
                 max_connected_users:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 api_key_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                     description: Optional expiration time for the platform API key.
 
         UpdatePlatformAppRequest:
@@ -25901,18 +25781,15 @@ components:
                     type: string
                     enum: [silent, user_signin, configurable]
                 max_connected_users:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 is_active:
                     type: boolean
                 api_key_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                     description: Optional expiration time for the platform API key. Set to null to clear.
                 siwe_domain:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Hostname allowed in SIWE messages for wallet sign-in (EIP-4361).
 
         PlatformAppDeleteResponse:
@@ -25968,27 +25845,22 @@ components:
                 description:
                     type: string
                 logo_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 api_key_prefix:
                     type: string
                 oidc_jwks_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 oidc_issuer:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 oidc_audience:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Expected audience claim for OIDC token validation
                 redirect_uris:
                     type: array
                     items:
                         type: string
                 webhook_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 is_active:
                     type: boolean
                 billing_model:
@@ -25996,23 +25868,19 @@ components:
                 auth_mode:
                     type: string
                 max_connected_users:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 connected_users:
                     type: integer
                 api_key_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                     description: When the platform API key expires.
                 api_key_rotated_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                     description: When the platform API key was last rotated.
                 siwe_domain:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Hostname allowed in SIWE messages for wallet sign-in (EIP-4361).
                 created_at:
                     type: string
@@ -26413,9 +26281,8 @@ components:
                     type: string
                     format: date-time
                 claimed_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         BootstrapRequest:
             type: object
@@ -26453,13 +26320,11 @@ components:
                     type: object
                     properties:
                         vault_id:
-                            type: string
+                            type: [string, "null"]
                             format: uuid
-                            nullable: true
                         agent_id:
-                            type: string
+                            type: [string, "null"]
                             format: uuid
-                            nullable: true
                         agent_ids:
                             type: array
                             items:
@@ -26477,12 +26342,10 @@ components:
                                 type: string
                             description: Chains with provisioned signing keys
                         agent_api_key:
-                            type: string
-                            nullable: true
+                            type: [string, "null"]
                             description: One-time agent API key (ocv_ prefix). Store securely — not retrievable later.
                         agent_evm_address:
-                            type: string
-                            nullable: true
+                            type: [string, "null"]
                             description: EOA address when provision_eoa is true in the template
                         signing_keys:
                             type: array
@@ -26549,11 +26412,9 @@ components:
                             description:
                                 type: string
                             logo_url:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
                             category:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
                             listing_tags:
                                 type: array
                                 items:
@@ -26563,8 +26424,7 @@ components:
                                 items:
                                     type: string
                             pricing_summary:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
 
         ConnectedAppResponse:
             type: object
@@ -26642,9 +26502,8 @@ components:
                     items:
                         type: string
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 created_at:
                     type: string
                     format: date-time
@@ -26686,8 +26545,7 @@ components:
                 app_slug:
                     type: string
                 app_logo_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 auth_mode:
                     type: string
                 vault_ids:
@@ -26709,8 +26567,7 @@ components:
                 expired:
                     type: boolean
                 return_to:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         ClaimRedeemResponse:
             type: object
@@ -26731,8 +26588,7 @@ components:
                         type: string
                         format: uuid
                 return_to:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 dashboard_url:
                     type: string
 
@@ -26789,9 +26645,8 @@ components:
                 attestation_verified:
                     type: boolean
                 last_used_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 created_at:
                     type: string
                     format: date-time
@@ -26922,7 +26777,7 @@ components:
                 id: { type: string, format: uuid }
                 peer_type: { type: string, enum: [user, platform_connection, external] }
                 peer_ref: { type: string }
-                display_name: { type: string, nullable: true }
+                display_name: { type: [string, "null"] }
                 profile: { type: object, additionalProperties: true }
                 status:
                     type: string
@@ -26942,8 +26797,7 @@ components:
                 fact_key: { type: string, example: "approval_tendency:refund.create|0-10|known|a@b.co" }
                 fact_value: { type: object, additionalProperties: true }
                 confidence:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: 0..1, capped below certainty — no history makes the next decision certain.
                 provenance:
                     type: array
@@ -26964,8 +26818,8 @@ components:
                 target_type:
                     type: string
                     enum: [sms, webhook, expo, email]
-                user_id: { type: string, format: uuid, nullable: true }
-                agent_id: { type: string, format: uuid, nullable: true }
+                user_id: { type: [string, "null"], format: uuid }
+                agent_id: { type: [string, "null"], format: uuid }
                 config: { type: object, additionalProperties: true }
                 events:
                     type: array
@@ -26987,8 +26841,7 @@ components:
                 description: { type: string }
                 category: { type: string, example: communication }
                 provider_slug:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: "`oauth_providers.slug`, or null when the connector uses a pasted API key."
                 oauth_scopes:
                     type: array
@@ -27061,11 +26914,11 @@ components:
                 key_prefix:
                     type: string
                     description: First 20 characters (`sk-shroud-v1-` + 7) — enough to recognise, not to use
-                max_concurrent_streams: { type: integer, nullable: true }
-                spend_cap_usd: { type: number, nullable: true }
+                max_concurrent_streams: { type: [integer, "null"] }
+                spend_cap_usd: { type: [number, "null"] }
                 created_at: { type: string, format: date-time }
-                last_used_at: { type: string, format: date-time, nullable: true }
-                revoked_at: { type: string, format: date-time, nullable: true }
+                last_used_at: { type: [string, "null"], format: date-time }
+                revoked_at: { type: [string, "null"], format: date-time }
 
         RouterKeyCreated:
             allOf:
@@ -27116,7 +26969,7 @@ components:
                 destination_hosts:
                     type: array
                     items: { type: string }
-                created_by: { type: string, format: uuid, nullable: true }
+                created_by: { type: [string, "null"], format: uuid }
                 created_at: { type: string, format: date-time }
 
         X402TopupResponse:
@@ -27153,8 +27006,8 @@ components:
                     type: boolean
                     description: False until the first poll has recorded what already exists. That poll emits nothing.
                 next_poll_at: { type: string, format: date-time }
-                last_polled_at: { type: string, format: date-time, nullable: true }
-                last_error: { type: string, nullable: true }
+                last_polled_at: { type: [string, "null"], format: date-time }
+                last_error: { type: [string, "null"] }
                 consecutive_errors: { type: integer }
                 events_emitted: { type: integer, format: int64 }
                 created_at: { type: string, format: date-time }
@@ -27167,8 +27020,7 @@ components:
                 binding_name: { type: string }
                 preset_slug: { type: string }
                 display_name:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Null if the preset has since been retired from the catalogue.
                 is_active: { type: boolean }
                 connected:
@@ -27193,9 +27045,8 @@ components:
                     type: string
                     format: uuid
                 agent_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 action:
                     type: string
                 target_type:
@@ -27208,17 +27059,15 @@ components:
                     maximum: 3
                     description: "The tier actually enforced. Authoritative."
                 declared_risk_tier:
-                    type: integer
+                    type: [integer, "null"]
                     minimum: 1
                     maximum: 3
-                    nullable: true
                     description: "What the caller asked for, when it asked for anything."
                 declared_below_floor:
                     type: boolean
                     description: "The caller asked for a lower tier than policy required."
                 human_summary:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: "Plain-language line sent to SMS, push and email."
                 payload:
                     type: object
@@ -27230,23 +27079,18 @@ components:
                     type: object
                     description: Structured summary of the action requiring approval
                 reason:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 decision_reason:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 decided_by:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 decided_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 created_at:
                     type: string
                     format: date-time
@@ -27270,9 +27114,8 @@ components:
                     type: string
                     enum: [pending, approved, rejected, expired, cancelled]
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         GuardrailReasonCode:
             type: string
@@ -27321,23 +27164,18 @@ components:
                 reason_code:
                     $ref: "#/components/schemas/GuardrailReasonCode"
                 limit:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 current:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 attempted:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 approval_available:
                     type: boolean
                     default: false
                 retry_after_seconds:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 detail:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         GuardrailDenial:
             description: Alias of GuardrailViolation (Convention 1 JSON shape).
@@ -27365,8 +27203,7 @@ components:
                     type: string
                     format: email
                 wallet_address:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Ethereum address if auto_provision_chains included an EVM chain
 
         # --- OAuth ---
@@ -27380,9 +27217,8 @@ components:
                 app_slug:
                     type: string
                 app_logo_url:
-                    type: string
+                    type: [string, "null"]
                     format: uri
-                    nullable: true
                 scopes:
                     type: array
                     items: { type: string }
@@ -27405,12 +27241,10 @@ components:
                     type: integer
                     description: Token lifetime in seconds
                 refresh_token:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Refresh token for obtaining new access tokens (when offline_access scope was granted)
                 id_token:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: OIDC ID token (when openid scope was granted)
                 scope:
                     type: string
@@ -27426,11 +27260,9 @@ components:
                     type: string
                     format: email
                 name:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 wallet_address:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         # --- Spend Policies ---
 
@@ -27533,14 +27365,12 @@ components:
                 entitlement_status:
                     type: string
                 provisioned_tier:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: |
                         Billing tier granted to the end-user org when billing_model is platform_pays
                         (from template plan at bootstrap). Null when not provisioned.
                 wallet_address:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 vault_ids:
                     type: array
                     items:
@@ -27562,9 +27392,8 @@ components:
                         type: string
                         format: uuid
                 claimed_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 claim:
                     $ref: "#/components/schemas/ClaimStatusResponse"
 
@@ -27576,9 +27405,8 @@ components:
                     type: string
                     enum: [pending, active, claimed]
                 redeemed_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         ConnectionUsageResponse:
             type: object
@@ -27634,12 +27462,10 @@ components:
                 holder_address:
                     type: string
                 last_value_raw:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 last_checked_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         TemplatePreviewRequest:
             type: object
@@ -27691,18 +27517,15 @@ components:
                     type: string
                     format: date-time
                 connection_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
 
         InferenceBudgetUnconfiguredResponse:
             type: object
             properties:
                 allowance_usd:
-                    type: string
-                    nullable: true
-                remaining_usd:
-                    nullable: true
+                    type: [string, "null"]
+                remaining_usd: {}
                 message:
                     type: string
 
@@ -27717,9 +27540,8 @@ components:
                     type: string
                     format: uuid
                 user_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 to_allowlist:
                     type: array
                     items: { type: string }
@@ -27727,11 +27549,9 @@ components:
                     type: array
                     items: { type: string }
                 max_value_per_tx_eth:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 daily_limit_eth:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 allowed_chains:
                     type: array
                     items: { type: string }
@@ -27739,27 +27559,20 @@ components:
                     type: array
                     items: { type: string }
                 max_transactions_per_day:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 inference_allowance_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 inference_reserved_pct:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 inference_hard_stop:
-                    type: boolean
-                    nullable: true
+                    type: [boolean, "null"]
                 inference_allowance_mode:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 max_request_cost_usd:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 human_factor_auth:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 created_at:
                     type: string
                     format: date-time
@@ -27782,8 +27595,7 @@ components:
                     type: object
                     properties:
                         require_passkey_above_usd:
-                            type: string
-                            nullable: true
+                            type: [string, "null"]
                         require_passkey_for_new_recipient:
                             type: boolean
 
@@ -27859,8 +27671,7 @@ components:
                 name:
                     type: string
                 prf_supported:
-                    type: boolean
-                    nullable: true
+                    type: [boolean, "null"]
                     description: |
                         `prf.enabled` from `credential.getClientExtensionResults()` —
                         whether this authenticator can derive the secret that wraps a
@@ -27875,9 +27686,8 @@ components:
                     enum: [passkey_prf, recovery_code]
                     description: Sidecar wraps are stored through `PUT /v1/keys/{key_id}/client-share/holder`.
                 credential_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: Required for `passkey_prf`; the passkey id from `GET /v1/auth/passkeys`.
                 wrapped_share:
                     type: string
@@ -27902,13 +27712,11 @@ components:
                     type: string
                     enum: [passkey_prf, recovery_code, sidecar]
                 credential_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 holder_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 wrapped_share:
                     type: string
                     description: Base64, exactly as stored.
@@ -27940,11 +27748,11 @@ components:
                 chain_id: { type: integer }
                 safe_address: { type: string }
                 passkey_id: { type: string, format: uuid }
-                passkey_name: { type: string, nullable: true, description: The owning passkey's name — only that credential can sign for the Safe. }
-                passkey_rp_id: { type: string, nullable: true, description: The domain the owning passkey was registered under (WebAuthn rpId); a browser on another domain cannot use it. }
+                passkey_name: { type: [string, "null"], description: The owning passkey's name — only that credential can sign for the Safe. }
+                passkey_rp_id: { type: [string, "null"], description: The domain the owning passkey was registered under (WebAuthn rpId); a browser on another domain cannot use it. }
                 custody: { type: string, enum: [passkey_owner] }
                 deploy_status: { type: string, enum: [pending, deployed] }
-                deploy_tx_hash: { type: string, nullable: true }
+                deploy_tx_hash: { type: [string, "null"] }
                 owner_signer: { type: string, description: The SafeWebAuthnSharedSigner address listed as the Safe's owner. }
                 created_at: { type: string, format: date-time }
 
@@ -27965,11 +27773,10 @@ components:
                 safe_tx_hash: { type: string, description: Hex SafeTx hash — the WebAuthn challenge (raw 32 bytes). }
                 credential_id: { type: string }
                 transports:
-                    type: array
-                    nullable: true
+                    type: [array, "null"]
                     items: { type: string }
                     description: The passkey's registered transports (`internal`, `hybrid`, `usb`…) — pass as the `allowCredentials` hint so the browser asks the right authenticator.
-                passkey_name: { type: string, nullable: true }
+                passkey_name: { type: [string, "null"] }
                 rp_id: { type: string }
 
         PasskeySafeGrant:
@@ -27984,8 +27791,8 @@ components:
                 allowance_amount: { type: string, description: Base units per reset period. }
                 reset_time_min: { type: integer }
                 status: { type: string, enum: [pending, active, revoking, revoked] }
-                setup_tx_hash: { type: string, nullable: true }
-                revoke_tx_hash: { type: string, nullable: true }
+                setup_tx_hash: { type: [string, "null"] }
+                revoke_tx_hash: { type: [string, "null"] }
                 created_at: { type: string, format: date-time }
 
         PasskeySafeGrantPrepare:
@@ -28126,35 +27933,25 @@ components:
                     type: string
                     description: "Risk event type (e.g. first_seen, geo_velocity, honeytoken_access)"
                 ip:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 asn:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 asn_org:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 country_code:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 region:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 city:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 latitude:
-                    type: number
-                    nullable: true
+                    type: [number, "null"]
                 longitude:
-                    type: number
-                    nullable: true
+                    type: [number, "null"]
                 user_agent:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 severity:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: "Computed severity at event time (low, medium, high, critical)"
                 payload:
                     type: object
@@ -28246,14 +28043,12 @@ components:
                     type: string
                     format: date-time
                 notes:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 triggered_count:
                     type: integer
                 last_triggered_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         CreateHoneytokenRequest:
             type: object
@@ -28424,18 +28219,15 @@ components:
                     type: boolean
                     description: Whether a credential is stored for this binding. The value itself is never returned.
                 credential_source_type:
-                    type: string
+                    type: [string, "null"]
                     enum: [inline, vault_ref]
-                    nullable: true
                     description: How the credential is sourced — inline (HSM-encrypted copy) or vault_ref (live pointer).
                 credential_vault_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: For vault_ref credentials — the vault containing the referenced secret.
                 credential_path:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: For vault_ref credentials — the secret path in the referenced vault.
                 created_at:
                     type: string
@@ -28453,8 +28245,7 @@ components:
                 latency_ms:
                     type: integer
                 error:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         ExecuteRequest:
             type: object
@@ -28498,9 +28289,8 @@ components:
                     type: string
                     enum: [pending]
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         TxAwaitingApproval:
             type: object
@@ -28513,13 +28303,11 @@ components:
                     type: string
                     format: uuid
                 tx_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         ExecuteResponse:
             type: object
@@ -28531,12 +28319,10 @@ components:
                 status:
                     type: string
                 result:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 error:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 duration_ms:
                     type: integer
                 redactions_applied:
@@ -28566,21 +28352,17 @@ components:
                 status:
                     type: string
                 request_summary:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 result_summary:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 error_message:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 duration_ms:
                     type: integer
                 cost_cents:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 redactions_applied:
                     type: integer
                 created_at:
@@ -28616,9 +28398,8 @@ components:
                     default: UTC
                     example: UTC
                 event_filter:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 workflow_spec:
                     description: |
                         Workflow steps. Accepts a bare array `[...]` or
@@ -28668,14 +28449,12 @@ components:
                 name:
                     type: string
                 cron_expr:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 timezone:
                     type: string
                 event_filter:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 workflow_spec:
                     oneOf:
                         - type: array
@@ -28697,7 +28476,6 @@ components:
                     type: string
                     description: Note recorded on the new spec version.
                 webhook_signature:
-                    nullable: true
                     description: |
                         Inbound signature scheme for a webhook-triggered automation. `stripe`
                         (`Stripe-Signature: t=…,v1=…` over `<t>.<body>`), `github`
@@ -28705,7 +28483,7 @@ components:
                         (`<header>: <hex|base64>` over the body). The secret is stored encrypted
                         and never returned; `null` removes the scheme. With a scheme set, an
                         unsigned or mis-signed delivery starts nothing.
-                    type: object
+                    type: [object, "null"]
                     properties:
                         scheme:
                             type: string
@@ -28742,8 +28520,7 @@ components:
                 created_by_type:
                     type: string
                 note:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 created_at:
                     type: string
                     format: date-time
@@ -28777,9 +28554,8 @@ components:
             properties:
                 id: { type: string, format: uuid }
                 org_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: Null for a global row.
                 provider: { type: string }
                 model_pattern: { type: string }
@@ -28841,7 +28617,7 @@ components:
                             requests: { type: integer, format: int64 }
                             previous_cost_usd: { type: number }
                             share_pct: { type: number }
-                            trend_pct: { type: number, nullable: true }
+                            trend_pct: { type: [number, "null"] }
                 by_model:
                     type: array
                     items:
@@ -28856,7 +28632,7 @@ components:
                             previous_cost_usd: { type: number }
                             priced: { type: boolean }
                             share_pct: { type: number }
-                            trend_pct: { type: number, nullable: true }
+                            trend_pct: { type: [number, "null"] }
                 by_agent:
                     type: array
                     items:
@@ -28869,18 +28645,18 @@ components:
                             tokens: { type: integer, format: int64 }
                             requests: { type: integer, format: int64 }
                             blocked: { type: integer, format: int64 }
-                            top_model: { type: string, nullable: true }
-                            top_provider: { type: string, nullable: true }
+                            top_model: { type: [string, "null"] }
+                            top_provider: { type: [string, "null"] }
                             previous_cost_usd: { type: number }
-                            last_request_at: { type: string, format: date-time, nullable: true }
-                            daily_budget_usd: { type: number, nullable: true }
+                            last_request_at: { type: [string, "null"], format: date-time }
+                            daily_budget_usd: { type: [number, "null"] }
                             today_cost_usd: { type: number }
                             blocked_by_budget: { type: integer, format: int64 }
-                            max_tokens_per_request: { type: integer, format: int64, nullable: true }
-                            max_requests_per_day: { type: integer, format: int64, nullable: true }
+                            max_tokens_per_request: { type: [integer, "null"], format: int64 }
+                            max_requests_per_day: { type: [integer, "null"], format: int64 }
                             share_pct: { type: number }
-                            trend_pct: { type: number, nullable: true }
-                            budget_used_pct: { type: number, nullable: true }
+                            trend_pct: { type: [number, "null"] }
+                            budget_used_pct: { type: [number, "null"] }
                 limits:
                     type: object
                     properties:
@@ -28898,8 +28674,8 @@ components:
                                     agent_name: { type: string }
                                     name: { type: string }
                                     spent_usd: { type: number }
-                                    cap_usd: { type: number, nullable: true }
-                                    last_used_at: { type: string, format: date-time, nullable: true }
+                                    cap_usd: { type: [number, "null"] }
+                                    last_used_at: { type: [string, "null"], format: date-time }
                         credit_balance_usd: { type: number }
                         inspection_fees_usd: { type: number }
                         billing_tier: { type: string }
@@ -29008,8 +28784,7 @@ components:
                             index:
                                 type: integer
                             name:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
                             type:
                                 type: string
                             known:
@@ -29019,8 +28794,7 @@ components:
                                 additionalProperties: true
                                 description: The step after template substitution.
                             skipped_by:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
                             effect:
                                 type: string
                             on_error:
@@ -29037,8 +28811,7 @@ components:
                                 items:
                                     type: string
                             budget_exceeded:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
 
         TriggerAutomationRequest:
             type: object
@@ -29070,14 +28843,12 @@ components:
                     type: string
                     enum: [cron, event, webhook, manual]
                 cron_expr:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 timezone:
                     type: string
                 event_filter:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                 workflow_spec:
                     oneOf:
                         - type: array
@@ -29089,28 +28860,22 @@ components:
                 is_active:
                     type: boolean
                 last_run_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 next_run_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 last_run_status:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Status of the most recent run (enriched list field)
                 total_runs:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Total runs in the last 30 days (enriched list field)
                 success_rate:
-                    type: number
-                    nullable: true
+                    type: [number, "null"]
                     description: Success rate percentage (enriched list field)
                 agent_name:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Resolved agent display name (enriched list field)
                 created_by_type:
                     type: string
@@ -29126,8 +28891,7 @@ components:
                     type: integer
                     description: Current `automation_versions` version.
                 webhook_signature_scheme:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Inbound signature scheme name, never the secret.
 
         AutomationCreatedResponse:
@@ -29174,12 +28938,10 @@ components:
                     items:
                         type: string
                 runtime_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 runtime_status:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 cli_hint:
                     type: string
 
@@ -29213,55 +28975,42 @@ components:
                         are parked states: the run's clock is stopped and it continues when the
                         approval is decided, the wake time passes, or the callback URL is posted to.
                 paused_reason:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     enum: [approval, wait_until, callback]
                 paused_at_step:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 paused_approval_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 paused_until:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 paused_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 spec_version:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 idempotency_key:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 parent_run_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: Set when a `call_automation` step started this run.
-                step_results:
-                    nullable: true
+                step_results: {}
                 error:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 trigger_source:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 context:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: JSONB context passed between workflow steps
                 started_at:
                     type: string
                     format: date-time
                 finished_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 tokens_used:
                     type: integer
                 cost_cents:
@@ -29294,8 +29043,7 @@ components:
                             trigger_type:
                                 type: string
                             cron_expr:
-                                type: string
-                                nullable: true
+                                type: [string, "null"]
                             workflow_spec:
                                 type: object
                                 additionalProperties: true
@@ -29378,12 +29126,11 @@ components:
             type: object
             properties:
                 schedule:
-                    nullable: true
                     description: |
                         Scheduled start/stop: start the container when `start_cron` fires (IANA
                         `timezone`, default UTC) and stop it `stop_after_secs` later (60–86400; null
                         leaves it to the idle reconciler). `null` clears the schedule.
-                    type: object
+                    type: [object, "null"]
                     properties:
                         start_cron:
                             type: string
@@ -29391,8 +29138,7 @@ components:
                             type: string
                             default: UTC
                         stop_after_secs:
-                            type: integer
-                            nullable: true
+                            type: [integer, "null"]
                 name:
                     type: string
                 template:
@@ -29431,24 +29177,19 @@ components:
             required: [id, name, agent_id, status, created_at, updated_at]
             properties:
                 previous_image_digest:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 image_digest:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Resolved image (digest form when the provider reports one); runtime-minted agent tokens carry it as `runtime_image`, which access policies can require via `conditions.runtime_image_in`.
                 schedule:
-                    type: object
-                    nullable: true
+                    type: [object, "null"]
                     additionalProperties: true
                 next_scheduled_start_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 scheduled_stop_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 id:
                     type: string
                     format: uuid
@@ -29458,48 +29199,36 @@ components:
                     type: string
                     format: uuid
                 template:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 preset:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 provider:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 status:
                     type: string
                     enum: [creating, running, stopping, stopped, failed, deleting]
                 image:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 environment:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Vault environment for env var resolution
                 env_public:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties:
                         type: string
-                    nullable: true
                 idle_timeout_secs:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 expose_http:
-                    type: boolean
-                    nullable: true
+                    type: [boolean, "null"]
                 slug:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 public_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 http_port:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 inbound_auth:
-                    type: string
+                    type: [string, "null"]
                     enum: [api_key, jwt, public]
-                    nullable: true
                 shell_access_enabled:
                     type: boolean
                 shell_auth_policy:
@@ -29507,8 +29236,7 @@ components:
                 shell_max_session_minutes:
                     type: integer
                 monthly_hours_used:
-                    type: number
-                    nullable: true
+                    type: [number, "null"]
                 has_paid_addon:
                     type: boolean
                     description: Whether this runtime has a paid Stripe add-on (unlimited hours).
@@ -29554,8 +29282,7 @@ components:
                 slug:
                     type: string
                 reason:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         ShellSessionRequest:
             type: object
@@ -29640,9 +29367,8 @@ components:
                     type: string
                     format: date-time
                 ttl_expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         PutMemoryRequest:
             type: object
@@ -29651,8 +29377,7 @@ components:
                 value:
                     type: string
                 ttl_seconds:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
 
         MemorySearchRequest:
             type: object
@@ -29714,18 +29439,15 @@ components:
                 name:
                     type: string
                 description:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 capabilities:
                     type: array
                     items:
                         type: string
                 a2a_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 mcp_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 tags:
                     type: array
                     items:
@@ -29741,8 +29463,7 @@ components:
                 name:
                     type: string
                 description:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 tags:
                     type: array
                     items:
@@ -29752,14 +29473,11 @@ components:
                     items:
                         type: string
                 a2a_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 mcp_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 org_name:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
 
         DirectoryResponse:
             type: object
@@ -29792,11 +29510,9 @@ components:
                     items:
                         type: string
                 a2a_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 mcp_url:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 intents_api_enabled:
                     type: boolean
                 execution_intents_enabled:
@@ -30036,9 +29752,8 @@ components:
                 is_active:
                     type: boolean
                 config:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties: true
-                    nullable: true
                     description: |
                         Channel-specific configuration JSON. May include:
                         - sender_allowlist (array of strings): restrict which external senders can trigger the agent
@@ -30053,18 +29768,16 @@ components:
                     type: boolean
                     description: Whether voice message transcription is enabled
                 unified_conversation_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: ID linking this channel to a unified cross-platform conversation
                 is_home_platform:
                     type: boolean
                     description: Whether this is the agent's home platform channel
                 sender_allowlist:
-                    type: array
+                    type: [array, "null"]
                     items:
                         type: string
-                    nullable: true
                     description: List of allowed sender IDs for auto-respond
                 auto_respond_enabled:
                     type: boolean
@@ -30123,16 +29836,13 @@ components:
                     type: boolean
                     description: Whether this message was a voice message
                 voice_file_id:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Telegram voice file ID
                 voice_duration_secs:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                     description: Duration of voice message in seconds
                 transcription_status:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     enum: [pending, completed, failed]
                     description: Status of voice transcription
                 created_at:
@@ -30187,17 +29897,15 @@ components:
                     items:
                         type: string
                 extra_auth_params:
-                    type: object
+                    type: [object, "null"]
                     additionalProperties:
                         type: string
-                    nullable: true
                 requires_app_credentials:
                     type: boolean
                     description: Whether custom app credentials are required (vs. shared 1Claw app)
                 documentation_url:
-                    type: string
+                    type: [string, "null"]
                     format: uri
-                    nullable: true
 
         OAuthProviderListResponse:
             type: object
@@ -30290,9 +29998,8 @@ components:
                 client_id:
                     type: string
                 redirect_uri:
-                    type: string
+                    type: [string, "null"]
                     format: uri
-                    nullable: true
                 created_at:
                     type: string
                     format: date-time
@@ -30680,9 +30387,8 @@ components:
                     type: string
                     enum: [narrowing, widening, neutral]
                 approval_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 created_at:
                     type: string
                     format: date-time
@@ -31655,8 +31361,7 @@ components:
                 safe_address:
                     type: string
                 nonce:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 created_at:
                     type: string
                     format: date-time
@@ -31678,22 +31383,18 @@ components:
                     items:
                         type: string
                 git_branch:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 sensitive:
                     type: boolean
                 comment:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 value:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Null for sensitive vars in list responses
                 version:
                     type: integer
                 created_by:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 created_at:
                     type: string
                     format: date-time
@@ -31753,8 +31454,7 @@ components:
                 environment:
                     type: string
                 git_branch:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 resolved_at:
                     type: string
                     format: date-time
@@ -31768,13 +31468,11 @@ components:
                 slug:
                     type: string
                 description:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 is_builtin:
                     type: boolean
                 copied_from:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 is_detached:
                     type: boolean
                 created_at:
@@ -31809,11 +31507,9 @@ components:
                 sensitive:
                     type: boolean
                 comment:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 value:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 version:
                     type: integer
                 linked_vaults:
@@ -31872,9 +31568,8 @@ components:
                     enum: [wallet, platform_app, org]
                     description: Policy scope — org-wide, platform app, or single wallet
                 scope_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: Wallet or platform app UUID when scope_type is not org
                 principal_type:
                     type: string
@@ -31928,9 +31623,8 @@ components:
                 scope_type:
                     type: string
                 scope_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                 principal_type:
                     type: string
                 principal_id:
@@ -31950,19 +31644,16 @@ components:
                     items:
                         type: string
                 max_value_per_tx_eth:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 daily_limit_eth:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 conditions:
                     type: object
                 is_active:
                     type: boolean
                 expires_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
                 created_by:
                     type: string
                     format: uuid
@@ -32030,8 +31721,7 @@ components:
                     type: string
                     enum: [approved]
                 recovery_code:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: One-time recovery code (only present for certain recovery types)
 
         CredentialRecoveryExecuteResponse:
@@ -32138,20 +31828,15 @@ components:
                 configured:
                     type: boolean
                 kek_id:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 threshold:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 total_shares:
-                    type: integer
-                    nullable: true
+                    type: [integer, "null"]
                 custody_mode:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                 custodians:
-                    type: array
-                    nullable: true
+                    type: [array, "null"]
                     items:
                         type: object
                         properties:
@@ -32161,9 +31846,8 @@ components:
                             share_provided:
                                 type: boolean
                 created_at:
-                    type: string
+                    type: [string, "null"]
                     format: date-time
-                    nullable: true
 
         ShamirKekReconstructRequest:
             type: object
@@ -32241,12 +31925,10 @@ components:
                 prior_total:
                     type: integer
                 delta_pct:
-                    type: number
-                    nullable: true
+                    type: [number, "null"]
                     description: Null when both the current and prior totals are 0.
                 notes:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: >
                         A known limitation worth surfacing for this vertical (e.g.
                         a source table with no org_id to exclude test-fixture
@@ -32263,8 +31945,7 @@ components:
                 retained_orgs:
                     type: integer
                 retention_pct:
-                    type: number
-                    nullable: true
+                    type: [number, "null"]
                     description: Null when there is no cohort yet (platform younger than the window).
 
         WebSearchResult:
