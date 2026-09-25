@@ -30668,6 +30668,39 @@
         }
       }
     },
+    "/v1/runtimes/{runtime_id}/enable-recommended-tools": {
+      "parameters": [
+        {
+          "name": "runtime_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Runtimes"
+        ],
+        "summary": "Enable the recommended tool set (image generation, web search, memory, Shroud, intents) on the runtime's agent. Human-only.",
+        "operationId": "enable_recommended_tools",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden, or the plan does not include this"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
     "/v1/vaults/{vault_id}/secret-version-disable/{*path_and_version}": {
       "parameters": [
         {
