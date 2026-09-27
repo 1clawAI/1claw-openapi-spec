@@ -18893,6 +18893,58 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /v1/runtimes/{runtime_id}/agent-token/renew:
+        parameters:
+            - name: runtime_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        post:
+            tags: [Runtimes]
+            summary: "Renew this runtime's own agent JWT before it expires"
+            description: >-
+                Called by the runtime container itself, not by a human or an
+                external client.
+
+                A runtime's `ONECLAW_AGENT_TOKEN` is a short-lived JWT that Cloud
+                Run resolves from Secret Manager when the instance starts and
+                never again, so a container that outlives the TTL loses its
+                credential — and with it every 1claw tool — until it is
+                restarted. This lets it replace the token in place instead.
+
+                Authenticated by the credential being renewed: the caller must
+                present a still-valid runtime-bound agent JWT together with a
+                matching `X-1Claw-Runtime-Id` header, and must be the agent that
+                runtime is bound to. It grants nothing new — the same claims with
+                a later expiry — and stops working the moment the token lapses,
+                the token is revoked, the agent is suspended, or the runtime is
+                no longer deployed. Exempt from the monthly request quota: upkeep
+                of an already-paid-for runtime is not itself a billable request.
+            operationId: renew_runtime_agent_token
+            responses:
+                '200':
+                    description: A fresh access token
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    access_token:
+                                        type: string
+                                    expires_in:
+                                        type: integer
+                                    token_type:
+                                        type: string
+                                        example: Bearer
+                '400':
+                    description: The runtime is not deployed, so it has nothing to renew
+                '401':
+                    description: Unauthenticated, or the token presented has already expired
+                '403':
+                    description: Not an agent caller
+                '404':
+                    description: No such runtime, or it is not bound to this agent
     /v1/otel/stream:
         get:
             tags: [Observability]
