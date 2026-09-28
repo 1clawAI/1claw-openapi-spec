@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.43"
+    version: "0.61.44"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -18000,6 +18000,87 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /v1/billing/promo/preview:
+        get:
+            tags: [Billing]
+            summary: "What a promotion code does to a plan"
+            description: >
+                Public, and deliberately so: a promo advertised on social media
+                is read by people who have no account yet, and the price they
+                were promised has to be on the pricing page before they make
+                one. It resolves a Stripe promotion code and one configured
+                plan price; no tenant data is reachable through it.
+
+
+                Distinct from `/v1/billing/promo/validate`, which answers for
+                the `promo_codes` grants an authenticated org can redeem in
+                place. This one describes a checkout discount, which needs a
+                card and therefore has to go through
+                `POST /v1/billing/subscribe` with `promo_code`.
+            operationId: preview_promo
+            security: []
+            parameters:
+                - name: code
+                  in: query
+                  required: true
+                  schema: { type: string, maxLength: 64 }
+                  description: The promotion code, as advertised.
+                - name: tier
+                  in: query
+                  required: false
+                  schema: { type: string, enum: [pro, team, business], default: pro }
+                - name: interval
+                  in: query
+                  required: false
+                  schema: { type: string, enum: [monthly, annual], default: monthly }
+            responses:
+                '200':
+                    description: >
+                        The offer, or why the code cannot be used. A code that
+                        does not apply answers 200 with `valid: false` and a
+                        message, not an error status — "this code is not for
+                        annual billing" is an answer, not a failure.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [valid, tier, interval]
+                                properties:
+                                    valid: { type: boolean }
+                                    code:
+                                        type: string
+                                        nullable: true
+                                        description: The code as Stripe stores it, not the caller's casing.
+                                    headline:
+                                        type: string
+                                        nullable: true
+                                        description: >
+                                            The offer in one sentence, derived from the coupon —
+                                            e.g. "$5/mo for your first 6 months, then $29/mo".
+                                            Rendered rather than composed by the client, so a page
+                                            cannot advertise terms different from the ones charged.
+                                    tier: { type: string }
+                                    interval: { type: string }
+                                    list_cents: { type: integer, nullable: true }
+                                    first_cents:
+                                        type: integer
+                                        nullable: true
+                                        description: What the first invoice comes to, after the discount.
+                                    duration_months:
+                                        type: integer
+                                        nullable: true
+                                        description: How many invoices the discount covers.
+                                    expires_at:
+                                        type: string
+                                        format: date-time
+                                        nullable: true
+                                        description: >
+                                            Last moment the code can be redeemed. Someone who
+                                            subscribes before this keeps the discount for its
+                                            full length.
+                                    message: { type: string, nullable: true }
+                '400':
+                    description: Unknown tier or interval
     /v1/billing/promo/validate:
         get:
             tags: [Billing]
