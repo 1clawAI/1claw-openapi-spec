@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.44"
+    version: "0.61.45"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -18000,6 +18000,71 @@ paths:
                     description: Forbidden, or the plan does not include this
                 '404':
                     description: Not found
+    /v1/marketing/unsubscribe:
+        get: &marketing_unsubscribe
+            tags: [Billing]
+            summary: "Unsubscribe an address from offers and announcements"
+            description: >
+                Public and session-less by necessity: the link lives in an
+                email, and an unsubscribe that asks the reader to log in
+                first is one they abandon — they mark the next message as
+                spam instead, which costs the sending domain far more.
+                The `t` parameter is an HMAC over the address, which is what
+                stops a stranger unsubscribing somebody else.
+
+
+                Offers and announcements only. Transactional mail — sign-in
+                codes, approval requests, invitations, reports the recipient
+                asked for — does not consult this flag and is unaffected;
+                turning it off must never lock someone out of their account.
+
+
+                Idempotent, and the answer is the same whether or not the
+                address has an account. "Stop emailing me" is always
+                answered "done", and a 404 here would tell a caller holding
+                a valid token which addresses are registered.
+            operationId: marketing_unsubscribe
+            security: []
+            parameters:
+                - name: email
+                  in: query
+                  required: true
+                  schema: { type: string, format: email }
+                - name: t
+                  in: query
+                  required: true
+                  schema: { type: string }
+                  description: HMAC over the address, from the link.
+                - name: c
+                  in: query
+                  required: false
+                  schema: { type: string }
+                  description: Campaign the link came from. Recorded, not trusted.
+            responses:
+                '200':
+                    description: Unsubscribed (or already was)
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [unsubscribed, email, message]
+                                properties:
+                                    unsubscribed: { type: boolean }
+                                    email: { type: string }
+                                    message: { type: string }
+                '400':
+                    description: The link's signature did not verify
+        post:
+            <<: *marketing_unsubscribe
+            summary: "Unsubscribe (one-click)"
+            description: >
+                Identical to the GET. Present because
+                `List-Unsubscribe-Post: List-Unsubscribe=One-Click` makes
+                Gmail and Yahoo POST here without ever opening the page, and
+                both require that header on bulk mail — an endpoint that only
+                answered GET would look like a working unsubscribe to a
+                person and a broken one to the providers scoring the domain.
+            operationId: marketing_unsubscribe_post
     /v1/billing/promo/preview:
         get:
             tags: [Billing]

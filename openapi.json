@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.44",
+    "version": "0.61.45",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -28147,6 +28147,146 @@
           },
           "404": {
             "description": "Not found"
+          }
+        }
+      }
+    },
+    "/v1/marketing/unsubscribe": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Unsubscribe an address from offers and announcements",
+        "description": "Public and session-less by necessity: the link lives in an email, and an unsubscribe that asks the reader to log in first is one they abandon — they mark the next message as spam instead, which costs the sending domain far more. The `t` parameter is an HMAC over the address, which is what stops a stranger unsubscribing somebody else.\n\nOffers and announcements only. Transactional mail — sign-in codes, approval requests, invitations, reports the recipient asked for — does not consult this flag and is unaffected; turning it off must never lock someone out of their account.\n\nIdempotent, and the answer is the same whether or not the address has an account. \"Stop emailing me\" is always answered \"done\", and a 404 here would tell a caller holding a valid token which addresses are registered.\n",
+        "operationId": "marketing_unsubscribe",
+        "security": [],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "HMAC over the address, from the link."
+          },
+          {
+            "name": "c",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Campaign the link came from. Recorded, not trusted."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsubscribed (or already was)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "unsubscribed",
+                    "email",
+                    "message"
+                  ],
+                  "properties": {
+                    "unsubscribed": {
+                      "type": "boolean"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The link's signature did not verify"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Unsubscribe (one-click)",
+        "description": "Identical to the GET. Present because `List-Unsubscribe-Post: List-Unsubscribe=One-Click` makes Gmail and Yahoo POST here without ever opening the page, and both require that header on bulk mail — an endpoint that only answered GET would look like a working unsubscribe to a person and a broken one to the providers scoring the domain.\n",
+        "operationId": "marketing_unsubscribe_post",
+        "security": [],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "HMAC over the address, from the link."
+          },
+          {
+            "name": "c",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Campaign the link came from. Recorded, not trusted."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsubscribed (or already was)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "unsubscribed",
+                    "email",
+                    "message"
+                  ],
+                  "properties": {
+                    "unsubscribed": {
+                      "type": "boolean"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The link's signature did not verify"
           }
         }
       }
