@@ -18279,8 +18279,22 @@ paths:
                                             the read grant could not be written —
                                             the agent will need access granted
                                             by hand.
+                                    bound_new_vault:
+                                        type: boolean
+                                        description: >
+                                            True when the agent had to be bound to
+                                            a vault it was not bound to before. Its
+                                            access is correct from now on, but a
+                                            JWT carries the `vault_ids` it was
+                                            minted with, so a token the agent
+                                            already holds is refused until it
+                                            re-mints. Answering into a vault the
+                                            agent already reaches avoids this.
                 '400':
-                    description: Already answered, expired, or an invalid path
+                    description: >
+                        Already answered, expired, an invalid path, or nothing is
+                        stored at that path — the location the agent is sent to has
+                        to be real.
                 '403':
                     description: Called by an agent
                 '404':
