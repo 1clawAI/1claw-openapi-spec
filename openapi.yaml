@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.46"
+    version: "0.61.47"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -18104,6 +18104,215 @@ paths:
                                             - $ref: '#/components/schemas/ConnectorPreset'
                 '401':
                     description: Unauthenticated
+    /v1/secret-requests:
+        post:
+            tags: [Secrets]
+            summary: "Ask a human for a credential"
+            description: >
+                Agent-authenticated. The agent says what it needs and why; the
+                human sees a secure field in the dashboard, stores the value
+                straight into the vault over their own session, and the agent
+                is later told **where** it went — never what it is.
+
+
+                This exists because the alternative is worse than it looks.
+                Typing a credential into runtime chat persists it to the
+                conversation, writes it into the agent's memory, and replays it
+                to the model on every later turn: one paste, four copies, no
+                way back.
+
+
+                One open request per agent per label: asking again with the
+                same label refreshes the existing one rather than queueing a
+                duplicate. Unanswered requests expire after 24 hours.
+            operationId: create_secret_request
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [label, purpose]
+                            properties:
+                                label:
+                                    type: string
+                                    maxLength: 120
+                                    example: X API access token
+                                purpose:
+                                    type: string
+                                    maxLength: 500
+                                    description: >
+                                        Shown to the person being asked. They are
+                                        handing over a secret and need to know
+                                        what for.
+                                    example: To post the daily update to X on your behalf.
+                                suggested_path:
+                                    type: string
+                                    nullable: true
+                                    description: >
+                                        A suggestion only — the human picks the
+                                        vault and may change the path.
+                                    example: api-keys/x-access-token
+            responses:
+                '202':
+                    description: Asked. Poll the status route; do not ask in conversation.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [id, status, expires_at, next]
+                                properties:
+                                    id: { type: string, format: uuid }
+                                    status: { type: string, example: pending }
+                                    expires_at: { type: string, format: date-time }
+                                    next: { type: string }
+                '400':
+                    description: Missing label or purpose, or an invalid suggested path
+                '403':
+                    description: >
+                        Not an agent. A person storing a credential uses the
+                        vault directly.
+        get:
+            tags: [Secrets]
+            summary: "What your agents have asked you for"
+            description: >
+                User-authenticated. Open requests for the caller's org, newest
+                first, excluding expired ones. Agents cannot call this — they
+                read their own request by id, so one agent can never enumerate
+                which credentials an org holds.
+            operationId: list_secret_requests
+            responses:
+                '200':
+                    description: Open requests
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [requests]
+                                properties:
+                                    requests:
+                                        type: array
+                                        items:
+                                            $ref: '#/components/schemas/SecretRequest'
+                '403':
+                    description: Called by an agent
+    /v1/secret-requests/{id}:
+        get:
+            tags: [Secrets]
+            summary: "Has my human answered yet?"
+            description: >
+                The asking agent's own view, and only its own — another agent's
+                request reads as 404 rather than 403, so its existence is not
+                disclosed. A fulfilled request returns a vault id and a path;
+                the value is read separately with `get_secret`.
+
+
+                Expiry is computed on read, so a lapsed request cannot appear
+                live because no sweeper has run.
+            operationId: get_secret_request
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                '200':
+                    description: Status and, once fulfilled, where to look
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SecretRequestAgentView'
+                '404':
+                    description: No such request, or it belongs to another agent
+    /v1/secret-requests/{id}/fulfil:
+        post:
+            tags: [Secrets]
+            summary: "Tell the agent where you put it"
+            description: >
+                User-authenticated. Takes a **location, never a value** — by
+                the time this is called the secret is already in the vault,
+                written by the browser with
+                `PUT /v1/vaults/{vault_id}/secrets/{path}` over the user's own
+                session. There is no field here that could carry a plaintext
+                credential, and there should never be one.
+
+
+                Fulfilment also grants the asking agent read on exactly that
+                path, and binds the vault to it if the agent has an explicit
+                vault list. Without both, the user hands over a credential and
+                the agent still gets a 403 — the failure this whole flow
+                exists to remove.
+            operationId: fulfil_secret_request
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [vault_id, path]
+                            properties:
+                                vault_id: { type: string, format: uuid }
+                                path:
+                                    type: string
+                                    example: api-keys/x-access-token
+            responses:
+                '200':
+                    description: Fulfilled
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [status, path, vault_id, granted_read]
+                                properties:
+                                    status: { type: string, example: fulfilled }
+                                    path: { type: string }
+                                    vault_id: { type: string, format: uuid }
+                                    granted_read:
+                                        type: boolean
+                                        description: >
+                                            False when the secret was stored but
+                                            the read grant could not be written —
+                                            the agent will need access granted
+                                            by hand.
+                '400':
+                    description: Already answered, expired, or an invalid path
+                '403':
+                    description: Called by an agent
+                '404':
+                    description: No such request, or no such vault in this org
+    /v1/secret-requests/{id}/decline:
+        post:
+            tags: [Secrets]
+            summary: "No, and stop asking"
+            description: >
+                User-authenticated. The agent's next poll returns `declined`
+                with an instruction not to ask again for the same thing and to
+                say plainly what it cannot do.
+            operationId: decline_secret_request
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema: { type: string, format: uuid }
+            responses:
+                '200':
+                    description: Declined
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [status]
+                                properties:
+                                    status: { type: string, example: declined }
+                '400':
+                    description: Already answered
+                '403':
+                    description: Called by an agent
     /v1/billing/promo/preview:
         get:
             tags: [Billing]
@@ -27088,6 +27297,62 @@ components:
                         An unverified SMS target receives notifications but cannot decide
                         an approval by reply.
                 created_at: { type: string, format: date-time }
+
+        SecretRequest:
+            type: object
+            description: >
+                An agent's open ask, as the human sees it. Carries the request
+                and, once fulfilled, a reference — never a value.
+            required: [id, label, purpose, status, expires_at, created_at]
+            properties:
+                id: { type: string, format: uuid }
+                agent_id: { type: string, format: uuid, nullable: true }
+                agent_name: { type: string, nullable: true }
+                label:
+                    type: string
+                    description: >
+                        Written by the agent. Untrusted text — render it as
+                        text, never as markup.
+                purpose: { type: string }
+                suggested_path: { type: string, nullable: true }
+                status:
+                    type: string
+                    enum: [pending, fulfilled, declined, expired]
+                stored_path:
+                    type: string
+                    nullable: true
+                    description: Set on fulfilment. Where the secret went, not what it is.
+                vault_id: { type: string, format: uuid, nullable: true }
+                expires_at: { type: string, format: date-time }
+                created_at: { type: string, format: date-time }
+
+        SecretRequestAgentView:
+            type: object
+            description: >
+                The same request as the *agent* is allowed to see it: status,
+                and once fulfilled where to look. Deliberately narrower than
+                `SecretRequest` — no `fulfilled_by`, no timestamps, and no
+                field anywhere that could hold a credential.
+            required: [id, status, next]
+            properties:
+                id: { type: string, format: uuid }
+                status:
+                    type: string
+                    enum: [pending, fulfilled, declined, expired]
+                vault_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: Present only once fulfilled.
+                path:
+                    type: string
+                    nullable: true
+                    description: >
+                        Present only once fulfilled. Read the credential from
+                        here with `get_secret`.
+                next:
+                    type: string
+                    description: What to do about this status, in the agent's terms.
 
         ConnectorPreset:
             type: object
