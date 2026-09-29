@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.45"
+    version: "0.61.46"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -18065,6 +18065,45 @@ paths:
                 answered GET would look like a working unsubscribe to a
                 person and a broken one to the providers scoring the domain.
             operationId: marketing_unsubscribe_post
+    /v1/connectors/suggest:
+        get:
+            tags: [Connectors]
+            summary: "Is there a connector for this credential?"
+            description: >
+                Asked before a secret is written, so the caller can offer to
+                connect the service properly instead of filing a key that
+                cannot do the job. A user stored an X bearer token, a consumer
+                key and a consumer secret and asked their agent to post daily;
+                none of the three can post, because X needs a user-context
+                OAuth grant. Nothing said so until the agent failed.
+
+
+                Matches on both a provider name and a credential word, so
+                `api-keys/x-bearer-token` suggests the X connector and
+                `notes/slack-migration-plan` suggests nothing — a hint that
+                fires on every path is one people learn to scroll past.
+            operationId: suggest_connector
+            parameters:
+                - name: path
+                  in: query
+                  required: true
+                  schema: { type: string }
+                  description: The secret path about to be written.
+            responses:
+                '200':
+                    description: The matching connector, or null.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [preset]
+                                properties:
+                                    preset:
+                                        nullable: true
+                                        allOf:
+                                            - $ref: '#/components/schemas/ConnectorPreset'
+                '401':
+                    description: Unauthenticated
     /v1/billing/promo/preview:
         get:
             tags: [Billing]
