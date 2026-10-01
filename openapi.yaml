@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.47"
+    version: "0.61.48"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -7207,6 +7207,109 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /v1/treasury/wallets/{chain}/sign-message:
+        post:
+            tags: [Treasury]
+            summary: "Sign a message with a human wallet (EIP-191)"
+            description: >
+                `personal_sign` over the given text, hashed as
+                `\x19Ethereum Signed Message:\n<len>` + message — what
+                viem's `verifyMessage` and ethers' `verifyMessage` expect.
+
+
+                Human callers only; an agent signs with its own key via
+                `POST /v1/agents/{agent_id}/sign`. Gated exactly as a send
+                is: `X-Auth-Confirm` step-up scored as a Send action, wallet
+                access policies (`WalletAction::Sign`), and a refusal for
+                wallets whose key is split or passkey-owned — those have no
+                server-side key and will not fall back to one.
+
+
+                EVM chains only.
+            operationId: signTreasuryMessage
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema: { type: string, example: ethereum }
+                - name: X-Auth-Confirm
+                  in: header
+                  required: true
+                  schema: { type: string }
+                  description: Account password, or a `rat_` token from `POST /v1/auth/reauth/complete`.
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [message]
+                            properties:
+                                message:
+                                    type: string
+                                    maxLength: 16384
+                                    example: Sign in to Example at 2026-10-01T10:00:00Z
+            responses:
+                '200':
+                    description: Signature
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/WalletSignature'
+                '400':
+                    description: Empty or oversized message, or a non-EVM chain
+                '403':
+                    description: >
+                        Agent caller, missing or insufficient step-up, denied by a
+                        wallet access policy, or a self-custody wallet the server
+                        cannot sign for.
+                '404':
+                    description: No wallet on that chain for this user
+    /v1/treasury/wallets/{chain}/sign-typed-data:
+        post:
+            tags: [Treasury]
+            summary: "Sign EIP-712 typed data with a human wallet"
+            description: >
+                Hashes and signs a full EIP-712 payload. Include
+                `EIP712Domain` in `types` — viem and ethers synthesise that
+                entry and omit it, and this hashes exactly what you send.
+
+
+                Same gates as `sign-message`.
+            operationId: signTreasuryTypedData
+            parameters:
+                - name: chain
+                  in: path
+                  required: true
+                  schema: { type: string, example: base }
+                - name: X-Auth-Confirm
+                  in: header
+                  required: true
+                  schema: { type: string }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [typed_data]
+                            properties:
+                                typed_data:
+                                    type: object
+                                    description: '`types`, `primaryType`, `domain`, `message`.'
+            responses:
+                '200':
+                    description: Signature
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/WalletSignature'
+                '400':
+                    description: Malformed EIP-712 payload, or a non-EVM chain
+                '403':
+                    description: Same refusals as sign-message
+                '404':
+                    description: No wallet on that chain for this user
     /v1/treasury/wallets/{chain}/swap:
         post:
             tags: [Treasury Wallets]
@@ -27311,6 +27414,18 @@ components:
                         An unverified SMS target receives notifications but cannot decide
                         an approval by reply.
                 created_at: { type: string, format: date-time }
+
+        WalletSignature:
+            type: object
+            required: [signature, address, chain]
+            properties:
+                signature:
+                    type: string
+                    description: 65-byte `0x`-prefixed signature, r‖s‖v.
+                address:
+                    type: string
+                    description: The signing wallet, so it can be passed straight to `verifyMessage`.
+                chain: { type: string }
 
         SecretRequest:
             type: object
