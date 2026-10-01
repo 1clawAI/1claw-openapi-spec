@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.48",
+    "version": "0.61.49",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -7756,6 +7756,194 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/staking/points": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Staking points for the signed-in user's wallet",
+        "description": "Points earned by staking, what has been redeemed here, and what is\nleft.\n\nThe two halves come from different places on purpose. `earned` is\nread per request from the staking service, which recomputes it from\non-chain events; `spent` is this service's own append-only ledger.\n`available` is the difference, floored at zero.\n\nThe wallet is the one on the account, proven by a SIWE signature at\nsign-in — there is no way to ask about another address.\n\n`can_redeem` is false until the account has a real, verified email:\na wallet signature proves possession of a key, not a reachable\nperson, and `redeem_blocked_reason` says what to do about it.\n",
+        "operationId": "getStakingPoints",
+        "responses": {
+          "200": {
+            "description": "Points and rates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "wallet_address": {
+                      "type": "string"
+                    },
+                    "earned": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "spent": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "available": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "can_redeem": {
+                      "type": "boolean"
+                    },
+                    "redeem_blocked_reason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "rates": {
+                      "type": "object",
+                      "properties": {
+                        "points_per_pro_month": {
+                          "type": "integer"
+                        },
+                        "micro_usd_per_point": {
+                          "type": "integer"
+                        },
+                        "points_per_day_per_100m_tokens": {
+                          "type": "integer"
+                        },
+                        "max_pro_months_per_redemption": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "recent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "wallet_address": {
+                            "type": "string"
+                          },
+                          "points_spent": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "reward_type": {
+                            "type": "string",
+                            "enum": [
+                              "pro_months",
+                              "credits"
+                            ]
+                          },
+                          "reward_detail": {
+                            "type": "object"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No wallet linked to this account"
+          },
+          "403": {
+            "description": "Only a signed-in person can read staking points"
+          },
+          "503": {
+            "description": "The staking service could not report points. Deliberately not\nreported as zero — that would tell a staker their earnings\nhad vanished.\n"
+          }
+        }
+      }
+    },
+    "/v1/staking/redeem": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Redeem staking points for plan time or credits",
+        "description": "Spends points from the wallet on the account.\n\n`quantity` is **months** for `pro_months` and **points** for\n`credits`; the response always states the cost actually charged.\n\nPro months extend an existing period rather than replacing it, so\nredeeming twice does not discard the time already granted. They are\nrefused when the organisation has a Stripe subscription, or is on a\ntier above Pro: a comped tier would overwrite the plan being paid\nfor and would never expire. Credits apply on top of a subscription\nand are the right choice there.\n\nRedemption serialises on the wallet's ledger, so two concurrent\nrequests cannot spend the same points.\n",
+        "operationId": "redeemStakingPoints",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reward_type",
+                  "quantity"
+                ],
+                "properties": {
+                  "reward_type": {
+                    "type": "string",
+                    "enum": [
+                      "pro_months",
+                      "credits"
+                    ]
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1,
+                    "description": "Months for pro_months; points for credits"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Redeemed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "redemption_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "points_spent": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "remaining_available": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "reward_type": {
+                      "type": "string"
+                    },
+                    "reward_detail": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not enough points, or no wallet linked"
+          },
+          "403": {
+            "description": "A real verified email is required before redeeming"
+          },
+          "409": {
+            "description": "Pro months refused because the organisation's billing is owned\nby Stripe, or its tier is above Pro. Redeem credits instead.\n"
+          },
+          "503": {
+            "description": "The staking service could not report points; nothing was charged"
           }
         }
       }
@@ -17670,6 +17858,143 @@
           },
           "429": {
             "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/v1/auth/siwe/challenge": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Start wallet sign-in (SIWE)",
+        "description": "Returns the exact EIP-4361 message to sign, for signing in to the\ndashboard with an Ethereum wallet.\n\nThe message is built server-side and returned whole: the domain and\nthe nonce are ours to decide, and a client that assembles its own\nmessage is a client that can be talked into signing a different\none. Sign it unmodified and post it back to\n`/v1/auth/siwe/verify`.\n\nThe nonce is single-use and valid for five minutes. Distinct from\n`/v1/platform/siwe/challenge`, which needs a `plt_` caller and\nissues nonces scoped to one platform app for *its* end users.\n",
+        "operationId": "siweLoginChallenge",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "address"
+                ],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "0x-prefixed 20-byte Ethereum address",
+                    "example": "0x0000000000000000000000000000000000000001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message to sign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Sign this verbatim"
+                    },
+                    "nonce": {
+                      "type": "string"
+                    },
+                    "expires_in_secs": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid Ethereum address"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/v1/auth/siwe/verify": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete wallet sign-in and get a JWT",
+        "description": "Verifies the signature over the challenge message and returns an\nordinary user JWT — the same token social login and email-OTP\nproduce.\n\nFirst sign-in for an address creates a user and org. That user's\nemail starts synthetic (`email_pending: true`) and unverified: a\nwallet signature proves possession of a key, not a reachable\nperson. Staking redemption refuses until a real address is added\nand confirmed.\n\nThe wallet recovered from the signature is stored on the account\nand is the identity staking points are counted against. It is\nnever accepted from a request body anywhere.\n",
+        "operationId": "siweLoginVerify",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "message",
+                  "signature"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "description": "The challenge message, unmodified"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "Hex signature over the message"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "org_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "wallet_address": {
+                      "type": "string"
+                    },
+                    "is_new_user": {
+                      "type": "boolean"
+                    },
+                    "email_pending": {
+                      "type": "boolean",
+                      "description": "True while the account email is still the synthetic\nwallet address. Redemption is blocked until a real\none is verified.\n"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Expired or reused challenge, or a message signed for another domain"
+          },
+          "401": {
+            "description": "Signature does not match the address in the message"
           }
         }
       }
