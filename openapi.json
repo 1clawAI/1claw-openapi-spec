@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.49",
+    "version": "0.61.50",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -7019,6 +7019,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OnboardingStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/referrals/me": {
+      "get": {
+        "tags": [
+          "Organization"
+        ],
+        "summary": "Your own referral link and signups",
+        "description": "The caller's referral code, the link to share, how many signups it has\nproduced, and a recent list.\n\nUsers only — a referral link belongs to a person, so an agent principal\ngets 403.\n\nThe link's host comes from the brand the request arrived on, the same\nway the SIWE domain and the WebAuthn rpId do: someone on 1claw.co must\nnot be handed a 1claw.xyz link to post.\n\n`recent[].referred_hint` is masked (`a**@example.com`) — enough to\nrecognise someone you did invite, not enough to contact someone you did\nnot. Neither the referred address nor its user id is returned.\n",
+        "operationId": "getMyReferrals",
+        "responses": {
+          "200": {
+            "description": "The caller's referral code, link and signup count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyReferralsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is an agent, not a person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -32924,6 +32956,63 @@
       }
     },
     "schemas": {
+      "MyReferralsResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "link",
+          "total",
+          "recent"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The caller's referral code, created on first read.",
+            "example": "7f3a9c2b"
+          },
+          "link": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL to share, built for the brand the request arrived on.",
+            "example": "https://1claw.co/?ref=7f3a9c2b"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Countable signups attributed to this code."
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferralRow"
+            }
+          }
+        }
+      },
+      "ReferralRow": {
+        "type": "object",
+        "required": [
+          "signup_method",
+          "created_at"
+        ],
+        "properties": {
+          "signup_method": {
+            "type": "string",
+            "description": "How the referred person signed up.",
+            "example": "email_otp"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "referred_hint": {
+            "type": "string",
+            "nullable": true,
+            "description": "Masked address — first character, then the domain.",
+            "example": "a**@example.com"
+          }
+        }
+      },
       "OtelTopology": {
         "type": "object",
         "required": [
