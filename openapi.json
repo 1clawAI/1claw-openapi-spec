@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.51",
+    "version": "0.61.52",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -7034,6 +7034,28 @@
         "summary": "Your own referral link and signups",
         "description": "The caller's referral code, the link to share, how many signups it has\nproduced, and a recent list.\n\nUsers only — a referral link belongs to a person, so an agent principal\ngets 403.\n\nThe link's host comes from the brand the request arrived on, the same\nway the SIWE domain and the WebAuthn rpId do: someone on 1claw.co must\nnot be handed a 1claw.xyz link to post.\n\n`recent[].referred_hint` is masked (`a**@example.com`) — enough to\nrecognise someone you did invite, not enough to contact someone you did\nnot. Neither the referred address nor its user id is returned.\n",
         "operationId": "getMyReferrals",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Start of a half-open window `[from, to)` on when the referral was made.\nSame boundary rule as the admin leaderboard, so the two cannot disagree\nabout a referral landing on the edge. Omit for no lower bound.\n"
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "End of the window, exclusive. A contest run \"through the 31st\" passes the\n1st of the next month. Omit for no upper bound.\n"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The caller's referral code, link and signup count",
@@ -32962,6 +32984,7 @@
           "code",
           "link",
           "total",
+          "qualified",
           "recent"
         ],
         "properties": {
@@ -32979,7 +33002,21 @@
           "total": {
             "type": "integer",
             "format": "int64",
-            "description": "Countable signups attributed to this code."
+            "description": "Countable signups attributed to this code, one per person."
+          },
+          "qualified": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Of those, the ones on a live paid subscription — what a contest settles\non. Always <= `total`.\n"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Echoed back when a window was requested, so a caller can confirm which window produced these numbers."
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
           },
           "recent": {
             "type": "array",

@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.51"
+    version: "0.61.52"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -4549,6 +4549,22 @@ paths:
                 recognise someone you did invite, not enough to contact someone you did
                 not. Neither the referred address nor its user id is returned.
             operationId: getMyReferrals
+            parameters:
+                - in: query
+                  name: from
+                  required: false
+                  schema: { type: string, format: date-time }
+                  description: |
+                      Start of a half-open window `[from, to)` on when the referral was made.
+                      Same boundary rule as the admin leaderboard, so the two cannot disagree
+                      about a referral landing on the edge. Omit for no lower bound.
+                - in: query
+                  name: to
+                  required: false
+                  schema: { type: string, format: date-time }
+                  description: |
+                      End of the window, exclusive. A contest run "through the 31st" passes the
+                      1st of the next month. Omit for no upper bound.
             responses:
                 "200":
                     description: The caller's referral code, link and signup count
@@ -21156,7 +21172,7 @@ components:
     schemas:
         MyReferralsResponse:
             type: object
-            required: [code, link, total, recent]
+            required: [code, link, total, qualified, recent]
             properties:
                 code:
                     type: string
@@ -21170,7 +21186,20 @@ components:
                 total:
                     type: integer
                     format: int64
-                    description: Countable signups attributed to this code.
+                    description: Countable signups attributed to this code, one per person.
+                qualified:
+                    type: integer
+                    format: int64
+                    description: |
+                        Of those, the ones on a live paid subscription — what a contest settles
+                        on. Always <= `total`.
+                from:
+                    type: string
+                    format: date-time
+                    description: Echoed back when a window was requested, so a caller can confirm which window produced these numbers.
+                to:
+                    type: string
+                    format: date-time
                 recent:
                     type: array
                     items:
