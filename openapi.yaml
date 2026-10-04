@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.50"
+    version: "0.61.51"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -11732,6 +11732,14 @@ paths:
             description: |
                 Standard OIDC UserInfo endpoint. Returns claims about the authenticated user
                 based on the granted scopes.
+
+                Scopes: `profile` for `name`, `email` for `email`, `wallet` for
+                `wallet_address`, and `referral` for `referral_code` and `referral_link`.
+                A non-OAuth user token sees every field, since it is the user's own data.
+
+                `referral` is separate from `profile` deliberately: a referral code is
+                something the holder is asked to spread, so an app has to request it by name
+                and the consent screen names it.
             operationId: getOAuthUserInfo
             security:
                 - BearerAuth: []
@@ -28217,6 +28225,20 @@ components:
                     type: [string, "null"]
                 wallet_address:
                     type: [string, "null"]
+                referral_code:
+                    type: [string, "null"]
+                    description: |
+                        The user's referral code, returned only under the `referral` scope.
+                        Minted on first read, so a user signing in to a partner site for the
+                        first time still gets one.
+                    example: 7f3a9c2b
+                referral_link:
+                    type: [string, "null"]
+                    description: |
+                        The same code as a shareable URL, built for the brand the request
+                        arrived on — returned so a host app never has to assemble it and pick
+                        the wrong domain.
+                    example: https://1claw.co/?ref=7f3a9c2b
 
         # --- Spend Policies ---
 

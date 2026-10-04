@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.50",
+    "version": "0.61.51",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -18366,7 +18366,7 @@
           "OAuth"
         ],
         "summary": "Get authenticated user info (OIDC UserInfo)",
-        "description": "Standard OIDC UserInfo endpoint. Returns claims about the authenticated user\nbased on the granted scopes.\n",
+        "description": "Standard OIDC UserInfo endpoint. Returns claims about the authenticated user\nbased on the granted scopes.\n\nScopes: `profile` for `name`, `email` for `email`, `wallet` for\n`wallet_address`, and `referral` for `referral_code` and `referral_link`.\nA non-OAuth user token sees every field, since it is the user's own data.\n\n`referral` is separate from `profile` deliberately: a referral code is\nsomething the holder is asked to spread, so an app has to request it by name\nand the consent screen names it.\n",
         "operationId": "getOAuthUserInfo",
         "security": [
           {
@@ -43986,6 +43986,22 @@
               "string",
               "null"
             ]
+          },
+          "referral_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The user's referral code, returned only under the `referral` scope.\nMinted on first read, so a user signing in to a partner site for the\nfirst time still gets one.\n",
+            "example": "7f3a9c2b"
+          },
+          "referral_link": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The same code as a shareable URL, built for the brand the request\narrived on — returned so a host app never has to assemble it and pick\nthe wrong domain.\n",
+            "example": "https://1claw.co/?ref=7f3a9c2b"
           }
         }
       },
