@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.52"
+    version: "0.61.53"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -22743,6 +22743,12 @@ components:
                 card_daily_limit_usd:
                     type: string
                     description: Maximum cumulative USD spent ordering cards per rolling 24h window.
+                usdc_daily_limit_usd:
+                    type: string
+                    description: >-
+                        One cap across ALL of this agent's x402 stablecoin spend — POST /v1/pay
+                        and card orders together. Calendar day, UTC. Omit for no cap.
+                        Applied **in addition to** the per-route caps, never instead of them: `tx_*` bounds signing and submitting, `pay_*` bounds POST /v1/pay, and `card_*` bounds card orders. None of those three bounds the others, so this is the only field that caps an agent's total stablecoin spend.
                 card_payto_allowlist:
                     type: array
                     items:
@@ -22992,6 +22998,12 @@ components:
                 card_daily_limit_usd:
                     type: [string, "null"]
                     description: Maximum cumulative USD spent ordering cards per rolling 24h window. null clears.
+                usdc_daily_limit_usd:
+                    type: [string, "null"]
+                    description: >-
+                        One cap across ALL of this agent's x402 stablecoin spend — POST /v1/pay
+                        and card orders together. Calendar day, UTC. null clears it.
+                        Applied **in addition to** the per-route caps, never instead of them: `tx_*` bounds signing and submitting, `pay_*` bounds POST /v1/pay, and `card_*` bounds card orders. None of those three bounds the others, so this is the only field that caps an agent's total stablecoin spend.
                 card_payto_allowlist:
                     type: array
                     items:
@@ -23291,6 +23303,12 @@ components:
                 card_daily_limit_usd:
                     type: string
                     description: Maximum cumulative USD spent ordering cards per rolling 24h window.
+                usdc_daily_limit_usd:
+                    type: string
+                    description: >-
+                        One cap across ALL of this agent's x402 stablecoin spend — POST /v1/pay
+                        and card orders together. Calendar day, UTC. Omit for no cap.
+                        Applied **in addition to** the per-route caps, never instead of them: `tx_*` bounds signing and submitting, `pay_*` bounds POST /v1/pay, and `card_*` bounds card orders. None of those three bounds the others, so this is the only field that caps an agent's total stablecoin spend.
                 card_payto_allowlist:
                     type: array
                     items:

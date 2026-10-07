@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.52",
+    "version": "0.61.53",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -35440,6 +35440,10 @@
             "type": "string",
             "description": "Maximum cumulative USD spent ordering cards per rolling 24h window."
           },
+          "usdc_daily_limit_usd": {
+            "type": "string",
+            "description": "One cap across ALL of this agent's x402 stablecoin spend — POST /v1/pay and card orders together. Calendar day, UTC. Omit for no cap. Applied **in addition to** the per-route caps, never instead of them: `tx_*` bounds signing and submitting, `pay_*` bounds POST /v1/pay, and `card_*` bounds card orders. None of those three bounds the others, so this is the only field that caps an agent's total stablecoin spend."
+          },
           "card_payto_allowlist": {
             "type": "array",
             "items": {
@@ -35809,6 +35813,13 @@
               "null"
             ],
             "description": "Maximum cumulative USD spent ordering cards per rolling 24h window. null clears."
+          },
+          "usdc_daily_limit_usd": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One cap across ALL of this agent's x402 stablecoin spend — POST /v1/pay and card orders together. Calendar day, UTC. null clears it. Applied **in addition to** the per-route caps, never instead of them: `tx_*` bounds signing and submitting, `pay_*` bounds POST /v1/pay, and `card_*` bounds card orders. None of those three bounds the others, so this is the only field that caps an agent's total stablecoin spend."
           },
           "card_payto_allowlist": {
             "type": "array",
@@ -36222,6 +36233,10 @@
           "card_daily_limit_usd": {
             "type": "string",
             "description": "Maximum cumulative USD spent ordering cards per rolling 24h window."
+          },
+          "usdc_daily_limit_usd": {
+            "type": "string",
+            "description": "One cap across ALL of this agent's x402 stablecoin spend — POST /v1/pay and card orders together. Calendar day, UTC. Omit for no cap. Applied **in addition to** the per-route caps, never instead of them: `tx_*` bounds signing and submitting, `pay_*` bounds POST /v1/pay, and `card_*` bounds card orders. None of those three bounds the others, so this is the only field that caps an agent's total stablecoin spend."
           },
           "card_payto_allowlist": {
             "type": "array",
