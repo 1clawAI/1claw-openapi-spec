@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.53"
+    version: "0.61.54"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -30748,8 +30748,19 @@ components:
                     type: array
                     items:
                         type: string
+                    description: >-
+                        External sender IDs permitted to trigger the agent and to
+                        run admin slash commands. An empty array clears it;
+                        omitting the field leaves it unchanged.
                 auto_respond_enabled:
                     type: boolean
+                owner_sender_id:
+                    type: string
+                    description: >-
+                        External sender ID treated as the channel owner for admin
+                        slash commands. Merged into channel metadata, which is
+                        where the slash-command authorizer reads it from. Set this
+                        or `sender_allowlist` to authorize admin commands.
 
         ChannelResponse:
             type: object
