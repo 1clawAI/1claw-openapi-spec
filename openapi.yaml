@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.54"
+    version: "0.61.55"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -30755,12 +30755,23 @@ components:
                 auto_respond_enabled:
                     type: boolean
                 owner_sender_id:
-                    type: string
+                    # `type: [string, "null"]`, not `nullable: true`: this is a
+                    # 3.1.0 document, where `nullable` was removed and is
+                    # ignored by generators — a client built from it would
+                    # reject the null that revokes admin. 374 other fields here
+                    # use the union form; the 19 remaining `nullable: true`
+                    # are legacy and have the same latent problem.
+                    type: [string, "null"]
                     description: >-
                         External sender ID treated as the channel owner for admin
                         slash commands. Merged into channel metadata, which is
                         where the slash-command authorizer reads it from. Set this
                         or `sender_allowlist` to authorize admin commands.
+                        An explicit `null` revokes admin by removing the key;
+                        omitting the field leaves the current admin unchanged.
+                        Revoking is durable on a channel that has already
+                        received a message — the first-contact claim fires only
+                        when a channel has no prior inbound message.
 
         ChannelResponse:
             type: object
