@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.55"
+    version: "0.61.56"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -24370,6 +24370,23 @@ components:
                         accepted `memory_enabled` in its spec and never read it, so
                         the capability was reachable only from the end user's own
                         dashboard. Templates now honour the flag too.
+                raw_signing_enabled:
+                    type: boolean
+                    description: |
+                        Raw/blind digest signing (`sign_digest`, `eip712_digest`),
+                        off by default. The same gap as `memory_enabled` above, one
+                        capability later: a template accepted `raw_signing_enabled`
+                        and never read it, and this route had no field for it, so a
+                        platform app that provisioned an agent for raw signing had
+                        no way to switch it on. Reported from production.
+
+                        This route is the only one that reaches an already
+                        bootstrapped agent — it lives in the end user's own org, so
+                        the platform app's own `PATCH /v1/agents/{agent_id}` returns
+                        403, and the fleet bulk-patch refuses capability flags by
+                        design. Enabling it is audited as
+                        `platform.connection.agent_patch` with
+                        `raw_signing_changed`.
                 system_prompt:
                     type: [string, "null"]
 
@@ -24384,6 +24401,8 @@ components:
                 execution_intents_enabled:
                     type: boolean
                 memory_enabled:
+                    type: boolean
+                raw_signing_enabled:
                     type: boolean
                 system_prompt:
                     type: [string, "null"]

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.55",
+    "version": "0.61.56",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -37764,6 +37764,10 @@
             "type": "boolean",
             "description": "Agent memory, off by default. Until this field existed a\nplatform app had no way to turn it on: a bootstrap template\naccepted `memory_enabled` in its spec and never read it, so\nthe capability was reachable only from the end user's own\ndashboard. Templates now honour the flag too.\n"
           },
+          "raw_signing_enabled": {
+            "type": "boolean",
+            "description": "Raw/blind digest signing (`sign_digest`, `eip712_digest`),\noff by default. The same gap as `memory_enabled` above, one\ncapability later: a template accepted `raw_signing_enabled`\nand never read it, and this route had no field for it, so a\nplatform app that provisioned an agent for raw signing had\nno way to switch it on. Reported from production.\n\nThis route is the only one that reaches an already\nbootstrapped agent — it lives in the end user's own org, so\nthe platform app's own `PATCH /v1/agents/{agent_id}` returns\n403, and the fleet bulk-patch refuses capability flags by\ndesign. Enabling it is audited as\n`platform.connection.agent_patch` with\n`raw_signing_changed`.\n"
+          },
           "system_prompt": {
             "type": [
               "string",
@@ -37786,6 +37790,9 @@
             "type": "boolean"
           },
           "memory_enabled": {
+            "type": "boolean"
+          },
+          "raw_signing_enabled": {
             "type": "boolean"
           },
           "system_prompt": {
