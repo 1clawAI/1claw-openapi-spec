@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.58"
+    version: "0.61.59"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -24438,7 +24438,25 @@ components:
                         format: uuid
                 agent_api_key:
                     type: string
-                    description: Returned once, at creation, and never retrievable again.
+                    description: |
+                        The first agent's key, kept so existing clients keep parsing.
+                        Prefer `agent_api_keys`.
+                agent_api_keys:
+                    type: array
+                    description: |
+                        Every agent created by this call, with its one-time API key.
+                        Returned once and never retrievable again: a platform app
+                        cannot rotate a key in the end user's org, so a key missed
+                        here is gone. The singular `agent_api_key` is the first of
+                        these and is kept for compatibility.
+                    items:
+                        type: object
+                        properties:
+                            agent_id:
+                                type: string
+                                format: uuid
+                            api_key:
+                                type: string
                 agent_evm_address:
                     type: string
                 signing_keys:
@@ -27429,7 +27447,25 @@ components:
                             description: Chains with provisioned signing keys
                         agent_api_key:
                             type: [string, "null"]
-                            description: One-time agent API key (ocv_ prefix). Store securely — not retrievable later.
+                            description: |
+                                First agent's one-time API key (ocv_ prefix). Kept for
+                                compatibility; prefer `agent_api_keys`, which covers every
+                                agent the template created.
+                        agent_api_keys:
+                            type: array
+                            description: |
+                                Every agent created, with its one-time API key. Returned once:
+                                a platform app cannot rotate a key in the end user's org, so a
+                                multi-agent template used to strand agents 2..N with
+                                credentials nobody could recover.
+                            items:
+                                type: object
+                                properties:
+                                    agent_id:
+                                        type: string
+                                        format: uuid
+                                    api_key:
+                                        type: string
                         agent_evm_address:
                             type: [string, "null"]
                             description: EOA address when provision_eoa is true in the template
