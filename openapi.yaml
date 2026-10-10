@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.57"
+    version: "0.61.58"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -26861,6 +26861,13 @@ components:
                     enum: [silent, user_signin, configurable]
                 max_connected_users:
                     type: [integer, "null"]
+                max_agents_per_connection:
+                    type: [integer, "null"]
+                    description: |
+                        Agents one connection may hold, enforced by
+                        `POST /v1/platform/connections/{connectionId}/agents`. `null`
+                        clears the override back to the built-in default; it does not
+                        mean unlimited.
                 is_active:
                     type: boolean
                 api_key_expires_at:
