@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.56",
+    "version": "0.61.57",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -15868,6 +15868,63 @@
           },
           "400": {
             "description": "Multiple agents — agent_id required"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/platform/connections/{connectionId}/agents": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Add agents to a bootstrapped connection",
+        "description": "Provision additional agents on a connection that has already been\nbootstrapped, from a template belonging to the same app. `plt_` auth only.\n\nBootstrap refuses a second run (409) because it also creates the vault,\nthe policies and the plan tier, none of which should happen twice. This\nroute applies only the agent portion of a template: its `agents`, their\nper-agent `signing_keys`, `eoa` and `runtime`. `vault`, `policies`,\n`automations` and `entitlements` in the spec are ignored, and new agents\nattach to the vault the connection already has.\n\nConfiguration comes from a template rather than from fields on the\nrequest so that the agent portion of a spec has exactly one reader,\nshared with bootstrap.\n\nCapped per connection by `max_agents_per_connection` on the platform app\n(unset means a built-in default, not unlimited: an agent with signing\nkeys costs a KMS key per chain). The whole batch is checked before\nanything is created, so a template that would overshoot is refused\nrather than partly applied.\n",
+        "operationId": "addConnectionAgents",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddConnectionAgentsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agents provisioned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddConnectionAgentsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Connection not bootstrapped yet, or the template provisions no agents"
+          },
+          "403": {
+            "description": "Past the per-connection agent cap"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -37747,6 +37804,92 @@
           },
           "curve": {
             "type": "string"
+          }
+        }
+      },
+      "AddConnectionAgentsRequest": {
+        "type": "object",
+        "required": [
+          "template_id"
+        ],
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A template belonging to the same platform app. Only its `agents`\nand their per-agent `signing_keys`, `eoa` and `runtime` are\napplied.\n"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Substituted into the spec as `{{params.*}}`, same as at bootstrap.\nUse it to name the agent after the account it signs for.\n"
+          }
+        }
+      },
+      "AddConnectionAgentsResponse": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "agent_api_key": {
+            "type": "string",
+            "description": "Returned once, at creation, and never retrievable again."
+          },
+          "agent_evm_address": {
+            "type": "string"
+          },
+          "signing_keys": {
+            "type": "array",
+            "description": "Provisioned signing key details, same shape as the bootstrap summary.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "chain": {
+                  "type": "string"
+                },
+                "curve": {
+                  "type": "string"
+                },
+                "public_key": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": "string"
+                },
+                "agent_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "runtime_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "agent_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Agents on this connection after the call."
+          },
+          "max_agents_per_connection": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The ceiling the call was checked against."
           }
         }
       },

@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.56"
+    version: "0.61.57"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -10090,6 +10090,60 @@ paths:
                     description: Key deactivated
                 "400":
                     description: Multiple agents — agent_id required
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/platform/connections/{connectionId}/agents:
+        post:
+            tags: [Platform]
+            summary: Add agents to a bootstrapped connection
+            description: |
+                Provision additional agents on a connection that has already been
+                bootstrapped, from a template belonging to the same app. `plt_` auth only.
+
+                Bootstrap refuses a second run (409) because it also creates the vault,
+                the policies and the plan tier, none of which should happen twice. This
+                route applies only the agent portion of a template: its `agents`, their
+                per-agent `signing_keys`, `eoa` and `runtime`. `vault`, `policies`,
+                `automations` and `entitlements` in the spec are ignored, and new agents
+                attach to the vault the connection already has.
+
+                Configuration comes from a template rather than from fields on the
+                request so that the agent portion of a spec has exactly one reader,
+                shared with bootstrap.
+
+                Capped per connection by `max_agents_per_connection` on the platform app
+                (unset means a built-in default, not unlimited: an agent with signing
+                keys costs a KMS key per chain). The whole batch is checked before
+                anything is created, so a template that would overshoot is refused
+                rather than partly applied.
+            operationId: addConnectionAgents
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: connectionId
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/AddConnectionAgentsRequest"
+            responses:
+                "201":
+                    description: Agents provisioned
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AddConnectionAgentsResponse"
+                "400":
+                    description: Connection not bootstrapped yet, or the template provisions no agents
+                "403":
+                    description: Past the per-connection agent cap
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -24352,6 +24406,71 @@ components:
                     type: string
                 curve:
                     type: string
+
+        AddConnectionAgentsRequest:
+            type: object
+            required: [template_id]
+            properties:
+                template_id:
+                    type: string
+                    format: uuid
+                    description: |
+                        A template belonging to the same platform app. Only its `agents`
+                        and their per-agent `signing_keys`, `eoa` and `runtime` are
+                        applied.
+                params:
+                    type: object
+                    additionalProperties: true
+                    description: |
+                        Substituted into the spec as `{{params.*}}`, same as at bootstrap.
+                        Use it to name the agent after the account it signs for.
+
+        AddConnectionAgentsResponse:
+            type: object
+            properties:
+                connection_id:
+                    type: string
+                    format: uuid
+                agent_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                agent_api_key:
+                    type: string
+                    description: Returned once, at creation, and never retrievable again.
+                agent_evm_address:
+                    type: string
+                signing_keys:
+                    type: array
+                    description: Provisioned signing key details, same shape as the bootstrap summary.
+                    items:
+                        type: object
+                        properties:
+                            chain:
+                                type: string
+                            curve:
+                                type: string
+                            public_key:
+                                type: string
+                            address:
+                                type: string
+                            agent_id:
+                                type: [string, "null"]
+                                format: uuid
+                runtime_ids:
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                agent_count:
+                    type: integer
+                    format: int64
+                    description: Agents on this connection after the call.
+                max_agents_per_connection:
+                    type: integer
+                    format: int64
+                    description: The ceiling the call was checked against.
 
         PatchConnectionAgentRequest:
             type: object
