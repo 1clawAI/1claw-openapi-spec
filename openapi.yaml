@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.59"
+    version: "0.61.60"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -10098,8 +10098,13 @@ paths:
             tags: [Platform]
             summary: Add agents to a bootstrapped connection
             description: |
-                Provision additional agents on a connection that has already been
+                Provision an additional agent on a connection that has already been
                 bootstrapped, from a template belonging to the same app. `plt_` auth only.
+
+                One agent per call. A template declaring more than one agent is refused
+                with 400: each agent's API key is returned once and cannot be re-issued
+                to a platform app, so batching them would put several unrecoverable
+                credentials in a single response.
 
                 Bootstrap refuses a second run (409) because it also creates the vault,
                 the policies and the plan tier, none of which should happen twice. This
@@ -24443,12 +24448,14 @@ components:
                         Prefer `agent_api_keys`.
                 agent_api_keys:
                     type: array
+                    maxItems: 1
                     description: |
-                        Every agent created by this call, with its one-time API key.
-                        Returned once and never retrievable again: a platform app
-                        cannot rotate a key in the end user's org, so a key missed
-                        here is gone. The singular `agent_api_key` is the first of
-                        these and is kept for compatibility.
+                        The created agent and its one-time API key. Exactly one entry:
+                        provisioning is one agent per call, because a key is returned
+                        once and cannot be re-issued to a platform app, so a response
+                        carrying several would put several unrecoverable credentials in
+                        one payload. A template declaring more than one agent is
+                        refused with 400. The singular `agent_api_key` is the same key.
                     items:
                         type: object
                         properties:
@@ -27453,11 +27460,12 @@ components:
                                 agent the template created.
                         agent_api_keys:
                             type: array
+                            maxItems: 1
                             description: |
-                                Every agent created, with its one-time API key. Returned once:
-                                a platform app cannot rotate a key in the end user's org, so a
-                                multi-agent template used to strand agents 2..N with
-                                credentials nobody could recover.
+                                The created agent and its one-time API key. Exactly one entry:
+                                a template declaring more than one agent is refused with 400,
+                                because a key is returned once and cannot be re-issued to a
+                                platform app. Split such a template and bootstrap once per agent.
                             items:
                                 type: object
                                 properties:
