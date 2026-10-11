@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.60",
+    "version": "0.61.61",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -5952,7 +5952,7 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "403": {
-            "description": "Guardrail violation or permission denied",
+            "description": "Guardrail violation or permission denied. From 2026-10-11 this also covers a resume_after_approval_id that does not name an approved, agent-bound, unused approval — including one that is still pending, and including a second use of one already spent. Such a request previously executed.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -26837,7 +26837,7 @@
           "Pending Approvals"
         ],
         "summary": "Execute an approved action",
-        "description": "Human-only. Marks the approval as executed after verifying signatures.",
+        "description": "Human-only. Marks the approval as executed after verifying signatures.\n\nExecuting mints the single-use token that satisfies the signing gate, so from 2026-10-11 it requires the same org role the consensus policy requires for approving. Where a policy sets approval.required_roles, a member whose role is not listed now gets 403 where it previously succeeded. Policies that do not set required_roles are unchanged.\n",
         "operationId": "executePendingApproval",
         "security": [
           {
@@ -37484,6 +37484,11 @@
             "format": "uuid",
             "description": "Optional pending approval ID. When consensus policies match, clients resubmit with this field set to bypass the 202 gate after the approval has been executed.\n"
           },
+          "resume_tx_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Resume signing a transaction that is already waiting on human approval. Send the transaction_id returned with the 202 awaiting_approval response, after a human has approved it.\n\nDocumented here because it is accepted from the wire and was not in this spec before 2026-10-11. It must reference an approval that a human set to approved, raised for this agent and this transaction, and not already used. Anything else is 403, including an approval that is still pending — which previously succeeded, because the only check was that the transaction row was still awaiting_approval, a state the caller reaches by submitting in the first place.\n\nSingle-use. A second resume of the same approval is 403.\n"
+          },
           "raw_transaction": {
             "type": "string",
             "description": "Pre-built raw transaction as a base64-encoded byte string. When provided, the handler decodes and deep-inspects the transaction for policy evaluation before signing. Supported for non-EVM chains where the client constructs the transaction payload.\n"
@@ -46056,7 +46061,7 @@
           "resume_after_approval_id": {
             "type": "string",
             "format": "uuid",
-            "description": "Internal — resume execution after human approval (server-injected)."
+            "description": "Resume execution after a human approved it. Send the approval_id returned with the 202 approval_required response.\n\nDescribed here as \"server-injected\" until 2026-10-11, which was not enforced: the field is accepted from the wire and the gate checked only whether it was present, so any UUID skipped the approval requirement. It is now verified against an approved, agent-bound, unused approval and is single-use. Anything else, including a second use of the same approval, is 403.\n"
           }
         }
       },
