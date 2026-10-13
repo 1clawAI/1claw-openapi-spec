@@ -3878,11 +3878,18 @@ paths:
                     $ref: "#/components/responses/BadRequest"
                 "403":
                     description: >
-                        Guardrail violation or permission denied. From 2026-10-11 this
-                        also covers a resume_after_approval_id that does not name an
-                        approved, agent-bound, unused approval — including one that is
-                        still pending, and including a second use of one already spent.
-                        Such a request previously executed.
+                        Guardrail violation or permission denied.
+
+
+                        Note on resuming an approved execution: there is no request
+                        field for it. A client cannot name the approval to resume
+                        under. Between 2026-10-11 and 2026-10-12 a resume_after_approval_id
+                        was accepted and verified against an approved, agent-bound,
+                        unused approval; verifying it bound the approval but not the
+                        request body the approval was granted for, so the field was
+                        removed from the wire entirely. Approved executions resume
+                        server-side from the stored approval payload, so the body that
+                        runs is the body a human saw.
                     content:
                         application/json:
                             schema:
@@ -24188,26 +24195,6 @@ components:
                         Optional pending approval ID. When consensus policies match,
                         clients resubmit with this field set to bypass the 202 gate
                         after the approval has been executed.
-                resume_tx_id:
-                    type: string
-                    format: uuid
-                    description: >
-                        Resume signing a transaction that is already waiting on human
-                        approval. Send the transaction_id returned with the 202
-                        awaiting_approval response, after a human has approved it.
-
-
-                        Documented here because it is accepted from the wire and was
-                        not in this spec before 2026-10-11. It must reference an
-                        approval that a human set to approved, raised for this agent
-                        and this transaction, and not already used. Anything else is
-                        403, including an approval that is still pending — which
-                        previously succeeded, because the only check was that the
-                        transaction row was still awaiting_approval, a state the
-                        caller reaches by submitting in the first place.
-
-
-                        Single-use. A second resume of the same approval is 403.
                 raw_transaction:
                     type: string
                     description: >
@@ -29515,20 +29502,6 @@ components:
                     type: boolean
                     default: false
                     description: When true, validate guardrails and approval policy without executing or persisting side effects.
-                resume_after_approval_id:
-                    type: string
-                    format: uuid
-                    description: >
-                        Resume execution after a human approved it. Send the
-                        approval_id returned with the 202 approval_required response.
-
-
-                        Described here as "server-injected" until 2026-10-11, which was
-                        not enforced: the field is accepted from the wire and the gate
-                        checked only whether it was present, so any UUID skipped the
-                        approval requirement. It is now verified against an approved,
-                        agent-bound, unused approval and is single-use. Anything else,
-                        including a second use of the same approval, is 403.
 
         ExecutionApprovalRequired:
             type: object
