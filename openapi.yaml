@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.63"
+    version: "0.61.64"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -12191,6 +12191,7 @@ paths:
                           - runtime_usage
                           - memory_usage
                           - automations
+                          - agent_wallets_created
                           - embedded_wallets_created
                           - embedded_wallets_used
                           - platform_api
