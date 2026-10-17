@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.68",
+    "version": "0.61.69",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -9629,6 +9629,351 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/keys/{key_id}/tss/refresh/begin": {
+      "post": {
+        "tags": [
+          "Key Custody"
+        ],
+        "summary": "Begin a share refresh",
+        "description": "Proactive refresh of a 2-of-3 key: the same three participants mint new\nshares of the same group key (same address) with a dealerless refresh DKG,\nand old shares stop combining with new ones. Needs `X-Passkey-Token` from a\ntx-assert with `action: tss_keygen` and `tx_digest` = hex SHA-256 of\n`refresh:{key_id}`. 409 while an earlier refresh waits to be committed or\naborted.\n",
+        "operationId": "tssRefreshBegin",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Passkey-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Session opened; the vault's refresh round-1 package",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "server_round1": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/keys/{key_id}/tss/refresh/round2": {
+      "post": {
+        "tags": [
+          "Key Custody"
+        ],
+        "summary": "Share refresh, round 2",
+        "description": "Same shapes as keygen round 2: round-1 packages from participants 2 and 3.\n",
+        "operationId": "tssRefreshRound2",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "session_id",
+                  "client_round1",
+                  "recovery_round1"
+                ],
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "client_round1": {
+                    "type": "string"
+                  },
+                  "recovery_round1": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The vault's round-2 packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "server_round2": {
+                      "type": "string"
+                    },
+                    "server_round2_for_recovery": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/keys/{key_id}/tss/refresh/complete": {
+      "post": {
+        "tags": [
+          "Key Custody"
+        ],
+        "summary": "Share refresh, phase 1 done",
+        "description": "The vault stores its new share for the next generation as pending. Nothing\nlive changes: the old shares, wraps and kit keep working until commit.\nNext, wrap the new device share for `generation` (PUT client-share with\n`generation`), seal and save a new kit, then commit.\n",
+        "operationId": "tssRefreshComplete",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "session_id",
+                  "client_round2",
+                  "recovery_round2"
+                ],
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "client_round2": {
+                    "type": "string"
+                  },
+                  "recovery_round2": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    },
+                    "public_key_package": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/keys/{key_id}/tss/refresh/commit": {
+      "post": {
+        "tags": [
+          "Key Custody"
+        ],
+        "summary": "Commit a share refresh",
+        "description": "One transaction: requires a passkey wrap of the new device share, then moves\nthe key onto the new generation (and kit coverage) and deletes every old\nwrap, runtime holder wraps included (re-provision runtimes after). Audited\n`tss_key.resharded`.\n",
+        "operationId": "tssRefreshCommit",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "generation",
+                  "kit_group_public_key"
+                ],
+                "properties": {
+                  "generation": {
+                    "type": "integer"
+                  },
+                  "kit_group_public_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed; the key's backup state"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/keys/{key_id}/tss/refresh/abort": {
+      "post": {
+        "tags": [
+          "Key Custody"
+        ],
+        "summary": "Abort a pending share refresh",
+        "description": "Discards the pending share and wraps. The old set stayed live throughout.\n",
+        "operationId": "tssRefreshAbort",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Aborted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }
@@ -45259,6 +45604,10 @@
             "type": "string",
             "description": "Base64 PRF salt, 16–64 bytes. For `wrap_version` 2, the account's salt\nfrom `GET /v1/keys/tss/prf-salt`; for 1, random per key.\n"
           },
+          "generation": {
+            "type": "integer",
+            "description": "Share generation this wrap holds. Defaults to the key's current one;\nduring a refresh, the pending one (the new device share).\n"
+          },
           "wrap_version": {
             "type": "integer",
             "enum": [
@@ -45324,6 +45673,9 @@
               1,
               2
             ]
+          },
+          "generation": {
+            "type": "integer"
           },
           "created_at": {
             "type": "string",
@@ -45578,6 +45930,17 @@
               "agent_signing_key",
               "treasury_wallet"
             ]
+          },
+          "generation": {
+            "type": "integer",
+            "description": "The key's live share generation; only its wraps sign."
+          },
+          "pending_generation": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "A refresh waiting to be committed or aborted."
           },
           "custody": {
             "type": "string",
