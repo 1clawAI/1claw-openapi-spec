@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.64"
+    version: "0.61.65"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6304,10 +6304,16 @@ paths:
             summary: Threshold signing, round 1
             description: |
                 Needs `X-Passkey-Token` from a tx-assert with `action: tss_sign` and
-                `tx_digest` = hex SHA-256 of `message`. The message must be a decodable
-                Solana transaction message; every transfer destination in it is checked
-                against the OFAC SDN list before the vault commits. Returns the vault's
-                signing commitments; nonces are single-use and expire with the session.
+                `tx_digest` = hex SHA-256 of `message`. The message must be exactly one
+                returned by `POST /v1/treasury/wallets/{chain}/tss/prepare` for this key,
+                within the prepared session's lifetime; any other message is refused
+                with 403. It must also be a shape this path signs (for Solana: System
+                transfers from the wallet, optionally with a memo, the wallet as the
+                only signer, legacy message); anything else, such as a token approval
+                or an authority change, is refused with 400. Every transfer destination
+                is checked against the OFAC SDN list before the vault commits. Returns
+                the vault's signing commitments; nonces are single-use and expire with
+                the session.
             operationId: tssSignBegin
             security:
                 - BearerAuth: []
@@ -6460,9 +6466,12 @@ paths:
             tags: [Key Custody]
             summary: Broadcast a threshold-signed send
             description: |
-                Verifies the signature under the wallet's public key over exactly this
-                message, checks `to` is a transfer destination inside it, assembles the
-                transaction and submits it. Audited as `treasury_wallet.send`.
+                The message must be one returned by `tss/prepare`. Verifies the signature
+                under the wallet's public key over exactly this message, checks the
+                prepared destination is a transfer inside it, assembles the transaction
+                and submits it. `to` and `value_base_units` must match what was
+                prepared; the spend is recorded from the prepared values. Audited as
+                `treasury_wallet.send`.
             operationId: tssTreasuryBroadcast
             security:
                 - BearerAuth: []
