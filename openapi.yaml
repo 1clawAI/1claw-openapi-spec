@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.66"
+    version: "0.61.67"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6138,6 +6138,33 @@ paths:
                     $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
+
+    /v1/keys/tss/prf-salt:
+        get:
+            tags: [Key Custody]
+            summary: The account's master-wrap PRF salt
+            description: |
+                The per-account WebAuthn PRF salt for the `client_tss` master wrap,
+                created on first use and stable after. Evaluate the passkey PRF over it,
+                then HKDF a wrap key per (key_id, share index). A public input: it
+                derives nothing without the passkey. Human users only.
+            operationId: getTssPrfSalt
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: The salt
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    salt: { type: string, description: Base64, 32 bytes. }
+                                    wrap_version: { type: integer, example: 2 }
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     /v1/keys/tss/keygen/begin:
         post:
@@ -28987,7 +29014,19 @@ components:
                     description: Base64 ciphertext (≤ 4 KiB). Opaque to the vault.
                 salt:
                     type: string
-                    description: Base64 PRF salt, 16–64 random bytes, one per key.
+                    description: |
+                        Base64 PRF salt, 16–64 bytes. For `wrap_version` 2, the account's salt
+                        from `GET /v1/keys/tss/prf-salt`; for 1, random per key.
+                wrap_version:
+                    type: integer
+                    enum: [1, 2]
+                    default: 1
+                    description: |
+                        1 = per-key salt (keys created before the master wrap). 2 = the
+                        per-account master wrap: account PRF salt, wrap key HKDF'd per
+                        (key_id, share index). Every passkey wrap of one key must use the
+                        same salt and version (409 otherwise), so any of the user's passkeys
+                        opens it with one touch.
 
         ClientShareResponse:
             type: object
@@ -29016,6 +29055,9 @@ components:
                 salt:
                     type: string
                     description: Base64.
+                wrap_version:
+                    type: integer
+                    enum: [1, 2]
                 created_at:
                     type: string
                     format: date-time
