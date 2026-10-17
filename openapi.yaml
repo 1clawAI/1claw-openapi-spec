@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.67"
+    version: "0.61.68"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6166,6 +6166,83 @@ paths:
                 "403":
                     $ref: "#/components/responses/Forbidden"
 
+    /v1/keys/{key_id}/kit:
+        post:
+            tags: [Key Custody]
+            summary: Confirm a recovery kit for the key's current share generation
+            description: |
+                The owner attests they hold the offline recovery kit for this 2-of-3 key at
+                its current share generation (after a refresh, or re-checking a kit they
+                have). The kit and the recovery code never reach 1Claw; the vault checks
+                only the public key and generation it is bound to. Audited `kit.downloaded`.
+            operationId: confirmTssKit
+            security:
+                - BearerAuth: []
+            parameters:
+                - { name: key_id, in: path, required: true, schema: { type: string, format: uuid } }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [generation, group_public_key]
+                            properties:
+                                generation: { type: integer }
+                                group_public_key: { type: string, description: Hex, from the kit entry. }
+            responses:
+                "200":
+                    description: The key's backup state after confirming
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/keys/{key_id}/client-share/restore:
+        post:
+            tags: [Key Custody]
+            summary: Restore a lost device share from the recovery kit
+            description: |
+                For an owner who lost every passkey holding the device share. The browser
+                opens the kit with the recovery code locally, re-wraps share 2 under a new
+                passkey (master wrap), and uploads only that wrap. Needs `X-Auth-Confirm`
+                (a re-auth token with purpose `tss.key.restore`, or the password). Audited
+                `tss_key.recovered_via_code`; the owner is emailed. No waiting period: the
+                kit plus the code can already spend without 1Claw.
+            operationId: restoreTssShareFromKit
+            security:
+                - BearerAuth: []
+            parameters:
+                - { name: key_id, in: path, required: true, schema: { type: string, format: uuid } }
+                - { name: X-Auth-Confirm, in: header, required: true, schema: { type: string } }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [credential_id, wrapped_share, salt, group_public_key]
+                            properties:
+                                credential_id: { type: string, format: uuid }
+                                wrapped_share: { type: string, description: Base64, opaque. }
+                                salt: { type: string, description: Base64 account PRF salt. }
+                                group_public_key: { type: string, description: Hex, from the kit entry. }
+            responses:
+                "201":
+                    description: The new wrap
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ClientShareResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
     /v1/keys/tss/keygen/begin:
         post:
             tags: [Key Custody]
@@ -6306,7 +6383,7 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [session_id, client_round2, recovery_round2]
+                            required: [session_id, client_round2, recovery_round2, kit_group_public_key]
                             properties:
                                 session_id: { type: string, format: uuid }
                                 client_round2:
@@ -6315,6 +6392,13 @@ paths:
                                 recovery_round2:
                                     type: string
                                     description: Base64 FROST DKG round-2 package from participant 3, addressed to the vault.
+                                kit_group_public_key:
+                                    type: string
+                                    description: |
+                                        Hex group public key the device sealed its offline recovery kit
+                                        for, before this call. The vault commits the key (and sweeps a
+                                        re-keyed wallet into it) only if it matches, and records kit
+                                        coverage for share generation 1.
             responses:
                 "201":
                     description: Wallet created
@@ -26419,14 +26503,29 @@ components:
                     enum: [server, client_tss]
                     description: |
                         `server` — 1claw holds the whole private key and can sign alone.
-                        `client_tss` — 2-party threshold key; the customer's passkey share is required.
+                        `client_tss` — threshold key (2-of-3: 1Claw, the customer's passkey, the
+                        customer's offline recovery kit); 1Claw cannot sign alone.
                 owner_wraps:
                     type: integer
                     description: |
-                        `client_tss` only (list responses). Wraps of the customer's share under
-                        their own credentials — passkey PRF or recovery code; runtime holder
-                        wraps are not counted. Below 2 the wallet should not be funded: one
-                        lost credential would lose the share.
+                        `client_tss` only (list responses). Passkey wraps of the customer's
+                        share; runtime holder wraps are not counted. Superseded by `backup`.
+                backup:
+                    type: object
+                    description: |
+                        `client_tss` only (list responses). Whether the key is backed up and
+                        what it still needs. A 2-of-3 key needs a passkey wrap and a recovery
+                        kit confirmed for its current share generation. Agents and runtimes
+                        refuse a key that is not backed up; the owner can always move funds out.
+                    properties:
+                        threshold: { type: string, enum: ["2of2", "2of3"] }
+                        passkey_wraps: { type: integer }
+                        recovery_code_wraps: { type: integer }
+                        generation: { type: integer }
+                        kit_generation: { type: [integer, "null"] }
+                        kit_covered: { type: boolean }
+                        backed_up: { type: boolean }
+                        missing: { type: array, items: { type: string } }
 
         TreasuryWalletListResponse:
             type: object
@@ -29003,8 +29102,11 @@ components:
             properties:
                 wrap_kind:
                     type: string
-                    enum: [passkey_prf, recovery_code]
-                    description: Sidecar wraps are stored through `PUT /v1/keys/{key_id}/client-share/holder`.
+                    enum: [passkey_prf]
+                    description: |
+                        Sidecar wraps are stored through `PUT /v1/keys/{key_id}/client-share/holder`.
+                        `recovery_code` is refused: the recovery code seals the offline kit in the
+                        browser, and 1Claw holds nothing it can open.
                 credential_id:
                     type: [string, "null"]
                     format: uuid
