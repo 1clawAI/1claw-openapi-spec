@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.65"
+    version: "0.61.66"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6186,6 +6186,16 @@ paths:
                                     curve: { type: string }
                                     server_identifier: { type: integer, example: 1 }
                                     client_identifier: { type: integer, example: 2 }
+                                    recovery_identifier:
+                                        type: integer
+                                        example: 3
+                                        description: |
+                                            The device runs both `client_identifier` (its everyday share)
+                                            and `recovery_identifier` (the share that goes only into the
+                                            customer's offline recovery kit). 2-of-3: any two shares sign;
+                                            the vault alone cannot.
+                                    min_signers: { type: integer, example: 2 }
+                                    max_signers: { type: integer, example: 3 }
                                     server_round1:
                                         type: string
                                         description: Base64 FROST DKG round-1 package.
@@ -6212,22 +6222,30 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [session_id, client_round1]
+                            required: [session_id, client_round1, recovery_round1]
                             properties:
                                 session_id: { type: string, format: uuid }
                                 client_round1:
                                     type: string
-                                    description: Base64 FROST DKG round-1 package from the browser.
+                                    description: Base64 FROST DKG round-1 package from participant 2 (the device share).
+                                recovery_round1:
+                                    type: string
+                                    description: Base64 FROST DKG round-1 package from participant 3 (the recovery share), also run on the device.
             responses:
                 "200":
-                    description: The vault's round-2 package, addressed to the caller
+                    description: The vault's round-2 packages, one for each device participant
                     content:
                         application/json:
                             schema:
                                 type: object
                                 properties:
                                     session_id: { type: string, format: uuid }
-                                    server_round2: { type: string }
+                                    server_round2:
+                                        type: string
+                                        description: Addressed to participant 2.
+                                    server_round2_for_recovery:
+                                        type: string
+                                        description: Addressed to participant 3.
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -6261,12 +6279,15 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [session_id, client_round2]
+                            required: [session_id, client_round2, recovery_round2]
                             properties:
                                 session_id: { type: string, format: uuid }
                                 client_round2:
                                     type: string
-                                    description: Base64 FROST DKG round-2 package from the browser, addressed to the vault.
+                                    description: Base64 FROST DKG round-2 package from participant 2, addressed to the vault.
+                                recovery_round2:
+                                    type: string
+                                    description: Base64 FROST DKG round-2 package from participant 3, addressed to the vault.
             responses:
                 "201":
                     description: Wallet created

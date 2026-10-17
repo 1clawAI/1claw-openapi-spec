@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.65",
+    "version": "0.61.66",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -9499,6 +9499,19 @@
                       "type": "integer",
                       "example": 2
                     },
+                    "recovery_identifier": {
+                      "type": "integer",
+                      "example": 3,
+                      "description": "The device runs both `client_identifier` (its everyday share)\nand `recovery_identifier` (the share that goes only into the\ncustomer's offline recovery kit). 2-of-3: any two shares sign;\nthe vault alone cannot.\n"
+                    },
+                    "min_signers": {
+                      "type": "integer",
+                      "example": 2
+                    },
+                    "max_signers": {
+                      "type": "integer",
+                      "example": 3
+                    },
                     "server_round1": {
                       "type": "string",
                       "description": "Base64 FROST DKG round-1 package."
@@ -9547,7 +9560,8 @@
                 "type": "object",
                 "required": [
                   "session_id",
-                  "client_round1"
+                  "client_round1",
+                  "recovery_round1"
                 ],
                 "properties": {
                   "session_id": {
@@ -9556,7 +9570,11 @@
                   },
                   "client_round1": {
                     "type": "string",
-                    "description": "Base64 FROST DKG round-1 package from the browser."
+                    "description": "Base64 FROST DKG round-1 package from participant 2 (the device share)."
+                  },
+                  "recovery_round1": {
+                    "type": "string",
+                    "description": "Base64 FROST DKG round-1 package from participant 3 (the recovery share), also run on the device."
                   }
                 }
               }
@@ -9565,7 +9583,7 @@
         },
         "responses": {
           "200": {
-            "description": "The vault's round-2 package, addressed to the caller",
+            "description": "The vault's round-2 packages, one for each device participant",
             "content": {
               "application/json": {
                 "schema": {
@@ -9576,7 +9594,12 @@
                       "format": "uuid"
                     },
                     "server_round2": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Addressed to participant 2."
+                    },
+                    "server_round2_for_recovery": {
+                      "type": "string",
+                      "description": "Addressed to participant 3."
                     }
                   }
                 }
@@ -9629,7 +9652,8 @@
                 "type": "object",
                 "required": [
                   "session_id",
-                  "client_round2"
+                  "client_round2",
+                  "recovery_round2"
                 ],
                 "properties": {
                   "session_id": {
@@ -9638,7 +9662,11 @@
                   },
                   "client_round2": {
                     "type": "string",
-                    "description": "Base64 FROST DKG round-2 package from the browser, addressed to the vault."
+                    "description": "Base64 FROST DKG round-2 package from participant 2, addressed to the vault."
+                  },
+                  "recovery_round2": {
+                    "type": "string",
+                    "description": "Base64 FROST DKG round-2 package from participant 3, addressed to the vault."
                   }
                 }
               }
