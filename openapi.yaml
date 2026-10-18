@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.72"
+    version: "0.61.73"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -1803,6 +1803,10 @@ paths:
             description: |
                 Enable client-side encryption on a vault. Requires Business or Enterprise plan.
                 Only the key's SHA-256 fingerprint is stored — the key never touches the server.
+
+                Refused with 400 on the signing-key vaults (`__agent-keys`,
+                `__treasury-keys`): the server signs with the keys they hold, and a key it
+                cannot open without the customer would break every signature.
             parameters:
                 - $ref: "#/components/parameters/VaultId"
             requestBody:
@@ -1850,6 +1854,11 @@ paths:
                 Re-encrypts all secrets from the old CMEK key to the new one.
                 Keys are passed in headers (TLS-only) and exist in server memory
                 only during the rotation. Batched in groups of 100 secrets.
+
+                Refused with 400 on the signing-key vaults (`__agent-keys`,
+                `__treasury-keys`): a rotation rewrites ciphertext in place, which the
+                key escrow would not pick up, leaving the escrowed copy sealed under the
+                retired key.
             parameters:
                 - $ref: "#/components/parameters/VaultId"
                 - name: x-cmek-old-key
@@ -2537,9 +2546,36 @@ paths:
         patch:
             tags: [Agents]
             summary: Update an agent
+            description: |
+                Human users only. Control-plane consensus on `agent.update` runs first:
+                when the org requires it the call answers 202 `pending_approval`, and the
+                same PATCH with `approval_id` set to the approved `pending_approval_id`
+                proceeds.
+
+                A change to any transaction guardrail needs a step-up: `X-Auth-Confirm`
+                with a re-auth token for purpose `security.guardrail.edit` or the account
+                password. Since 2026-10-18 that includes `raw_signing_enabled` and
+                `raw_signing_policy`, because blind signing bypasses every other
+                guardrail; before, enabling it was a plain `agent.update`. The step-up
+                applies whenever the value actually changes, tightening included. A
+                widening (turning raw signing on, or moving `raw_signing_policy` from
+                `deny` toward `approve` or `allow`) is queued for human approval when the
+                org requires approval for guardrail changes: the call answers 202
+                `awaiting_approval` and the change is applied by the server when that
+                approval is approved. Spend-cap fields record a revision and can queue,
+                but do not need the step-up.
             operationId: updateAgent
             parameters:
                 - $ref: "#/components/parameters/AgentId"
+                - in: header
+                  name: X-Auth-Confirm
+                  required: false
+                  description: |
+                      Required when the request changes a transaction guardrail, including
+                      `raw_signing_enabled` and `raw_signing_policy`: a re-auth token for purpose
+                      `security.guardrail.edit`, or the account password.
+                  schema:
+                      type: string
             requestBody:
                 required: true
                 content:
@@ -2555,14 +2591,22 @@ paths:
                                 $ref: "#/components/schemas/AgentResponse"
                 "202":
                     description: |
-                        Guardrail widening queued for human approval. The change is not
-                        applied until approved via POST /v1/approvals/{approval_id}/decide.
-                        Resubmit this PATCH with `approval_id` set to the returned value
-                        after approval to apply the widening.
+                        Held. `awaiting_approval`: a guardrail widening queued for human
+                        approval; the server applies it when the approval is approved via
+                        POST /v1/approvals/{approval_id}/decide, with no resubmission.
+                        `pending_approval`: control-plane consensus on `agent.update`;
+                        resubmit this PATCH with `approval_id` set to `pending_approval_id`
+                        once approved.
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/GuardrailWideningQueuedResponse"
+                                oneOf:
+                                    - $ref: "#/components/schemas/GuardrailWideningQueuedResponse"
+                                    - $ref: "#/components/schemas/SubmitPendingApprovalResponse"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
         delete:
@@ -2786,7 +2830,14 @@ paths:
                             schema:
                                 $ref: "#/components/schemas/TransactionResponse"
                 "202":
-                    description: Transaction held for human approval (graduated tx_approval_policy)
+                    description: |
+                        Transaction held for human approval (graduated tx_approval_policy).
+                        Do not resubmit: when the approval is approved the server signs (and
+                        broadcasts) the stored request itself. Poll
+                        `GET /v1/approvals/{approval_id}` or the transaction. There is no
+                        request field for resuming; a `resume_tx_id` in the body is ignored.
+                        (The self-custody `POST /v1/agents/{agent_id}/tss/prepare` is the
+                        exception: it does take `resume_tx_id`, because the agent co-signs.)
                     content:
                         application/json:
                             schema:
@@ -2981,6 +3032,15 @@ paths:
         post:
             tags: [Signing Keys]
             summary: Rotate a signing key for a chain
+            description: |
+                Human users only. Generates a new server-held key for the chain and
+                retires the old one. A self-custody (`client_tss`) agent key cannot be
+                rotated: anyone other than its owner gets 403, and its owner gets 409
+                (rotating would replace it with a server key; deactivate it as its owner
+                and create the replacement you want). Gated by control-plane consensus as
+                `signing_key.rotate` (202 with `pending_approval_id`; call again with
+                `?approval_id=`). The approval is spent only after the new key is stored
+                and escrowed.
             operationId: rotateSigningKey
             parameters:
                 - $ref: "#/components/parameters/AgentId"
@@ -2989,6 +3049,13 @@ paths:
                   required: true
                   schema:
                       type: string
+                - name: approval_id
+                  in: query
+                  required: false
+                  description: An approved `signing_key.rotate` consensus approval (from an earlier 202).
+                  schema:
+                      type: string
+                      format: uuid
             responses:
                 "200":
                     description: Rotated signing key
@@ -2996,13 +3063,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/SigningKeyResponse"
+                "202":
+                    description: The org requires M-of-N consensus on `signing_key.rotate`. Nothing was rotated.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
+                "409":
+                    description: The active key is a self-custody (`client_tss`) key; rotating would replace it with a server key.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
 
     /v1/agents/{agent_id}/signing-keys/{chain}:
         delete:
             tags: [Signing Keys]
             summary: Deactivate a signing key for a chain
+            description: |
+                Human users only. A self-custody (`client_tss`) agent key can be
+                deactivated only by its owner (the user who holds shares 2 and 3);
+                anyone else gets 403. Gated by control-plane consensus as
+                `signing_key.deactivate` (202 with `pending_approval_id`; call again
+                with `?approval_id=`).
             operationId: deactivateSigningKey
             parameters:
                 - $ref: "#/components/parameters/AgentId"
@@ -3011,9 +3098,24 @@ paths:
                   required: true
                   schema:
                       type: string
+                - name: approval_id
+                  in: query
+                  required: false
+                  description: An approved `signing_key.deactivate` consensus approval (from an earlier 202).
+                  schema:
+                      type: string
+                      format: uuid
             responses:
                 "204":
                     description: Key deactivated
+                "202":
+                    description: The org requires M-of-N consensus on `signing_key.deactivate`.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
 
@@ -3756,9 +3858,9 @@ paths:
                                 $ref: "#/components/schemas/BindingResponse"
                 "202":
                     description: |
-                        Binding guardrail widening queued for human approval. Resubmit
-                        PATCH with `approval_id` after approval via
-                        POST /v1/approvals/{approval_id}/decide.
+                        Binding guardrail widening queued for human approval. The server
+                        applies it when the approval is approved via
+                        POST /v1/approvals/{approval_id}/decide; there is nothing to resubmit.
                     content:
                         application/json:
                             schema:
@@ -5110,8 +5212,7 @@ paths:
                                     available: { type: integer, format: int64 }
                                     can_redeem: { type: boolean }
                                     redeem_blocked_reason:
-                                        type: string
-                                        nullable: true
+                                        type: [string, "null"]
                                     rates:
                                         type: object
                                         properties:
@@ -6008,11 +6109,16 @@ paths:
             description: |
                 Stores ciphertext the vault cannot open: the customer's share of a
                 2-party threshold signing key, wrapped in the browser under the
-                passkey's WebAuthn PRF output (`passkey_prf`, one wrap per credential)
-                or under a recovery code (`recovery_code`, one per key). The vault
-                keeps the blob and its salt and returns them only to the owning user.
-                Human users only; the passkey must have reported PRF support at
-                registration. Idempotent per (key, credential).
+                passkey's WebAuthn PRF output (`passkey_prf`, one wrap per credential
+                and share generation). `recovery_code` wraps are refused: the recovery
+                code seals the offline kit in the browser. The vault keeps the blob and
+                its salt and returns them only to the owning user. Human users only;
+                the passkey must have reported PRF support at registration.
+
+                A stored wrap is never overwritten: if a wrap for this credential and
+                generation already exists the call answers 409. To replace it, delete
+                the old wrap first (`DELETE /v1/keys/{key_id}/client-share/{share_id}`,
+                which needs re-authentication).
             operationId: putClientKeyShare
             security:
                 - BearerAuth: []
@@ -6037,6 +6143,15 @@ paths:
                     $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
+                "409":
+                    description: |
+                        A wrap for this credential and generation already exists, the
+                        generation is neither the key's current nor its pending one, or
+                        the salt or wrap version disagrees with the key's other passkey wraps.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
         get:
             tags: [Key Custody]
             summary: List the caller's wrapped shares for a key
@@ -6077,7 +6192,9 @@ paths:
                 Same write as `PUT …/client-share`, for a key that already has at
                 least one wrap: the browser, holding the share in memory during a
                 passkey session, re-wraps it under a newly added passkey's PRF
-                output or under the recovery code. 409 if no wrap exists yet.
+                output. Owner only. 409 if no wrap exists yet, or if a wrap for
+                this credential and generation already exists (delete it first,
+                with re-authentication, to replace it).
             operationId: rewrapClientKeyShare
             security:
                 - BearerAuth: []
@@ -6126,12 +6243,22 @@ paths:
                 Deletes a single wrap. Wraps tied to a passkey are also removed when
                 that passkey is deleted. Removing the last wrap of a `client_tss` key
                 makes the key unrecoverable — the vault holds only its own share.
+
+                Owner only, and needs `X-Auth-Confirm`: a single-use re-auth token
+                from `POST /v1/auth/reauth/complete` with purpose `tss.key.wrap_delete`,
+                or the account password. Strong factor: once a passkey (usable on this
+                domain) or TOTP is enrolled, the confirmation must use one of them and
+                a password is refused. Audited `client_share.deleted`.
             operationId: deleteClientKeyShare
             security:
                 - BearerAuth: []
+            parameters:
+                - { name: X-Auth-Confirm, in: header, required: true, schema: { type: string } }
             responses:
                 "204":
                     description: Wrap removed
+                "400":
+                    $ref: "#/components/responses/BadRequest"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "403":
@@ -6184,7 +6311,7 @@ paths:
                             schema:
                                 type: object
                                 properties:
-                                    salt: { type: string, description: Base64, 32 bytes. }
+                                    salt: { type: string, description: "Base64, 32 bytes." }
                                     wrap_version: { type: integer, example: 2 }
                 "401":
                     $ref: "#/components/responses/Unauthorized"
@@ -6198,8 +6325,11 @@ paths:
             description: |
                 The owner attests they hold the offline recovery kit for this 2-of-3 key at
                 its current share generation (after a refresh, or re-checking a kit they
-                have). The kit and the recovery code never reach 1Claw; the vault checks
-                only the public key and generation it is bound to. Audited `kit.downloaded`.
+                have). The kit and the recovery code never reach 1Claw. The vault checks
+                the public key and generation it is bound to, and `kit_proof`: a proof,
+                made in the browser from the opened kit, that the kit holds share 3 of the
+                key's current generation (a kit from before a refresh is refused, since the
+                group key alone cannot tell old shares from new). Audited `kit.downloaded`.
             operationId: confirmTssKit
             security:
                 - BearerAuth: []
@@ -6211,10 +6341,16 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [generation, group_public_key]
+                            required: [generation, group_public_key, kit_proof]
                             properties:
                                 generation: { type: integer }
-                                group_public_key: { type: string, description: Hex, from the kit entry. }
+                                group_public_key: { type: string, description: "Hex, from the kit entry." }
+                                kit_proof:
+                                    type: string
+                                    description: |
+                                        Base64 Schnorr proof of possession of the kit's share 3 for
+                                        `generation` (`@1claw/tss-wasm` `kit_share_proof`). Missing,
+                                        malformed or not matching: 400.
             responses:
                 "200":
                     description: The key's backup state after confirming
@@ -6248,12 +6384,19 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [credential_id, wrapped_share, salt, group_public_key]
+                            required: [credential_id, wrapped_share, salt, group_public_key, kit_proof]
                             properties:
                                 credential_id: { type: string, format: uuid }
-                                wrapped_share: { type: string, description: Base64, opaque. }
+                                wrapped_share: { type: string, description: "Base64, opaque." }
                                 salt: { type: string, description: Base64 account PRF salt. }
-                                group_public_key: { type: string, description: Hex, from the kit entry. }
+                                group_public_key: { type: string, description: "Hex, from the kit entry." }
+                                kit_proof:
+                                    type: string
+                                    description: |
+                                        Base64 Schnorr proof of possession of the kit's share 3 for the
+                                        key's current share generation (`@1claw/tss-wasm`
+                                        `kit_share_proof`). An older generation's kit would restore a
+                                        dead share, so it is refused with 400, as is a missing proof.
             responses:
                 "201":
                     description: The new wrap
@@ -6407,10 +6550,19 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [generation, kit_group_public_key]
+                            required: [generation, kit_group_public_key, kit_proof]
                             properties:
                                 generation: { type: integer }
-                                kit_group_public_key: { type: string }
+                                kit_group_public_key:
+                                    type: string
+                                    description: Hex group public key of the new kit the owner saved.
+                                kit_proof:
+                                    type: string
+                                    description: |
+                                        Base64 Schnorr proof of possession of the new kit's share 3 for
+                                        `generation` (`@1claw/tss-wasm` `kit_share_proof`). The group key
+                                        is unchanged by a refresh, so only this proof tells the new kit
+                                        from the old one. Missing or not matching: 400.
             responses:
                 "200":
                     description: Committed; the key's backup state
@@ -6490,7 +6642,28 @@ paths:
                                     type: string
                                     format: uuid
                                     description: Required for `agent_signing_key`.
+                                approval_id:
+                                    type: string
+                                    format: uuid
+                                    description: |
+                                        Re-key only. A re-key moves the whole balance into a key whose
+                                        shares 2 and 3 sit on the customer's kit, so it is gated as an
+                                        export, at begin and before the device makes a kit: wallet
+                                        access (`export` and `send`) on the old wallet, the
+                                        `treasury_wallet.export` control-plane consensus policy, and the
+                                        activity policy for `export`. When consensus is required the call
+                                        answers 202 with `pending_approval_id`; once approved, call begin
+                                        again with that id here.
             responses:
+                "202":
+                    description: |
+                        Re-key only: the org requires M-of-N consensus on
+                        `treasury_wallet.export`. Nothing was started; call again with
+                        `approval_id` once the approval is granted.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
                 "201":
                     description: Session opened; the vault's round-1 package
                     content:
@@ -6596,7 +6769,7 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [session_id, client_round2, recovery_round2, kit_group_public_key]
+                            required: [session_id, client_round2, recovery_round2, kit_group_public_key, kit_proof]
                             properties:
                                 session_id: { type: string, format: uuid }
                                 client_round2:
@@ -6612,6 +6785,14 @@ paths:
                                         for, before this call. The vault commits the key (and sweeps a
                                         re-keyed wallet into it) only if it matches, and records kit
                                         coverage for share generation 1.
+                                kit_proof:
+                                    type: string
+                                    description: |
+                                        Base64 Schnorr proof of possession of share 3 for generation 1
+                                        (`@1claw/tss-wasm` `kit_share_proof`), proving the page that
+                                        sealed the kit held this key's recovery share. Required
+                                        alongside `kit_group_public_key`: missing, malformed or not
+                                        matching is a 400 and no key is created.
             responses:
                 "201":
                     description: Wallet created
@@ -6990,11 +7171,31 @@ paths:
             tags: [Key Custody]
             summary: Agent declares a send from a delegated client_tss wallet
             description: |
-                Runs the agent's guardrails (chains, allowlists, caps, daily limits,
-                approval policy) and the sanctions screen on the declared call, builds
-                the unsigned message and records it as a prepared intent. Only a
-                prepared message can enter `/tss/sign/begin`. Requires a treasury
-                delegation and a share provisioned to the agent's runtime.
+                The only gate on an agent threshold signature: sign/complete hands the
+                signature to the agent, which could broadcast it without 1Claw, so
+                everything `POST /v1/agents/{agent_id}/transactions` checks before
+                signing is checked here, in this order: the agent's guardrails (chains,
+                allowlists, per-transaction and daily caps), the sanctions screen, the
+                human approval policy (or the resume of an approved one), Cedar/OPA
+                transaction policy, and M-of-N consensus (action `submit_transaction`).
+                Then it builds the unsigned message, writes a `prepared` row to the
+                transaction ledger (so daily caps count it from this moment) and
+                records the prepared intent. Only a prepared message can enter
+                `/tss/sign/begin`, and sign/complete and broadcast refuse (403) a
+                prepare that recorded no ledger row. Requires a treasury delegation and
+                a share provisioned to the agent's runtime.
+
+                Two 202 outcomes, neither of which builds a message:
+
+                - Human approval (`status: awaiting_approval`): a ledger row is written
+                  as `awaiting_approval` and an approval with action
+                  `agent_tss_transaction` is created. Once a human approves it, call
+                  prepare again with the same `key_id`, `to` and `value` and
+                  `resume_tx_id` set to the returned `transaction_id`. Rejecting the
+                  approval marks the row `rejected`.
+                - M-of-N consensus (`status: pending_approval`): call prepare again with
+                  the same transfer and `approval_id` set to the returned
+                  `pending_approval_id` once the approval is granted.
             operationId: agentTssPrepare
             security:
                 - BearerAuth: []
@@ -7010,9 +7211,40 @@ paths:
                                 to: { type: string }
                                 value: { type: string, description: Major units. }
                                 memo: { type: string }
+                                approval_id:
+                                    type: string
+                                    format: uuid
+                                    description: |
+                                        An approved M-of-N consensus approval for this exact transfer
+                                        (the `pending_approval_id` of an earlier 202). The approval is
+                                        bound to `key_id`, `chain`, `to`, `value` and `memo`.
+                                resume_tx_id:
+                                    type: string
+                                    format: uuid
+                                    description: |
+                                        The `transaction_id` of an earlier prepare that was parked on
+                                        human approval (202 `awaiting_approval`). The transaction must
+                                        still be `awaiting_approval`, belong to this agent, match this
+                                        transfer, and its approval must be approved; resuming spends
+                                        that approval.
             responses:
                 "200":
-                    description: Unsigned message
+                    description: Unsigned message, recorded as a prepared intent with a ledger row
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TssPrepareResponse"
+                "202":
+                    description: |
+                        Held for approval. `awaiting_approval` = human approval (resume with
+                        `resume_tx_id`); `pending_approval` = M-of-N consensus (retry with
+                        `approval_id`).
+                    content:
+                        application/json:
+                            schema:
+                                oneOf:
+                                    - $ref: "#/components/schemas/TssPrepareAwaitingApproval"
+                                    - $ref: "#/components/schemas/SubmitPendingApprovalResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -7064,6 +7296,12 @@ paths:
         post:
             tags: [Key Custody]
             summary: Agent threshold signing, round 2
+            description: |
+                Billed as a signature before signing. The signing session must trace back
+                to a prepare that wrote a `prepared` ledger row; one that did not is
+                refused with 403 ("prepare it again"). On success the row moves to
+                `signed`, so it keeps counting toward daily caps whether or not the
+                agent broadcasts through 1Claw.
             operationId: agentTssSignComplete
             security:
                 - BearerAuth: []
@@ -7085,6 +7323,8 @@ paths:
                     $ref: "#/components/responses/BadRequest"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
                 "409":
@@ -7101,9 +7341,12 @@ paths:
             summary: Broadcast an agent's threshold-signed send
             description: |
                 Verifies the signature under the wallet key, checks the message is the
-                prepared one, re-runs the agent's guardrails, records the transaction
-                (daily limits count it) and submits. Audited as `treasury_wallet.send`
-                with `via: runtime_share_holder`.
+                prepared one and that the prepared destination is a transfer inside it,
+                and submits. Guardrails are not re-run here: they ran at prepare, and
+                the ledger row written there has counted toward daily limits since. A
+                prepare that recorded no ledger row is refused with 403. The broadcast
+                updates that row with the transaction hash. Audited as
+                `treasury_wallet.send` with `via: runtime_share_holder`.
             operationId: agentTssBroadcast
             security:
                 - BearerAuth: []
@@ -7647,6 +7890,16 @@ paths:
                 Generates a new keypair, deactivates the old wallet, and creates a
                 new active wallet. The old private key version is retained in the
                 vault for audit. Counts toward wallet quota (does not require a paid plan).
+                Human users only.
+
+                Rotation generates a 1Claw-held (server) key, so a self-custody
+                (`client_tss`) wallet is refused with 409 (use a share refresh,
+                `POST /v1/keys/{key_id}/tss/refresh/begin`, to change its shares), and
+                the org's custody policy applies as it does on create (403 where new
+                server keys are no longer issued). Gated by control-plane consensus as
+                `treasury_wallet.rotate`: when the org requires it the call answers 202
+                with `pending_approval_id`; call again with `?approval_id=` once approved.
+                The approval is spent only after the new key is stored and escrowed.
             operationId: rotateTreasuryWallet
             security:
                 - BearerAuth: []
@@ -7656,6 +7909,13 @@ paths:
                   required: true
                   schema:
                       type: string
+                - name: approval_id
+                  in: query
+                  required: false
+                  description: An approved `treasury_wallet.rotate` consensus approval (from an earlier 202).
+                  schema:
+                      type: string
+                      format: uuid
             responses:
                 "200":
                     description: Wallet rotated
@@ -7663,6 +7923,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/TreasuryWalletResponse"
+                "202":
+                    description: The org requires M-of-N consensus on `treasury_wallet.rotate`. Nothing was rotated.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -7671,6 +7937,12 @@ paths:
                     $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
+                "409":
+                    description: The wallet is a self-custody (`client_tss`) wallet; rotating would replace it with a server key.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ProblemDetails"
 
     /v1/treasury/wallets/{chain}/balance:
         get:
@@ -10534,10 +10806,30 @@ paths:
                 Platform-scoped agent update for connected end-users. Allows enabling Intents API,
                 Execution Intents, and updating the default system prompt without human dashboard access.
                 Agent must be provisioned on the connection. plt_ auth only.
+
+                `raw_signing_enabled: false` is applied directly. `raw_signing_enabled: true` on an
+                agent that does not already have it is not a platform privilege: the call must carry
+                `X-Auth-Confirm` with a re-auth token (`rat_...`) the end user obtained for purpose
+                `security.guardrail.edit` (a password is refused on this route), and the enable runs
+                through the end user's own `PATCH /v1/agents/{agent_id}` path in their org. That
+                applies control-plane consensus on `agent.update` (202 `pending_approval`; retry with
+                `approval_id`), the guardrail step-up, and the widening approval queue when the org
+                requires approval for guardrail changes (202 `awaiting_approval`). The enable leaves
+                `raw_signing_policy` at `approve` unless the end user already chose `approve` or
+                `deny`. Audited `platform.connection.raw_signing_enable` with outcome `applied` or
+                `queued`.
             operationId: patchConnectionAgent
             security:
                 - BearerAuth: []
             parameters:
+                - in: header
+                  name: X-Auth-Confirm
+                  required: false
+                  description: |
+                      Required only to turn `raw_signing_enabled` on: the end user's re-auth token
+                      for purpose `security.guardrail.edit`.
+                  schema:
+                      type: string
                 - in: path
                   name: connectionId
                   required: true
@@ -10563,6 +10855,17 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/PatchConnectionAgentResponse"
+                "202":
+                    description: |
+                        Raw signing enable held: `pending_approval` (control-plane consensus on
+                        `agent.update`; retry with `approval_id`) or `awaiting_approval` (the
+                        org's guardrail widening queue). No other field in the request was applied.
+                    content:
+                        application/json:
+                            schema:
+                                oneOf:
+                                    - $ref: "#/components/schemas/SubmitPendingApprovalResponse"
+                                    - $ref: "#/components/schemas/GuardrailWideningQueuedResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "403":
@@ -10589,9 +10892,33 @@ paths:
                   schema:
                       type: string
                       format: uuid
+                - in: header
+                  name: X-Auth-Confirm
+                  required: false
+                  description: Same as on PATCH; required only to turn `raw_signing_enabled` on.
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/PatchConnectionAgentRequest"
             responses:
                 "200":
                     description: Agent updated
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/PatchConnectionAgentResponse"
+                "202":
+                    description: Raw signing enable held for approval; see PATCH.
+                    content:
+                        application/json:
+                            schema:
+                                oneOf:
+                                    - $ref: "#/components/schemas/SubmitPendingApprovalResponse"
+                                    - $ref: "#/components/schemas/GuardrailWideningQueuedResponse"
                 "403":
                     $ref: "#/components/responses/Forbidden"
                 "404":
@@ -12629,17 +12956,34 @@ paths:
         patch:
             tags: [Pay]
             summary: Set an agent's payment guardrails
-            description: >
-                Human callers only. These are the numbers every payment decision
-                is measured against — the per-payment cap, the daily limit, the
-                recipient allowlist, whether a passkey is required at all, and
-                whether the agent may hold a spending grant. An agent that could
-                set them would be setting its own ceiling.
-                Omitted fields are left alone; values can currently be set but
-                not cleared.
+            description: |
+                Human owners and admins only. These are the numbers every payment
+                decision is measured against: the per-payment cap, the daily limit,
+                the recipient allowlist, whether a passkey is required at all, and
+                whether the agent may hold a spending grant. An agent that could set
+                them would be setting its own ceiling.
+
+                Omitted fields are left alone; `null` clears a cap, the allowlist or
+                the grant TTL. A change that widens anything (raising or clearing a
+                cap, turning pay or grant mode on, turning a passkey or approval
+                requirement off, a longer grant TTL, or naming a recipient that is not
+                already on the allowlist) needs `X-Auth-Confirm` with a re-auth token
+                for purpose `security.agent_pay_guardrails.widen` (strong factor: a
+                password is refused once a passkey or TOTP is enrolled). Tightening
+                needs no step-up. Audited `agent.pay_guardrails_updated`.
+
+                No allowlist is not a wildcard: `null` and `[]` are enforced alike, so
+                an agent with `pay_require_passkey: false` and no allowlist can pay no
+                one unattended.
             operationId: updatePaySettings
             parameters:
                 - $ref: "#/components/parameters/AgentId"
+                - name: X-Auth-Confirm
+                  in: header
+                  required: false
+                  description: Required for a widening change; see above.
+                  schema:
+                      type: string
             requestBody:
                 required: true
                 content:
@@ -12648,7 +12992,7 @@ paths:
                             $ref: "#/components/schemas/UpdatePayGuardrailsRequest"
             responses:
                 "200": { description: Updated guardrails }
-                "403": { description: Not a human caller }
+                "403": { description: 'Not a human caller, not an owner or admin, or a widening change without a valid step-up token' }
     /v1/agents/{agent_id}/pay/prepare:
         post:
             tags: [Pay]
@@ -12731,6 +13075,7 @@ paths:
                 minutes. The nonce never leaves the server, so the digest cannot
                 be recomputed for different terms. Human callers only; terms are
                 validated against the agent's maximum cap and window here as well.
+                Owners and admins only.
             operationId: preparePayGrant
             parameters:
                 - $ref: "#/components/parameters/AgentId"
@@ -12760,13 +13105,13 @@ paths:
                                     action: { type: string, enum: [x402_grant] }
                                     expires_in_secs: { type: integer }
                 '400': { description: Invalid terms }
-                '403': { description: 'Not a human caller, grant mode disabled, or over the agent''s maximum' }
+                '403': { description: 'Not a human owner or admin, grant mode disabled, or over the agent''s maximum' }
     /v1/agents/{agent_id}/pay/grants:
         post:
             tags: [Pay]
             summary: Create a spending grant
             description: >
-                Human callers only. Requires a passkey assertion over the digest
+                Human owners and admins only. Requires a passkey assertion over the digest
                 of exactly these terms, and stays within the agent's own maximum
                 cap and window — a grant is a delegation inside the limits
                 already set, not a way around them.
@@ -12786,7 +13131,7 @@ paths:
                             $ref: "#/components/schemas/CreatePayGrantRequest"
             responses:
                 "200": { description: Grant created }
-                "403": { description: 'Not a human caller, grant mode disabled, or terms exceed the agent''s maximum' }
+                "403": { description: 'Not a human owner or admin, grant mode disabled, or terms exceed the agent''s maximum' }
     /v1/agents/{agent_id}/pay/{payment_id}/result:
         post:
             tags: [Pay]
@@ -18934,9 +19279,9 @@ paths:
                                 required: [preset]
                                 properties:
                                     preset:
-                                        nullable: true
-                                        allOf:
+                                        oneOf:
                                             - $ref: '#/components/schemas/ConnectorPreset'
+                                            - type: "null"
                 '401':
                     description: Unauthenticated
     /v1/secret-requests:
@@ -18982,8 +19327,7 @@ paths:
                                         what for.
                                     example: To post the daily update to X on your behalf.
                                 suggested_path:
-                                    type: string
-                                    nullable: true
+                                    type: [string, "null"]
                                     description: >
                                         A suggestion only — the human picks the
                                         vault and may change the path.
@@ -19210,12 +19554,10 @@ paths:
                                 properties:
                                     valid: { type: boolean }
                                     code:
-                                        type: string
-                                        nullable: true
+                                        type: [string, "null"]
                                         description: The code as Stripe stores it, not the caller's casing.
                                     headline:
-                                        type: string
-                                        nullable: true
+                                        type: [string, "null"]
                                         description: >
                                             The offer in one sentence, derived from the coupon —
                                             e.g. "$5/mo for your first 6 months, then $29/mo".
@@ -19223,24 +19565,21 @@ paths:
                                             cannot advertise terms different from the ones charged.
                                     tier: { type: string }
                                     interval: { type: string }
-                                    list_cents: { type: integer, nullable: true }
+                                    list_cents: { type: [integer, "null"] }
                                     first_cents:
-                                        type: integer
-                                        nullable: true
+                                        type: [integer, "null"]
                                         description: What the first invoice comes to, after the discount.
                                     duration_months:
-                                        type: integer
-                                        nullable: true
+                                        type: [integer, "null"]
                                         description: How many invoices the discount covers.
                                     expires_at:
-                                        type: string
+                                        type: [string, "null"]
                                         format: date-time
-                                        nullable: true
                                         description: >
                                             Last moment the code can be redeemed. Someone who
                                             subscribes before this keeps the discount for its
                                             full length.
-                                    message: { type: string, nullable: true }
+                                    message: { type: [string, "null"] }
                 '400':
                     description: Unknown tier or interval
     /v1/billing/promo/validate:
@@ -21658,8 +21997,7 @@ components:
                     type: string
                     format: date-time
                 referred_hint:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Masked address — first character, then the domain.
                     example: a**@example.com
         OtelTopology:
@@ -21760,9 +22098,11 @@ components:
                 pay_payto_allowlist:
                     type: [array, "null"]
                     items: { type: string }
-                    description: >
-                        Recipients an unattended agent may pay. Null is not a
-                        wildcard — for an unattended agent it means no one.
+                    description: |
+                        Recipients an unattended agent may pay. Null is not a wildcard:
+                        it is enforced exactly like `[]`, so for an unattended agent it
+                        means no one. An agent that requires a passkey or an approval can
+                        pay any recipient a person approves, payment by payment.
                 pay_require_passkey:
                     type: boolean
                     description: Defaults true. Turning it off is what "unattended" means.
@@ -23320,7 +23660,11 @@ components:
                     description: Default policy applied to EIP-712 signing requests.
                 raw_signing_enabled:
                     type: boolean
-                    description: Allow this agent to sign raw digests.
+                    description: |
+                        Allow this agent to sign raw digests (blind signing; bypasses transaction
+                        guardrails). A change needs the guardrail step-up (`X-Auth-Confirm`, purpose
+                        `security.guardrail.edit`); turning it on is a widening and queues when the
+                        org requires approval for guardrail changes.
                 default_llm_provider:
                     type: [string, "null"]
                     description: Default LLM provider for automations and Shroud.
@@ -23505,7 +23849,10 @@ components:
                 raw_signing_policy:
                     type: string
                     enum: [allow, deny, approve]
-                    description: Raw digest signing policy.
+                    description: |
+                        Raw digest signing policy. A change needs the guardrail step-up
+                        (`X-Auth-Confirm`, purpose `security.guardrail.edit`); moving toward `allow`
+                        is a widening and queues when the org requires approval for guardrail changes.
                 personal_sign_policy:
                     type: object
                     additionalProperties: true
@@ -23588,10 +23935,12 @@ components:
                 approval_id:
                     type: string
                     format: uuid
-                    description: >
-                        Approved policy_change id when applying a queued guardrail
-                        widening. Resubmit PATCH with this field after the approval
-                        has been approved via POST /v1/approvals/{approval_id}/decide.
+                    description: |
+                        Completes a control-plane consensus gate on `agent.update`: the
+                        `pending_approval_id` of an earlier 202, once approved. It does not
+                        apply a queued guardrail widening and cannot bypass the widening
+                        queue: a queued widening is applied by the server when its approval
+                        is approved, with nothing to resubmit.
 
         AgentResponse:
             type: object
@@ -24914,13 +25263,22 @@ components:
                         platform app that provisioned an agent for raw signing had
                         no way to switch it on. Reported from production.
 
-                        This route is the only one that reaches an already
-                        bootstrapped agent — it lives in the end user's own org, so
-                        the platform app's own `PATCH /v1/agents/{agent_id}` returns
-                        403, and the fleet bulk-patch refuses capability flags by
-                        design. Enabling it is audited as
-                        `platform.connection.agent_patch` with
-                        `raw_signing_changed`.
+                        `false` is applied directly. `true` (on an agent that does not
+                        already have it) needs the end user's consent: `X-Auth-Confirm`
+                        with their re-auth token for purpose `security.guardrail.edit`.
+                        It is applied through the end user's own agent update path, so
+                        control-plane consensus and the guardrail widening queue apply
+                        and the call can answer 202. Without the token: 403. The enable
+                        sets `raw_signing_policy` to `approve` unless the end user
+                        already chose `approve` or `deny`. Audited as
+                        `platform.connection.raw_signing_enable`.
+                approval_id:
+                    type: string
+                    format: uuid
+                    description: |
+                        Completes a control-plane consensus gate (`agent.update`) for a
+                        raw signing enable: the `pending_approval_id` of an earlier 202,
+                        once approved.
                 system_prompt:
                     type: [string, "null"]
 
@@ -28417,23 +28775,22 @@ components:
             required: [id, label, purpose, status, expires_at, created_at]
             properties:
                 id: { type: string, format: uuid }
-                agent_id: { type: string, format: uuid, nullable: true }
-                agent_name: { type: string, nullable: true }
+                agent_id: { type: [string, "null"], format: uuid }
+                agent_name: { type: [string, "null"] }
                 label:
                     type: string
                     description: >
                         Written by the agent. Untrusted text — render it as
                         text, never as markup.
                 purpose: { type: string }
-                suggested_path: { type: string, nullable: true }
+                suggested_path: { type: [string, "null"] }
                 status:
                     type: string
                     enum: [pending, fulfilled, declined, expired]
                 stored_path:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: Set on fulfilment. Where the secret went, not what it is.
-                vault_id: { type: string, format: uuid, nullable: true }
+                vault_id: { type: [string, "null"], format: uuid }
                 expires_at: { type: string, format: date-time }
                 created_at: { type: string, format: date-time }
 
@@ -28451,13 +28808,11 @@ components:
                     type: string
                     enum: [pending, fulfilled, declined, expired]
                 vault_id:
-                    type: string
+                    type: [string, "null"]
                     format: uuid
-                    nullable: true
                     description: Present only once fulfilled.
                 path:
-                    type: string
-                    nullable: true
+                    type: [string, "null"]
                     description: >
                         Present only once fulfilled. Read the credential from
                         here with `get_secret`.
@@ -29815,10 +30170,12 @@ components:
                 approval_id:
                     type: string
                     format: uuid
-                    description: >
-                        Approved policy_change id when applying a queued binding
-                        guardrail widening. Resubmit PATCH with this field after
-                        approval via POST /v1/approvals/{approval_id}/decide.
+                    description: |
+                        Recorded on the guardrail revision row for reference. It does not
+                        gate or bypass anything: a binding guardrail widening always queues
+                        when the org requires approval, and the server applies it when the
+                        approval is approved via POST /v1/approvals/{approval_id}/decide,
+                        with nothing to resubmit.
 
         BindingGuardrails:
             type: object
@@ -29966,22 +30323,78 @@ components:
                     type: [string, "null"]
                     format: date-time
 
-        TxAwaitingApproval:
+        TssPrepareResponse:
             type: object
-            required: [status, approval_id]
+            required: [key_id, chain, from, to, value_base_units, recent_blockhash, message, message_digest]
+            properties:
+                key_id:
+                    type: string
+                    format: uuid
+                chain:
+                    type: string
+                from:
+                    type: string
+                to:
+                    type: string
+                value_base_units:
+                    type: string
+                recent_blockhash:
+                    type: string
+                    description: The chain's freshness value the message was built against.
+                message:
+                    type: string
+                    description: Base64 unsigned transaction message; what `/tss/sign/begin` takes.
+                message_digest:
+                    type: string
+                    description: Hex SHA-256 of the message.
+                transaction_id:
+                    type: string
+                    format: uuid
+                    description: |
+                        The `prepared` ledger row an agent prepare wrote. Present on an agent
+                        prepare; absent on a user's own treasury prepare.
+
+        TssPrepareAwaitingApproval:
+            type: object
+            required: [status, transaction_id, approval_id, message]
             properties:
                 status:
                     type: string
                     enum: [awaiting_approval]
+                transaction_id:
+                    type: string
+                    format: uuid
+                    description: The ledger row parked as `awaiting_approval`. Pass it back as `resume_tx_id`.
                 approval_id:
                     type: string
                     format: uuid
-                tx_id:
-                    type: [string, "null"]
+                    description: The human approval (action `agent_tss_transaction`) to decide.
+                message:
+                    type: string
+
+        TxAwaitingApproval:
+            type: object
+            required: [status]
+            description: |
+                A held transaction. The tx_approval_policy hold carries `transaction_id`
+                and `approval_id`; a simulation-revert hold (`simulation_failure_policy:
+                approve`) carries `message` and `simulation_status` instead.
+            properties:
+                status:
+                    type: string
+                    enum: [awaiting_approval]
+                transaction_id:
+                    type: string
                     format: uuid
-                expires_at:
-                    type: [string, "null"]
-                    format: date-time
+                    description: The ledger row parked as `awaiting_approval`.
+                approval_id:
+                    type: string
+                    format: uuid
+                message:
+                    type: string
+                simulation_status:
+                    type: string
+                    enum: [reverted]
 
         ExecuteResponse:
             type: object
@@ -31409,9 +31822,9 @@ components:
                     # `type: [string, "null"]`, not `nullable: true`: this is a
                     # 3.1.0 document, where `nullable` was removed and is
                     # ignored by generators — a client built from it would
-                    # reject the null that revokes admin. 374 other fields here
-                    # use the union form; the 19 remaining `nullable: true`
-                    # are legacy and have the same latent problem.
+                    # reject the null that revokes admin. Every nullable field
+                    # here uses the union form (the last legacy `nullable: true`
+                    # entries were converted on 2026-10-18).
                     type: [string, "null"]
                     description: >-
                         External sender ID treated as the channel owner for admin
