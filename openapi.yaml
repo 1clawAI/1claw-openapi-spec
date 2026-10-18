@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.71"
+    version: "0.61.72"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6476,6 +6476,20 @@ paths:
                                         this chain. On `complete` its balance is swept to the new
                                         address by the old key's last signature and the old wallet is
                                         deactivated (audit `treasury_wallet.rekeyed`).
+                                key_kind:
+                                    type: string
+                                    enum: [treasury_wallet, agent_signing_key]
+                                    default: treasury_wallet
+                                    description: |
+                                        `agent_signing_key` creates a self-custody signing key for
+                                        `agent_id`: shares 2 and 3 are the caller's, the agent co-signs
+                                        only through a runtime share holder the caller provisions, and
+                                        only the caller can back it up or restore it (audited
+                                        `signing_key.recovered`, webhook of the same name).
+                                agent_id:
+                                    type: string
+                                    format: uuid
+                                    description: Required for `agent_signing_key`.
             responses:
                 "201":
                     description: Session opened; the vault's round-1 package
@@ -6676,6 +6690,8 @@ paths:
                                     key_id: { type: string, format: uuid }
                                     message_digest: { type: string }
                                     server_commitments: { type: string }
+                                    chain: { type: string }
+                                    wallet_address: { type: string }
                                     signing_payload:
                                         type: string
                                         description: |
@@ -24731,7 +24747,14 @@ components:
                     enum: [server, client_tss]
                     description: |
                         `server` — 1claw holds the whole private key and can sign alone.
-                        `client_tss` — 2-party threshold key; the customer's passkey share is required.
+                        `client_tss` — 2-of-3 threshold key; its human owner holds shares 2 and 3.
+                owner_user_id:
+                    type: string
+                    format: uuid
+                    description: "`client_tss` only: the human who can back up, provision and restore the key."
+                backup:
+                    type: object
+                    description: "`client_tss` only (list): the key's backup state, as on treasury wallets."
 
         SigningKeyListResponse:
             type: object

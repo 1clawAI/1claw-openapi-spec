@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.71",
+    "version": "0.61.72",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -10059,6 +10059,20 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Re-key ceremony: replace the active server-custody wallet on\nthis chain. On `complete` its balance is swept to the new\naddress by the old key's last signature and the old wallet is\ndeactivated (audit `treasury_wallet.rekeyed`).\n"
+                  },
+                  "key_kind": {
+                    "type": "string",
+                    "enum": [
+                      "treasury_wallet",
+                      "agent_signing_key"
+                    ],
+                    "default": "treasury_wallet",
+                    "description": "`agent_signing_key` creates a self-custody signing key for\n`agent_id`: shares 2 and 3 are the caller's, the agent co-signs\nonly through a runtime share holder the caller provisions, and\nonly the caller can back it up or restore it (audited\n`signing_key.recovered`, webhook of the same name).\n"
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Required for `agent_signing_key`."
                   }
                 }
               }
@@ -10400,6 +10414,12 @@
                       "type": "string"
                     },
                     "server_commitments": {
+                      "type": "string"
+                    },
+                    "chain": {
+                      "type": "string"
+                    },
+                    "wallet_address": {
                       "type": "string"
                     },
                     "signing_payload": {
@@ -38369,7 +38389,16 @@
               "server",
               "client_tss"
             ],
-            "description": "`server` — 1claw holds the whole private key and can sign alone.\n`client_tss` — 2-party threshold key; the customer's passkey share is required.\n"
+            "description": "`server` — 1claw holds the whole private key and can sign alone.\n`client_tss` — 2-of-3 threshold key; its human owner holds shares 2 and 3.\n"
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "`client_tss` only: the human who can back up, provision and restore the key."
+          },
+          "backup": {
+            "type": "object",
+            "description": "`client_tss` only (list): the key's backup state, as on treasury wallets."
           }
         }
       },
