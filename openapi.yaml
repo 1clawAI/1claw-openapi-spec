@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.70"
+    version: "0.61.71"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6138,6 +6138,31 @@ paths:
                     $ref: "#/components/responses/Forbidden"
                 "404":
                     $ref: "#/components/responses/NotFound"
+
+    /v1/keys/tss/chains:
+        get:
+            tags: [Key Custody]
+            summary: Chains you can create a self-custody wallet on
+            description: |
+                `chains` is what this organization can create now; `supported` is every
+                chain the threshold path implements. XRP and Cardano roll out as a beta.
+                Only creation is gated: an existing key always signs, restores, refreshes
+                and recovers offline.
+            operationId: getTssChains
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Chains
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    chains: { type: array, items: { type: string } }
+                                    supported: { type: array, items: { type: string } }
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
 
     /v1/keys/tss/prf-salt:
         get:
