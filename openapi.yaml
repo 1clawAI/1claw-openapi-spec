@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.73"
+    version: "0.61.75"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -6274,7 +6274,9 @@ paths:
                 `chains` is what this organization can create now; `supported` is every
                 chain the threshold path implements. XRP and Cardano roll out as a beta.
                 Only creation is gated: an existing key always signs, restores, refreshes
-                and recovers offline.
+                and recovers offline. `multisig_chains` / `multisig_supported` are the
+                same for native 2-of-3 multisig wallets (Tron, `client_multisig`), behind
+                the same rollout flags, and `multisig_safe_chains` for 2-of-3 Safes on EVM.
             operationId: getTssChains
             security:
                 - BearerAuth: []
@@ -6288,6 +6290,20 @@ paths:
                                 properties:
                                     chains: { type: array, items: { type: string } }
                                     supported: { type: array, items: { type: string } }
+                                    multisig_chains:
+                                        type: array
+                                        items: { type: string }
+                                        description: Native multisig chains this organization can create a wallet on now.
+                                    multisig_supported:
+                                        type: array
+                                        items: { type: string }
+                                        description: Every chain the native multisig path implements (`tron`, `tron-nile`, `tron-shasta`).
+                                    multisig_safe_chains:
+                                        type: array
+                                        items: { type: string }
+                                        description: |
+                                            EVM chains this organization can create a 2-of-3 Safe on now
+                                            (beta; chains with a pinned Safe v1.4.1 deployment).
                 "401":
                     $ref: "#/components/responses/Unauthorized"
 
@@ -6349,8 +6365,14 @@ paths:
                                     type: string
                                     description: |
                                         Base64 Schnorr proof of possession of the kit's share 3 for
-                                        `generation` (`@1claw/tss-wasm` `kit_share_proof`). Missing,
-                                        malformed or not matching: 400.
+                                        `generation` (`@1claw/tss-wasm` `kit_share_proof`). For a
+                                        `client_multisig` wallet: hex 65-byte signature by the kit's
+                                        recovery key over sha256("1claw-multisig-kit-v1" ‖ device
+                                        address ‖ generation as i32 big-endian)
+                                        (`multisig_kit_proof`), and `group_public_key` is the device
+                                        public key. For a 2-of-3 Safe (`key_id` = the Safe's id) the
+                                        device address is the device owner's lowercase 0x EVM address.
+                                        Missing, malformed or not matching: 400.
             responses:
                 "200":
                     description: The key's backup state after confirming
@@ -6397,6 +6419,9 @@ paths:
                                         key's current share generation (`@1claw/tss-wasm`
                                         `kit_share_proof`). An older generation's kit would restore a
                                         dead share, so it is refused with 400, as is a missing proof.
+                                        For a `client_multisig` wallet or 2-of-3 Safe: the recovery
+                                        key's hex signature over the kit digest (`multisig_kit_proof`),
+                                        with the device public key as `group_public_key`.
             responses:
                 "201":
                     description: The new wrap
@@ -7034,6 +7059,457 @@ paths:
                     $ref: "#/components/responses/Unauthorized"
                 "404":
                     $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/multisig/wallets:
+        post:
+            tags: [Key Custody]
+            summary: Create a Tron 2-of-3 native multisig wallet (client_multisig)
+            description: |
+                Beta (same rollout flags as self-custody creation; see
+                `GET /v1/keys/tss/chains` `multisig_chains`). The page generates the
+                device key D and the recovery key R, proves possession of each, and
+                seals both into the offline recovery kit before calling this; the vault
+                adds its own key V (escrowed) and records the wallet as
+                `pending_activation`. The address is D's, so until activation the
+                customer alone controls it. Each proof is a 65-byte recoverable ECDSA
+                signature (r ‖ s ‖ v, low-S) over
+                sha256("1claw-multisig-pop-v1" ‖ user_id (16 bytes) ‖ chain ‖ 0x00 ‖ role
+                ‖ 0x00 ‖ public key bytes), role `device` or `recovery`. Needs a passkey
+                with PRF (D is then wrapped under it, `PUT /v1/keys/{key_id}/client-share`).
+                Owner only. Audited `treasury_wallet.multisig_created`.
+            operationId: createMultisigWallet
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateMultisigWalletRequest"
+            responses:
+                "201":
+                    description: The wallet, pending activation
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigWalletResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/wallets/{chain}/multisig/activation:
+        parameters:
+            - name: chain
+              in: path
+              required: true
+              schema: { type: string }
+        post:
+            tags: [Key Custody]
+            summary: Prepare the activation of a multisig wallet
+            description: |
+                Once the wallet is backed up (a passkey holds D and the kit is
+                confirmed) and its address holds at least 101 TRX
+                (`activation_min_sun`), builds the AccountPermissionUpdate that installs
+                owner = 2-of-3 and active = 2-of-3 (transfers and contract calls only)
+                over V, D and R, from a reference block, and returns its raw bytes. The
+                network burns a 100 TRX fee when it lands. The device decodes and checks
+                the raw itself, then signs it with D (the account's sole owner until
+                then) and calls `activation/complete`. 409 when already active or not
+                funded.
+            operationId: prepareMultisigActivation
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: The raw permission update to sign
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigPreparedRaw"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/wallets/{chain}/multisig/activation/complete:
+        parameters:
+            - name: chain
+              in: path
+              required: true
+              schema: { type: string }
+        post:
+            tags: [Key Custody]
+            summary: Broadcast a multisig wallet's signed activation
+            description: |
+                `raw` must be exactly what `activation` prepared and `device_signature`
+                D's signature over sha256(raw). Needs `X-Passkey-Token` from a passkey
+                assertion bound to action `tss_sign` and the hex sha256 of `raw`. The
+                vault re-checks the raw, broadcasts it with D's signature alone, and
+                waits a few blocks for the permissions to appear; poll
+                `activation/status` if it answers `pending_activation`. A second submit
+                of the same prepared raw is 409. Audited
+                `treasury_wallet.multisig_activation_sent` then
+                `treasury_wallet.multisig_activated`.
+            operationId: completeMultisigActivation
+            security:
+                - BearerAuth: []
+            parameters:
+                - { name: X-Passkey-Token, in: header, required: true, schema: { type: string } }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/MultisigSignedRawRequest"
+            responses:
+                "200":
+                    description: The wallet after broadcasting
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigWalletResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/wallets/{chain}/multisig/activation/status:
+        parameters:
+            - name: chain
+              in: path
+              required: true
+              schema: { type: string }
+        post:
+            tags: [Key Custody]
+            summary: Re-check a multisig wallet's activation on chain
+            description: |
+                For a `pending_activation` wallet, reads the account from the network
+                and marks the wallet `active` once its owner and active permissions are
+                exactly the 2-of-3 over the wallet's keys. Returns the wallet either way.
+            operationId: getMultisigActivationStatus
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: The wallet
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigWalletResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/wallets/{chain}/multisig/prepare:
+        parameters:
+            - name: chain
+              in: path
+              required: true
+              schema: { type: string }
+        post:
+            tags: [Key Custody]
+            summary: Build a TRX transfer from an active multisig wallet
+            description: |
+                Runs the owner's send gates (wallet access, the sanctions screen on the
+                destination, spend policies), then builds a native transfer under the
+                active permission (Permission_id 2) from a reference block and returns
+                its raw bytes, `to` and `value_base_units` (sun). The device decodes and
+                checks the raw, confirms it pays exactly what was asked, signs with D,
+                and calls `multisig/broadcast`. 409 until the wallet is active.
+            operationId: prepareMultisigSend
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [to, value]
+                            properties:
+                                to: { type: string, description: Base58check Tron address. }
+                                value: { type: string, description: 'TRX (major units) as a decimal string, e.g. "1.5".' }
+            responses:
+                "200":
+                    description: The raw transfer to sign
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigPreparedRaw"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/wallets/{chain}/multisig/broadcast:
+        parameters:
+            - name: chain
+              in: path
+              required: true
+              schema: { type: string }
+        post:
+            tags: [Key Custody]
+            summary: Co-sign and broadcast a multisig transfer
+            description: |
+                `raw` must be a transfer this wallet prepared (and not yet submitted),
+                `device_signature` D's signature over sha256(raw), and `X-Passkey-Token`
+                a passkey assertion bound to `tss_sign` and the hex sha256 of `raw`. The
+                vault re-checks the raw against what was prepared, adds its own
+                signature last, and broadcasts D + V. The vault's key never signs
+                alone. Audited `treasury_wallet.send`; fires `wallet.transfer.sent`.
+            operationId: broadcastMultisigSend
+            security:
+                - BearerAuth: []
+            parameters:
+                - { name: X-Passkey-Token, in: header, required: true, schema: { type: string } }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/MultisigSignedRawRequest"
+            responses:
+                "200":
+                    description: Broadcast
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TreasuryWalletSendResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/multisig-safes:
+        post:
+            tags: [Key Custody]
+            summary: Create a 2-of-3 Safe on EVM (client_multisig)
+            description: |
+                Beta (same rollout flags as self-custody creation; see
+                `GET /v1/keys/tss/chains` `multisig_safe_chains`). A Safe v1.4.1 with
+                owners V (the vault's key, generated here and escrowed), D (the device
+                key, wrapped under the customer's passkey) and R (the recovery kit's
+                key), in that order, threshold 2: `Safe.setup` with no module or signer
+                configuration and the pinned fallback handler. The page generates D and
+                R and proves possession of each: a 65-byte recoverable ECDSA signature
+                (r ‖ s ‖ v, low-S) over sha256("1claw-multisig-pop-v1" ‖ user_id (16
+                bytes) ‖ chain ‖ 0x00 ‖ role ‖ 0x00 ‖ public key bytes), role `device` or
+                `recovery`, chain the EVM chain. The vault records the counterfactual
+                (CREATE2) address, salt keccak256("1claw-multisig-safe-v1" ‖ user_id ‖
+                safe_id)[0..8] (big-endian, top bit clear); the Safe is deployed with the
+                first send. The page re-derives the address from the three owners and
+                the ids and refuses a mismatch, then wraps D (`PUT
+                /v1/keys/{safe_id}/client-share`), seals the recovery kit and confirms it
+                (`POST /v1/keys/{safe_id}/kit`). One Safe per chain per user. Needs a
+                passkey with PRF. Owner only. Audited `multisig_safe.created`.
+            operationId: createMultisigSafe
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/CreateMultisigSafeRequest"
+            responses:
+                "201":
+                    description: The Safe (counterfactual until the first send)
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigSafeResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+        get:
+            tags: [Key Custody]
+            summary: List your 2-of-3 Safes
+            description: The caller's active 2-of-3 Safes, each with its owners and backup state. Owner only.
+            operationId: listMultisigSafes
+            security:
+                - BearerAuth: []
+            responses:
+                "200":
+                    description: Safes
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [safes]
+                                properties:
+                                    safes:
+                                        type: array
+                                        items: { $ref: "#/components/schemas/MultisigSafeResponse" }
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /v1/treasury/multisig-safes/{safe_id}:
+        parameters:
+            - name: safe_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        delete:
+            tags: [Key Custody]
+            summary: Retire an undeployed, empty 2-of-3 Safe
+            description: |
+                Retires a Safe that was never deployed and holds nothing on chain, so a
+                Safe whose recovery kit was never saved does not block its chain. Refused
+                (409) once the Safe has code or any balance.
+            operationId: retireMultisigSafe
+            security:
+                - BearerAuth: []
+            responses:
+                "204":
+                    description: Retired
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /v1/treasury/multisig-safes/{safe_id}/prepare:
+        parameters:
+            - name: safe_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Prepare a native transfer from a 2-of-3 Safe
+            description: |
+                Runs the owner's send gates (the sanctions screen on the destination,
+                spend policies), then fixes a SafeTx: a native transfer (no calldata,
+                operation 0, positive value, not to the Safe itself) at the Safe's
+                current nonce (0 while undeployed). Returns its EIP-712 SafeTx hash (Safe
+                v1.4.1 domain: chainId and verifyingContract; gas fields zero). The
+                device recomputes the hash from the fields, confirms it pays exactly what
+                was asked, signs it with D after a passkey touch bound to it, and calls
+                `execute`. ERC-20 and contract calls are refused on this path.
+            operationId: prepareMultisigSafeSend
+            security:
+                - BearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [to, value_wei]
+                            properties:
+                                to: { type: string, description: 0x EVM address. }
+                                value_wei: { type: string, description: "Amount in wei, as a decimal string." }
+            responses:
+                "200":
+                    description: The prepared SafeTx
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigSafePrepared"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /v1/treasury/multisig-safes/{safe_id}/execute:
+        parameters:
+            - name: safe_id
+              in: path
+              required: true
+              schema: { type: string, format: uuid }
+        post:
+            tags: [Key Custody]
+            summary: Co-sign and relay a prepared 2-of-3 Safe transfer
+            description: |
+                `safe_tx_hash` must be a transfer this Safe prepared (and not yet
+                submitted) and `device_signature` D's signature over it. Needs
+                `X-Passkey-Token` from a passkey assertion bound to action `tss_sign` and
+                the SafeTx hash (lowercase hex, no 0x). The vault reads the destination,
+                amount and nonce from the prepared row, recomputes the hash, checks D's
+                signature and the on-chain nonce, adds V's signature last, and relays:
+                the owner's server-custody Ethereum treasury wallet (not an owner) pays
+                gas, deploying the Safe through the pinned factory first if needed, then
+                submitting `execTransaction`. 400 when that wallet lacks gas on the
+                chain; 409 if the nonce moved or the transaction was already submitted.
+                Audited `multisig_safe.executed`; fires `wallet.transfer.sent`.
+            operationId: executeMultisigSafeSend
+            security:
+                - BearerAuth: []
+            parameters:
+                - { name: X-Passkey-Token, in: header, required: true, schema: { type: string } }
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [safe_tx_hash, device_signature]
+                            properties:
+                                safe_tx_hash: { type: string, description: Hex SafeTx hash from `prepare`. }
+                                device_signature:
+                                    type: string
+                                    description: Hex 65-byte recoverable ECDSA signature (r ‖ s ‖ v, low-S, v 0/1 or 27/28) by D over the SafeTx hash.
+            responses:
+                "200":
+                    description: Relayed
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/MultisigSafeExecuteResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
 
     /v1/runtimes/{runtime_id}/tss/holder:
         parameters:
@@ -27086,11 +27562,14 @@ components:
                     format: date-time
                 custody:
                     type: string
-                    enum: [server, client_tss]
+                    enum: [server, client_tss, client_multisig]
                     description: |
                         `server` — 1claw holds the whole private key and can sign alone.
                         `client_tss` — threshold key (2-of-3: 1Claw, the customer's passkey, the
                         customer's offline recovery kit); 1Claw cannot sign alone.
+                        `client_multisig`: native 2-of-3 multisig (Tron), three ordinary keys
+                        (1Claw's, the passkey-held device key, the kit's recovery key) and the
+                        chain's own account permissions; the address is the device key's.
                 owner_wraps:
                     type: integer
                     description: |
@@ -27112,6 +27591,161 @@ components:
                         kit_covered: { type: boolean }
                         backed_up: { type: boolean }
                         missing: { type: array, items: { type: string } }
+                multisig_status:
+                    type: string
+                    enum: [pending_activation, active]
+                    description: |
+                        `client_multisig` only. `pending_activation` until the 2-of-3 account
+                        permissions are confirmed on chain.
+                multisig_keys:
+                    description: "`client_multisig` only: the three keys' addresses and public keys."
+                    allOf:
+                        - $ref: "#/components/schemas/MultisigKeys"
+
+        MultisigKeyInfo:
+            type: object
+            required: [address, public_key]
+            properties:
+                address: { type: string, description: "Base58check Tron address, or a lowercase 0x EVM address for a Safe's owners." }
+                public_key: { type: string, description: Hex SEC1 public key (33 or 65 bytes). }
+
+        MultisigKeys:
+            type: object
+            required: [threshold, vault, device, recovery]
+            properties:
+                threshold: { type: integer, description: Always 2. }
+                vault: { $ref: "#/components/schemas/MultisigKeyInfo" }
+                device: { $ref: "#/components/schemas/MultisigKeyInfo" }
+                recovery: { $ref: "#/components/schemas/MultisigKeyInfo" }
+
+        CreateMultisigWalletRequest:
+            type: object
+            required: [chain, device_public_key, recovery_public_key, device_proof, recovery_proof]
+            properties:
+                chain: { type: string, enum: [tron, tron-nile, tron-shasta] }
+                device_public_key: { type: string, description: Hex SEC1 public key of D (the account key). }
+                recovery_public_key: { type: string, description: Hex SEC1 public key of R (kit only). }
+                device_proof: { type: string, description: Hex 65-byte signature by D over its proof-of-possession digest. }
+                recovery_proof: { type: string, description: Hex 65-byte signature by R over its proof-of-possession digest. }
+                kit_sealed:
+                    type: boolean
+                    default: false
+                    description: |
+                        The page sealed a recovery kit holding D and R before calling. With
+                        R's proof, records kit coverage for generation 1.
+
+        MultisigWalletResponse:
+            type: object
+            required: [key_id, chain, address, custody, status, keys, activation_min_sun]
+            properties:
+                key_id: { type: string, format: uuid }
+                chain: { type: string }
+                address: { type: string, description: The account address (D's). }
+                custody: { type: string, enum: [client_multisig] }
+                status: { type: string, enum: [pending_activation, active] }
+                keys: { $ref: "#/components/schemas/MultisigKeys" }
+                activation_min_sun:
+                    type: integer
+                    format: int64
+                    description: What the account must hold before activation (101 TRX), in sun.
+
+        MultisigPreparedRaw:
+            type: object
+            required: [key_id, chain, raw, txid, kind, expires_at_ms]
+            properties:
+                key_id: { type: string, format: uuid }
+                chain: { type: string }
+                raw:
+                    type: string
+                    description: |
+                        Base64 `Transaction.raw` protobuf bytes, built by the vault in
+                        canonical form. Decode and check them before signing.
+                txid: { type: string, description: "Hex sha256(raw), the digest each key signs and the passkey binds." }
+                kind: { type: string, enum: [activation, transfer] }
+                to: { type: string, description: Transfers only. }
+                value_base_units: { type: string, description: Transfers only; sun. }
+                expires_at_ms: { type: integer, format: int64, description: When the raw expires (10 minutes after its reference block). }
+
+        MultisigSignedRawRequest:
+            type: object
+            required: [raw, device_signature]
+            properties:
+                raw: { type: string, description: Base64 raw bytes exactly as prepared. }
+                device_signature:
+                    type: string
+                    description: Hex 65-byte recoverable ECDSA signature (r ‖ s ‖ v, low-S) by D over sha256(raw).
+
+        CreateMultisigSafeRequest:
+            type: object
+            required: [chain, device_public_key, recovery_public_key, device_proof, recovery_proof]
+            properties:
+                chain: { type: string, enum: [base, optimism, arbitrum, polygon, ethereum, base-sepolia, sepolia] }
+                device_public_key: { type: string, description: Hex SEC1 public key of D (wrapped under the passkey). }
+                recovery_public_key: { type: string, description: Hex SEC1 public key of R (kit only). }
+                device_proof: { type: string, description: Hex 65-byte signature by D over its proof-of-possession digest (chain = this EVM chain). }
+                recovery_proof: { type: string, description: Hex 65-byte signature by R over its proof-of-possession digest. }
+                kit_sealed:
+                    type: boolean
+                    default: false
+                    description: |
+                        Records kit coverage at creation. The dashboard sends false and seals
+                        the kit after the Safe exists (so the kit can name V and the Safe's
+                        initializer and salt), then confirms it with `POST /v1/keys/{safe_id}/kit`.
+
+        MultisigSafeResponse:
+            type: object
+            required: [id, chain, chain_id, safe_address, custody, deploy_status, owners, threshold, backup]
+            properties:
+                id: { type: string, format: uuid }
+                chain: { type: string }
+                chain_id: { type: integer, format: int64 }
+                safe_address: { type: string, description: Lowercase 0x counterfactual (CREATE2) address. }
+                custody: { type: string, enum: [client_multisig] }
+                deploy_status: { type: string, description: "`pending` until the first send deploys the Safe, then `deployed`." }
+                owners:
+                    description: V, D and R (lowercase 0x EVM addresses and hex SEC1 public keys), threshold 2.
+                    allOf:
+                        - $ref: "#/components/schemas/MultisigKeys"
+                threshold: { type: integer, description: Always 2. }
+                backup:
+                    type: object
+                    description: Whether a passkey holds D and a recovery kit is confirmed.
+                    properties:
+                        threshold: { type: string, enum: ["2of2", "2of3"] }
+                        passkey_wraps: { type: integer }
+                        recovery_code_wraps: { type: integer }
+                        generation: { type: integer }
+                        kit_generation: { type: [integer, "null"] }
+                        kit_covered: { type: boolean }
+                        backed_up: { type: boolean }
+                        missing: { type: array, items: { type: string } }
+
+        MultisigSafePrepared:
+            type: object
+            required: [id, chain_id, safe_address, to, value_wei, nonce, safe_tx_hash, deployed]
+            properties:
+                id: { type: string, format: uuid }
+                chain_id: { type: integer, format: int64 }
+                safe_address: { type: string }
+                to: { type: string, description: Lowercase 0x destination. }
+                value_wei: { type: string }
+                nonce: { type: integer, format: int64, description: The Safe nonce the SafeTx uses (0 while undeployed). }
+                safe_tx_hash: { type: string, description: Hex EIP-712 SafeTx hash; what D signs and the passkey token binds. }
+                deployed: { type: boolean }
+
+        MultisigSafeExecuteResponse:
+            type: object
+            required: [chain, safe_address, to, value_wei, safe_tx_hash, tx_hash, custody, relayer]
+            properties:
+                chain: { type: string }
+                safe_address: { type: string }
+                to: { type: string }
+                value_wei: { type: string }
+                safe_tx_hash: { type: string }
+                deploy_tx_hash: { type: [string, "null"], description: "The factory deployment, when this send deployed the Safe." }
+                tx_hash: { type: string, description: The relayed `execTransaction`. }
+                custody: { type: string, enum: [client_multisig] }
+                relayer: { type: string, description: The gas payer (the owner's Ethereum treasury wallet). }
 
         TreasuryWalletListResponse:
             type: object
@@ -27225,6 +27859,11 @@ components:
                 user_op_hash:
                     type: string
                     description: UserOperation hash (only present for gasless sends via paymaster)
+                raw_tx:
+                    type: string
+                    description: |
+                        Raw signed transaction, non-EVM only (hex for Bitcoin and Cardano,
+                        base64 for Solana and for a Tron multisig `Transaction`).
 
         TreasuryWalletSwapRequest:
             type: object
