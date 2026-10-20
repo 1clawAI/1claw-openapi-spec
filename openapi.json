@@ -19369,6 +19369,18 @@
                     "type": "string",
                     "description": "Required for Discord — must match the redirect URI used in the OAuth flow"
                   },
+                  "oauth_state": {
+                    "type": "string",
+                    "description": "Required for Discord. HMAC-signed state parameter (`timestamp.hmac_hex`)."
+                  },
+                  "platform_app_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Platform app context for embedded social login (cross-org consent flow)."
+                  },
+                  "referral_code": {
+                    "type": "string"
+                  },
                   "auto_provision_chains": {
                     "type": "array",
                     "items": {
@@ -19382,10 +19394,24 @@
         },
         "responses": {
           "200": {
-            "description": "Login successful"
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailOtpVerifyResponse"
+                }
+              }
+            }
           },
           "201": {
-            "description": "New user created"
+            "description": "New user created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailOtpVerifyResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Invalid or unverified token"
@@ -42802,15 +42828,20 @@
           },
           "value_wei": {
             "type": "string",
-            "description": "Value in wei (or major-unit decimal string for non-EVM)"
+            "description": "Value in wei (or major-unit decimal string for non-EVM). `value` is accepted as an alias."
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of an approved consensus approval, sent when resubmitting a send that required one."
           },
           "data": {
             "type": "string",
             "description": "Hex-encoded calldata (optional)"
           },
           "gas_limit": {
-            "type": "integer",
-            "description": "Gas limit override"
+            "type": "string",
+            "description": "Gas limit override (decimal string)"
           },
           "gasless": {
             "type": "boolean",
@@ -46304,6 +46335,41 @@
               "null"
             ],
             "description": "Ethereum address if auto_provision_chains included an EVM chain"
+          },
+          "mfa_required": {
+            "type": "boolean",
+            "description": "Set when the account has MFA enabled. `token` is then empty; finish at `POST /v1/auth/mfa/verify` with `mfa_token`."
+          },
+          "mfa_token": {
+            "type": "string"
+          },
+          "mfa_method": {
+            "type": "string",
+            "description": "`\"totp\"` or `\"passkey\"`"
+          },
+          "link_required": {
+            "type": "object",
+            "description": "Returned with 409 when the user belongs to a different org than the platform app. `token` is empty.",
+            "required": [
+              "status",
+              "reason",
+              "authorize_url",
+              "app_slug"
+            ],
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "authorize_url": {
+                "type": "string"
+              },
+              "app_slug": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -46844,16 +46910,25 @@
         "type": "object",
         "required": [
           "id",
-          "platform_app_id",
-          "created_at"
+          "org_id",
+          "is_active",
+          "created_at",
+          "updated_at"
         ],
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
           },
-          "platform_app_id": {
+          "org_id": {
             "type": "string",
+            "format": "uuid"
+          },
+          "platform_app_id": {
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "user_id": {
@@ -46942,7 +47017,14 @@
             ],
             "additionalProperties": true
           },
+          "is_active": {
+            "type": "boolean"
+          },
           "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
             "type": "string",
             "format": "date-time"
           }
