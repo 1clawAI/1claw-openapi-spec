@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.75"
+    version: "0.61.76"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -2652,7 +2652,8 @@ paths:
                 inherits the parent's vault access policies (policy lookups include the
                 parent's rows) and guardrails; does not count against the plan's agent cap
                 (capped at 50 per parent); and cannot have children of its own. Human-only.
-                Audited as `agent.child_created`.
+                When the parent has 1Claw Pay or cards enabled, only an org owner or admin
+                may create a child (403 otherwise). Audited as `agent.child_created`.
             operationId: createChildAgent
             security:
                 - BearerAuth: []
@@ -3891,6 +3892,12 @@ paths:
         post:
             tags: [Execution Intents]
             summary: Test binding connectivity
+            description: |
+                Runs the binding's connectivity check with its stored credential and the
+                same URL, host and TLS rules as execute (for `postgres` / `mysql`, see
+                the sslmode rule on `binding_type`). `error` is scrubbed the same way an
+                execute error is: credential values (including their base64 and
+                percent-encoded forms) are redacted and request URLs are stripped.
             operationId: testBinding
             parameters:
                 - $ref: "#/components/parameters/AgentId"
@@ -3909,7 +3916,12 @@ paths:
                             properties:
                                 timeout_ms:
                                     type: integer
-                                    description: Connection test timeout in milliseconds
+                                    default: 5000
+                                    minimum: 1000
+                                    maximum: 30000
+                                    description: |
+                                        Connection test timeout in milliseconds. Default 5000; values
+                                        outside 1000..30000 are clamped into that range, not refused.
             responses:
                 "200":
                     description: Test result
@@ -6119,9 +6131,26 @@ paths:
                 generation already exists the call answers 409. To replace it, delete
                 the old wrap first (`DELETE /v1/keys/{key_id}/client-share/{share_id}`,
                 which needs re-authentication).
+
+                Owner only. The first wrap of a share generation (part of creating the
+                key, or of a refresh) needs no step-up. Any later wrap for that
+                generation adds another way to open the share, so it needs
+                `X-Auth-Confirm` (purpose `tss.key.wrap_add`, strong factor), the same
+                as `…/client-share/rewrap`; without it the call answers 403.
             operationId: putClientKeyShare
             security:
                 - BearerAuth: []
+            parameters:
+                - name: X-Auth-Confirm
+                  in: header
+                  required: false
+                  description: |
+                      Single-use re-auth token from `POST /v1/auth/reauth/complete` with
+                      purpose `tss.key.wrap_add`, or the account password. Strong factor:
+                      once a passkey (usable on this domain) or TOTP is enrolled, the
+                      confirmation must use one of them and a password is refused.
+                      Required only when the key already has a wrap for this generation.
+                  schema: { type: string }
             requestBody:
                 required: true
                 content:
@@ -6195,9 +6224,17 @@ paths:
                 output. Owner only. 409 if no wrap exists yet, or if a wrap for
                 this credential and generation already exists (delete it first,
                 with re-authentication, to replace it).
+
+                Needs `X-Auth-Confirm`: a single-use re-auth token from
+                `POST /v1/auth/reauth/complete` with purpose `tss.key.wrap_add`, or the
+                account password. Strong factor: once a passkey (usable on this domain)
+                or TOTP is enrolled, the confirmation must use one of them and a
+                password is refused. Without it the call answers 403.
             operationId: rewrapClientKeyShare
             security:
                 - BearerAuth: []
+            parameters:
+                - { name: X-Auth-Confirm, in: header, required: true, schema: { type: string } }
             requestBody:
                 required: true
                 content:
@@ -6890,21 +6927,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: object
-                                properties:
-                                    session_id: { type: string, format: uuid }
-                                    key_id: { type: string, format: uuid }
-                                    message_digest: { type: string }
-                                    server_commitments: { type: string }
-                                    chain: { type: string }
-                                    wallet_address: { type: string }
-                                    signing_payload:
-                                        type: string
-                                        description: |
-                                            Base64 bytes the threshold signature covers, derived from the message by the
-                                            chain's rule (Solana: the message; XRPL: its signing data; Cardano: blake2b-256
-                                            of the body). The device derives them itself and refuses on mismatch.
-                                    expires_at: { type: string, format: date-time }
+                                $ref: "#/components/schemas/TssSignBeginResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -6935,24 +6958,14 @@ paths:
                 content:
                     application/json:
                         schema:
-                            type: object
-                            required: [session_id, client_commitments, client_signature_share]
-                            properties:
-                                session_id: { type: string, format: uuid }
-                                client_commitments: { type: string }
-                                client_signature_share: { type: string }
+                            $ref: "#/components/schemas/TssSignCompleteRequest"
             responses:
                 "200":
                     description: Signature
                     content:
                         application/json:
                             schema:
-                                type: object
-                                properties:
-                                    key_id: { type: string, format: uuid }
-                                    message_digest: { type: string }
-                                    signature: { type: string, description: Base64 64-byte Ed25519 signature. }
-                                    signature_hex: { type: string }
+                                $ref: "#/components/schemas/TssSignCompleteResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -6976,6 +6989,10 @@ paths:
                 declared destination, fetches a recent blockhash and returns the
                 unsigned transaction message. Sign it with `/v1/keys/{key_id}/tss/sign/*`
                 and submit with `…/tss/broadcast`.
+                It then runs the same Cedar/OPA transaction policy (action `submit`) and
+                `treasury_send` M-of-N consensus a server-custody treasury send runs; the
+                vault co-signs this send, so an org rule that would stop a server send
+                stops it too.
             operationId: tssTreasuryPrepare
             security:
                 - BearerAuth: []
@@ -6990,6 +7007,12 @@ paths:
                                 to: { type: string }
                                 value: { type: string, description: 'Major units, e.g. "0.5".' }
                                 memo: { type: string }
+                                approval_id:
+                                    type: string
+                                    format: uuid
+                                    description: |
+                                        An approved `treasury_send` M-of-N consensus approval for this
+                                        exact send (the `pending_approval_id` of an earlier 202).
             responses:
                 "200":
                     description: Unsigned message
@@ -7006,6 +7029,16 @@ paths:
                                     recent_blockhash: { type: string }
                                     message: { type: string }
                                     message_digest: { type: string }
+                "202":
+                    description: |
+                        The org's `treasury_send` consensus policy holds this send for
+                        M-of-N approval. Nothing is built. Once approved, call prepare
+                        again with the same transfer and `approval_id` set to
+                        `pending_approval_id`.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -7044,6 +7077,13 @@ paths:
                             properties:
                                 message: { type: string }
                                 signature: { type: string }
+                                signatures:
+                                    type: array
+                                    items: { type: string }
+                                    description: |
+                                        Every signature from `sign/complete` (`signatures`), when the
+                                        transaction has several payloads (Bitcoin inputs). `signature`
+                                        is then the first.
                                 to: { type: string }
                                 value_base_units: { type: string }
             responses:
@@ -7076,7 +7116,9 @@ paths:
                 sha256("1claw-multisig-pop-v1" ‖ user_id (16 bytes) ‖ chain ‖ 0x00 ‖ role
                 ‖ 0x00 ‖ public key bytes), role `device` or `recovery`. Needs a passkey
                 with PRF (D is then wrapped under it, `PUT /v1/keys/{key_id}/client-share`).
-                Owner only. Audited `treasury_wallet.multisig_created`.
+                Creation never records kit coverage: confirm the kit afterwards with
+                `POST /v1/keys/{key_id}/kit` and R's kit proof. Owner only. Audited
+                `treasury_wallet.multisig_created`.
             operationId: createMultisigWallet
             security:
                 - BearerAuth: []
@@ -7234,6 +7276,10 @@ paths:
                 its raw bytes, `to` and `value_base_units` (sun). The device decodes and
                 checks the raw, confirms it pays exactly what was asked, signs with D,
                 and calls `multisig/broadcast`. 409 until the wallet is active.
+                It then runs the same Cedar/OPA transaction policy (action `submit`) and
+                `treasury_send` M-of-N consensus a server-custody treasury send runs; the
+                vault co-signs this send, so an org rule that would stop a server send
+                stops it too.
             operationId: prepareMultisigSend
             security:
                 - BearerAuth: []
@@ -7247,6 +7293,12 @@ paths:
                             properties:
                                 to: { type: string, description: Base58check Tron address. }
                                 value: { type: string, description: 'TRX (major units) as a decimal string, e.g. "1.5".' }
+                                approval_id:
+                                    type: string
+                                    format: uuid
+                                    description: |
+                                        An approved `treasury_send` M-of-N consensus approval for this
+                                        exact send (the `pending_approval_id` of an earlier 202).
             responses:
                 "200":
                     description: The raw transfer to sign
@@ -7254,6 +7306,16 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/MultisigPreparedRaw"
+                "202":
+                    description: |
+                        The org's `treasury_send` consensus policy holds this send for
+                        M-of-N approval. Nothing is built. Once approved, call prepare
+                        again with the same transfer and `approval_id` set to
+                        `pending_approval_id`.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -7418,8 +7480,9 @@ paths:
             tags: [Key Custody]
             summary: Prepare a native transfer from a 2-of-3 Safe
             description: |
-                Runs the owner's send gates (the sanctions screen on the destination,
-                spend policies), then fixes a SafeTx: a native transfer (no calldata,
+                Runs the owner's send gates (wallet access, the sanctions screen on the
+                destination, spend policies, Cedar/OPA transaction policy and
+                `treasury_send` M-of-N consensus), then fixes a SafeTx: a native transfer (no calldata,
                 operation 0, positive value, not to the Safe itself) at the Safe's
                 current nonce (0 while undeployed). Returns its EIP-712 SafeTx hash (Safe
                 v1.4.1 domain: chainId and verifyingContract; gas fields zero). The
@@ -7439,6 +7502,12 @@ paths:
                             properties:
                                 to: { type: string, description: 0x EVM address. }
                                 value_wei: { type: string, description: "Amount in wei, as a decimal string." }
+                                approval_id:
+                                    type: string
+                                    format: uuid
+                                    description: |
+                                        An approved `treasury_send` M-of-N consensus approval for this
+                                        exact send (the `pending_approval_id` of an earlier 202).
             responses:
                 "200":
                     description: The prepared SafeTx
@@ -7446,6 +7515,16 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/MultisigSafePrepared"
+                "202":
+                    description: |
+                        The org's `treasury_send` consensus policy holds this send for
+                        M-of-N approval. Nothing is built. Once approved, call prepare
+                        again with the same transfer and `approval_id` set to
+                        `pending_approval_id`.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/SubmitPendingApprovalResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -7469,8 +7548,10 @@ paths:
                 submitted) and `device_signature` D's signature over it. Needs
                 `X-Passkey-Token` from a passkey assertion bound to action `tss_sign` and
                 the SafeTx hash (lowercase hex, no 0x). The vault reads the destination,
-                amount and nonce from the prepared row, recomputes the hash, checks D's
-                signature and the on-chain nonce, adds V's signature last, and relays:
+                amount and nonce from the prepared row, recomputes the hash, re-runs the
+                sanctions screen on the destination, checks D's signature and the
+                on-chain nonce, records the send in the spend ledger at its value (so it
+                counts toward daily caps), adds V's signature last, and relays:
                 the owner's server-custody Ethereum treasury wallet (not an owner) pays
                 gas, deploying the Safe through the pinned factory first if needed, then
                 submitting `execTransaction`. 400 when that wallet lacks gas on the
@@ -7756,6 +7837,12 @@ paths:
             responses:
                 "201":
                     description: Session opened
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TssSignBeginResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
                 "401":
                     $ref: "#/components/responses/Unauthorized"
                 "403":
@@ -7786,15 +7873,14 @@ paths:
                 content:
                     application/json:
                         schema:
-                            type: object
-                            required: [session_id, client_commitments, client_signature_share]
-                            properties:
-                                session_id: { type: string, format: uuid }
-                                client_commitments: { type: string }
-                                client_signature_share: { type: string }
+                            $ref: "#/components/schemas/TssSignCompleteRequest"
             responses:
                 "200":
                     description: Signature
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/TssSignCompleteResponse"
                 "400":
                     $ref: "#/components/responses/BadRequest"
                 "401":
@@ -7837,6 +7923,13 @@ paths:
                                 key_id: { type: string, format: uuid }
                                 message: { type: string }
                                 signature: { type: string }
+                                signatures:
+                                    type: array
+                                    items: { type: string }
+                                    description: |
+                                        Every signature from `sign/complete` (`signatures`), when the
+                                        transaction has several payloads (Bitcoin inputs). `signature`
+                                        is then the first.
             responses:
                 "200":
                     description: Broadcast
@@ -10124,7 +10217,12 @@ paths:
         post:
             tags: [Platform]
             summary: Bootstrap resources for a connected user
-            description: Executes a template to create vault, agent, and policies for the connected user. Returns a claim URL and token for the user to claim their resources.
+            description: |
+                Executes a template to create vault, agent, and policies for the connected user. Returns a claim URL and token for the user to claim their resources.
+
+                A template agent with raw signing turned on is created with
+                `raw_signing_enabled: true` and `raw_signing_policy: approve`, so each raw
+                signature waits for a human approval until the end user changes the policy.
             security:
                 - BearerAuth: []
             parameters:
@@ -11244,6 +11342,12 @@ paths:
                 keys costs a KMS key per chain). The whole batch is checked before
                 anything is created, so a template that would overshoot is refused
                 rather than partly applied.
+
+                Agents added here always start with `raw_signing_enabled: false`, even if
+                the template's agent asks for raw signing: no end user consented on this
+                call. The end user turns it on through
+                `PATCH /v1/platform/connections/{connectionId}/agents/{agentId}` with
+                their re-auth token.
             operationId: addConnectionAgents
             security:
                 - BearerAuth: []
@@ -27627,12 +27731,6 @@ components:
                 recovery_public_key: { type: string, description: Hex SEC1 public key of R (kit only). }
                 device_proof: { type: string, description: Hex 65-byte signature by D over its proof-of-possession digest. }
                 recovery_proof: { type: string, description: Hex 65-byte signature by R over its proof-of-possession digest. }
-                kit_sealed:
-                    type: boolean
-                    default: false
-                    description: |
-                        The page sealed a recovery kit holding D and R before calling. With
-                        R's proof, records kit coverage for generation 1.
 
         MultisigWalletResponse:
             type: object
@@ -27684,13 +27782,6 @@ components:
                 recovery_public_key: { type: string, description: Hex SEC1 public key of R (kit only). }
                 device_proof: { type: string, description: Hex 65-byte signature by D over its proof-of-possession digest (chain = this EVM chain). }
                 recovery_proof: { type: string, description: Hex 65-byte signature by R over its proof-of-possession digest. }
-                kit_sealed:
-                    type: boolean
-                    default: false
-                    description: |
-                        Records kit coverage at creation. The dashboard sends false and seals
-                        the kit after the Safe exists (so the kit can name V and the Safe's
-                        initializer and salt), then confirms it with `POST /v1/keys/{safe_id}/kit`.
 
         MultisigSafeResponse:
             type: object
@@ -27701,7 +27792,7 @@ components:
                 chain_id: { type: integer, format: int64 }
                 safe_address: { type: string, description: Lowercase 0x counterfactual (CREATE2) address. }
                 custody: { type: string, enum: [client_multisig] }
-                deploy_status: { type: string, description: "`pending` until the first send deploys the Safe, then `deployed`." }
+                deploy_status: { type: string, description: "`pending` until the first send deploys the Safe and contract code is seen at the address, then `deployed`." }
                 owners:
                     description: V, D and R (lowercase 0x EVM addresses and hex SEC1 public keys), threshold 2.
                     allOf:
@@ -30778,6 +30869,14 @@ components:
                 binding_type:
                     type: string
                     enum: [http, graphql, postgres, mysql, redis, grpc, smtp, cloud_sdk, s3, custom]
+                    description: |
+                        `postgres` / `mysql`: the connection URL must set
+                        `sslmode=verify-full` (Postgres) or `ssl-mode=VERIFY_IDENTITY`
+                        (MySQL) for TLS, or `sslmode=disable` / `ssl-mode=DISABLED` for a
+                        plaintext connection pinned to the resolved public IP. Any other
+                        mode, including leaving it unset (the drivers default to
+                        `prefer`), is refused with 400 when the binding is executed or
+                        tested.
                 config:
                     type: object
                     additionalProperties: true
@@ -30845,7 +30944,13 @@ components:
                 allowed_request_headers:
                     type: array
                     items: { type: string }
-                    description: Agent-supplied headers permitted in execute params. Defaults to content-type, accept, user-agent, idempotency-key.
+                    description: |
+                        Agent-supplied headers permitted in execute params (http, graphql,
+                        custom and grpc bindings); any other agent header is dropped.
+                        Defaults to content-type, accept, user-agent, idempotency-key. On
+                        grpc bindings the `grpc-*` and `connect-*` protocol headers (for
+                        example `Connect-Protocol-Version`, `grpc-timeout`) always pass,
+                        except names containing `auth` or `host`.
                 allow_mutations:
                     type: boolean
                     default: true
@@ -33818,6 +33923,66 @@ components:
                         type: string
                 org_webhooks_note:
                     type: string
+
+        TssSignBeginResponse:
+            type: object
+            required: [session_id, key_id, message_digest, server_commitments, chain, wallet_address, signing_payload, signing_payloads, server_commitments_all, expires_at]
+            properties:
+                session_id: { type: string, format: uuid }
+                key_id: { type: string, format: uuid }
+                message_digest: { type: string, description: Hex SHA-256 of the message; what the passkey token was bound to. }
+                server_commitments: { type: string, description: Base64 FROST signing commitments from the vault (first payload). }
+                chain: { type: string }
+                wallet_address: { type: string, description: The wallet the transaction must spend from. }
+                signing_payload:
+                    type: string
+                    description: |
+                        Base64 bytes the threshold signature covers, derived from the message by the
+                        chain's rule (Solana: the message; XRPL: its signing data; Cardano: blake2b-256
+                        of the body; Bitcoin: the first input's BIP341 sighash). The device derives them
+                        itself and refuses on mismatch.
+                signing_payloads:
+                    type: array
+                    items: { type: string }
+                    description: |
+                        Every payload (Base64), one per input for a Bitcoin transaction;
+                        `signing_payload` is the first. The device signs each with its own round.
+                server_commitments_all:
+                    type: array
+                    items: { type: string }
+                    description: The vault's commitments, one per payload; `server_commitments` is the first.
+                expires_at: { type: string, format: date-time }
+
+        TssSignCompleteRequest:
+            type: object
+            required: [session_id, client_commitments, client_signature_share]
+            properties:
+                session_id: { type: string, format: uuid }
+                client_commitments: { type: string, description: Base64 FROST signing commitments from the client. }
+                client_signature_share: { type: string, description: Base64 FROST signature share from the client. }
+                client_commitments_all:
+                    type: array
+                    items: { type: string }
+                    description: |
+                        One per payload, in order, when the transaction has several (Bitcoin
+                        inputs). The single fields are then ignored.
+                client_signature_shares_all:
+                    type: array
+                    items: { type: string }
+                    description: One per payload, in order, alongside `client_commitments_all`.
+
+        TssSignCompleteResponse:
+            type: object
+            required: [key_id, message_digest, signature, signature_hex, signatures]
+            properties:
+                key_id: { type: string, format: uuid }
+                message_digest: { type: string }
+                signature: { type: string, description: "Base64 64-byte signature over the (first) payload: Ed25519, or BIP340 for a Taproot key." }
+                signature_hex: { type: string }
+                signatures:
+                    type: array
+                    items: { type: string }
+                    description: Every signature (Base64), one per payload; `signature` is the first.
 
         SubmitPendingApprovalResponse:
             type: object

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.75",
+    "version": "0.61.76",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -3938,7 +3938,7 @@
           "Agents"
         ],
         "summary": "Create a child agent",
-        "description": "A cheap sub-agent under a parent. The child has its own API key, memory\nnamespaces and `action_approval_policy`; is created with a subset of the\nparent's `vault_ids` and `scopes` (a superset is refused, not trimmed);\ninherits the parent's vault access policies (policy lookups include the\nparent's rows) and guardrails; does not count against the plan's agent cap\n(capped at 50 per parent); and cannot have children of its own. Human-only.\nAudited as `agent.child_created`.\n",
+        "description": "A cheap sub-agent under a parent. The child has its own API key, memory\nnamespaces and `action_approval_policy`; is created with a subset of the\nparent's `vault_ids` and `scopes` (a superset is refused, not trimmed);\ninherits the parent's vault access policies (policy lookups include the\nparent's rows) and guardrails; does not count against the plan's agent cap\n(capped at 50 per parent); and cannot have children of its own. Human-only.\nWhen the parent has 1Claw Pay or cards enabled, only an org owner or admin\nmay create a child (403 otherwise). Audited as `agent.child_created`.\n",
         "operationId": "createChildAgent",
         "security": [
           {
@@ -5878,6 +5878,7 @@
           "Execution Intents"
         ],
         "summary": "Test binding connectivity",
+        "description": "Runs the binding's connectivity check with its stored credential and the\nsame URL, host and TLS rules as execute (for `postgres` / `mysql`, see\nthe sslmode rule on `binding_type`). `error` is scrubbed the same way an\nexecute error is: credential values (including their base64 and\npercent-encoded forms) are redacted and request URLs are stripped.\n",
         "operationId": "testBinding",
         "parameters": [
           {
@@ -5902,7 +5903,10 @@
                 "properties": {
                   "timeout_ms": {
                     "type": "integer",
-                    "description": "Connection test timeout in milliseconds"
+                    "default": 5000,
+                    "minimum": 1000,
+                    "maximum": 30000,
+                    "description": "Connection test timeout in milliseconds. Default 5000; values\noutside 1000..30000 are clamped into that range, not refused.\n"
                   }
                 }
               }
@@ -9328,11 +9332,22 @@
           "Key Custody"
         ],
         "summary": "Store the customer's wrapped share of a threshold key",
-        "description": "Stores ciphertext the vault cannot open: the customer's share of a\n2-party threshold signing key, wrapped in the browser under the\npasskey's WebAuthn PRF output (`passkey_prf`, one wrap per credential\nand share generation). `recovery_code` wraps are refused: the recovery\ncode seals the offline kit in the browser. The vault keeps the blob and\nits salt and returns them only to the owning user. Human users only;\nthe passkey must have reported PRF support at registration.\n\nA stored wrap is never overwritten: if a wrap for this credential and\ngeneration already exists the call answers 409. To replace it, delete\nthe old wrap first (`DELETE /v1/keys/{key_id}/client-share/{share_id}`,\nwhich needs re-authentication).\n",
+        "description": "Stores ciphertext the vault cannot open: the customer's share of a\n2-party threshold signing key, wrapped in the browser under the\npasskey's WebAuthn PRF output (`passkey_prf`, one wrap per credential\nand share generation). `recovery_code` wraps are refused: the recovery\ncode seals the offline kit in the browser. The vault keeps the blob and\nits salt and returns them only to the owning user. Human users only;\nthe passkey must have reported PRF support at registration.\n\nA stored wrap is never overwritten: if a wrap for this credential and\ngeneration already exists the call answers 409. To replace it, delete\nthe old wrap first (`DELETE /v1/keys/{key_id}/client-share/{share_id}`,\nwhich needs re-authentication).\n\nOwner only. The first wrap of a share generation (part of creating the\nkey, or of a refresh) needs no step-up. Any later wrap for that\ngeneration adds another way to open the share, so it needs\n`X-Auth-Confirm` (purpose `tss.key.wrap_add`, strong factor), the same\nas `…/client-share/rewrap`; without it the call answers 403.\n",
         "operationId": "putClientKeyShare",
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Auth-Confirm",
+            "in": "header",
+            "required": false,
+            "description": "Single-use re-auth token from `POST /v1/auth/reauth/complete` with\npurpose `tss.key.wrap_add`, or the account password. Strong factor:\nonce a passkey (usable on this domain) or TOTP is enrolled, the\nconfirmation must use one of them and a password is refused.\nRequired only when the key already has a wrap for this generation.\n",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -9432,11 +9447,21 @@
           "Key Custody"
         ],
         "summary": "Add a wrap for another credential or the recovery code",
-        "description": "Same write as `PUT …/client-share`, for a key that already has at\nleast one wrap: the browser, holding the share in memory during a\npasskey session, re-wraps it under a newly added passkey's PRF\noutput. Owner only. 409 if no wrap exists yet, or if a wrap for\nthis credential and generation already exists (delete it first,\nwith re-authentication, to replace it).\n",
+        "description": "Same write as `PUT …/client-share`, for a key that already has at\nleast one wrap: the browser, holding the share in memory during a\npasskey session, re-wraps it under a newly added passkey's PRF\noutput. Owner only. 409 if no wrap exists yet, or if a wrap for\nthis credential and generation already exists (delete it first,\nwith re-authentication, to replace it).\n\nNeeds `X-Auth-Confirm`: a single-use re-auth token from\n`POST /v1/auth/reauth/complete` with purpose `tss.key.wrap_add`, or the\naccount password. Strong factor: once a passkey (usable on this domain)\nor TOTP is enrolled, the confirmation must use one of them and a\npassword is refused. Without it the call answers 403.\n",
         "operationId": "rewrapClientKeyShare",
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Auth-Confirm",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -10559,37 +10584,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "session_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "key_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "message_digest": {
-                      "type": "string"
-                    },
-                    "server_commitments": {
-                      "type": "string"
-                    },
-                    "chain": {
-                      "type": "string"
-                    },
-                    "wallet_address": {
-                      "type": "string"
-                    },
-                    "signing_payload": {
-                      "type": "string",
-                      "description": "Base64 bytes the threshold signature covers, derived from the message by the\nchain's rule (Solana: the message; XRPL: its signing data; Cardano: blake2b-256\nof the body). The device derives them itself and refuses on mismatch.\n"
-                    },
-                    "expires_at": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  }
+                  "$ref": "#/components/schemas/TssSignBeginResponse"
                 }
               }
             }
@@ -10638,24 +10633,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": [
-                  "session_id",
-                  "client_commitments",
-                  "client_signature_share"
-                ],
-                "properties": {
-                  "session_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "client_commitments": {
-                    "type": "string"
-                  },
-                  "client_signature_share": {
-                    "type": "string"
-                  }
-                }
+                "$ref": "#/components/schemas/TssSignCompleteRequest"
               }
             }
           }
@@ -10666,23 +10644,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "key_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "message_digest": {
-                      "type": "string"
-                    },
-                    "signature": {
-                      "type": "string",
-                      "description": "Base64 64-byte Ed25519 signature."
-                    },
-                    "signature_hex": {
-                      "type": "string"
-                    }
-                  }
+                  "$ref": "#/components/schemas/TssSignCompleteResponse"
                 }
               }
             }
@@ -10718,7 +10680,7 @@
           "Key Custody"
         ],
         "summary": "Build the unsigned message for a send from a client_tss wallet",
-        "description": "Runs wallet access, the sanctions screen and spend policies on the\ndeclared destination, fetches a recent blockhash and returns the\nunsigned transaction message. Sign it with `/v1/keys/{key_id}/tss/sign/*`\nand submit with `…/tss/broadcast`.\n",
+        "description": "Runs wallet access, the sanctions screen and spend policies on the\ndeclared destination, fetches a recent blockhash and returns the\nunsigned transaction message. Sign it with `/v1/keys/{key_id}/tss/sign/*`\nand submit with `…/tss/broadcast`.\nIt then runs the same Cedar/OPA transaction policy (action `submit`) and\n`treasury_send` M-of-N consensus a server-custody treasury send runs; the\nvault co-signs this send, so an org rule that would stop a server send\nstops it too.\n",
         "operationId": "tssTreasuryPrepare",
         "security": [
           {
@@ -10745,6 +10707,11 @@
                   },
                   "memo": {
                     "type": "string"
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "An approved `treasury_send` M-of-N consensus approval for this\nexact send (the `pending_approval_id` of an earlier 202).\n"
                   }
                 }
               }
@@ -10785,6 +10752,16 @@
                       "type": "string"
                     }
                   }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The org's `treasury_send` consensus policy holds this send for\nM-of-N approval. Nothing is built. Once approved, call prepare\nagain with the same transfer and `approval_id` set to\n`pending_approval_id`.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitPendingApprovalResponse"
                 }
               }
             }
@@ -10846,6 +10823,13 @@
                   "signature": {
                     "type": "string"
                   },
+                  "signatures": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Every signature from `sign/complete` (`signatures`), when the\ntransaction has several payloads (Bitcoin inputs). `signature`\nis then the first.\n"
+                  },
                   "to": {
                     "type": "string"
                   },
@@ -10886,7 +10870,7 @@
           "Key Custody"
         ],
         "summary": "Create a Tron 2-of-3 native multisig wallet (client_multisig)",
-        "description": "Beta (same rollout flags as self-custody creation; see\n`GET /v1/keys/tss/chains` `multisig_chains`). The page generates the\ndevice key D and the recovery key R, proves possession of each, and\nseals both into the offline recovery kit before calling this; the vault\nadds its own key V (escrowed) and records the wallet as\n`pending_activation`. The address is D's, so until activation the\ncustomer alone controls it. Each proof is a 65-byte recoverable ECDSA\nsignature (r ‖ s ‖ v, low-S) over\nsha256(\"1claw-multisig-pop-v1\" ‖ user_id (16 bytes) ‖ chain ‖ 0x00 ‖ role\n‖ 0x00 ‖ public key bytes), role `device` or `recovery`. Needs a passkey\nwith PRF (D is then wrapped under it, `PUT /v1/keys/{key_id}/client-share`).\nOwner only. Audited `treasury_wallet.multisig_created`.\n",
+        "description": "Beta (same rollout flags as self-custody creation; see\n`GET /v1/keys/tss/chains` `multisig_chains`). The page generates the\ndevice key D and the recovery key R, proves possession of each, and\nseals both into the offline recovery kit before calling this; the vault\nadds its own key V (escrowed) and records the wallet as\n`pending_activation`. The address is D's, so until activation the\ncustomer alone controls it. Each proof is a 65-byte recoverable ECDSA\nsignature (r ‖ s ‖ v, low-S) over\nsha256(\"1claw-multisig-pop-v1\" ‖ user_id (16 bytes) ‖ chain ‖ 0x00 ‖ role\n‖ 0x00 ‖ public key bytes), role `device` or `recovery`. Needs a passkey\nwith PRF (D is then wrapped under it, `PUT /v1/keys/{key_id}/client-share`).\nCreation never records kit coverage: confirm the kit afterwards with\n`POST /v1/keys/{key_id}/kit` and R's kit proof. Owner only. Audited\n`treasury_wallet.multisig_created`.\n",
         "operationId": "createMultisigWallet",
         "security": [
           {
@@ -11112,7 +11096,7 @@
           "Key Custody"
         ],
         "summary": "Build a TRX transfer from an active multisig wallet",
-        "description": "Runs the owner's send gates (wallet access, the sanctions screen on the\ndestination, spend policies), then builds a native transfer under the\nactive permission (Permission_id 2) from a reference block and returns\nits raw bytes, `to` and `value_base_units` (sun). The device decodes and\nchecks the raw, confirms it pays exactly what was asked, signs with D,\nand calls `multisig/broadcast`. 409 until the wallet is active.\n",
+        "description": "Runs the owner's send gates (wallet access, the sanctions screen on the\ndestination, spend policies), then builds a native transfer under the\nactive permission (Permission_id 2) from a reference block and returns\nits raw bytes, `to` and `value_base_units` (sun). The device decodes and\nchecks the raw, confirms it pays exactly what was asked, signs with D,\nand calls `multisig/broadcast`. 409 until the wallet is active.\nIt then runs the same Cedar/OPA transaction policy (action `submit`) and\n`treasury_send` M-of-N consensus a server-custody treasury send runs; the\nvault co-signs this send, so an org rule that would stop a server send\nstops it too.\n",
         "operationId": "prepareMultisigSend",
         "security": [
           {
@@ -11137,6 +11121,11 @@
                   "value": {
                     "type": "string",
                     "description": "TRX (major units) as a decimal string, e.g. \"1.5\"."
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "An approved `treasury_send` M-of-N consensus approval for this\nexact send (the `pending_approval_id` of an earlier 202).\n"
                   }
                 }
               }
@@ -11150,6 +11139,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MultisigPreparedRaw"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The org's `treasury_send` consensus policy holds this send for\nM-of-N approval. Nothing is built. Once approved, call prepare\nagain with the same transfer and `approval_id` set to\n`pending_approval_id`.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitPendingApprovalResponse"
                 }
               }
             }
@@ -11395,7 +11394,7 @@
           "Key Custody"
         ],
         "summary": "Prepare a native transfer from a 2-of-3 Safe",
-        "description": "Runs the owner's send gates (the sanctions screen on the destination,\nspend policies), then fixes a SafeTx: a native transfer (no calldata,\noperation 0, positive value, not to the Safe itself) at the Safe's\ncurrent nonce (0 while undeployed). Returns its EIP-712 SafeTx hash (Safe\nv1.4.1 domain: chainId and verifyingContract; gas fields zero). The\ndevice recomputes the hash from the fields, confirms it pays exactly what\nwas asked, signs it with D after a passkey touch bound to it, and calls\n`execute`. ERC-20 and contract calls are refused on this path.\n",
+        "description": "Runs the owner's send gates (wallet access, the sanctions screen on the\ndestination, spend policies, Cedar/OPA transaction policy and\n`treasury_send` M-of-N consensus), then fixes a SafeTx: a native transfer (no calldata,\noperation 0, positive value, not to the Safe itself) at the Safe's\ncurrent nonce (0 while undeployed). Returns its EIP-712 SafeTx hash (Safe\nv1.4.1 domain: chainId and verifyingContract; gas fields zero). The\ndevice recomputes the hash from the fields, confirms it pays exactly what\nwas asked, signs it with D after a passkey touch bound to it, and calls\n`execute`. ERC-20 and contract calls are refused on this path.\n",
         "operationId": "prepareMultisigSafeSend",
         "security": [
           {
@@ -11420,6 +11419,11 @@
                   "value_wei": {
                     "type": "string",
                     "description": "Amount in wei, as a decimal string."
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "An approved `treasury_send` M-of-N consensus approval for this\nexact send (the `pending_approval_id` of an earlier 202).\n"
                   }
                 }
               }
@@ -11433,6 +11437,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MultisigSafePrepared"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The org's `treasury_send` consensus policy holds this send for\nM-of-N approval. Nothing is built. Once approved, call prepare\nagain with the same transfer and `approval_id` set to\n`pending_approval_id`.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitPendingApprovalResponse"
                 }
               }
             }
@@ -11469,7 +11483,7 @@
           "Key Custody"
         ],
         "summary": "Co-sign and relay a prepared 2-of-3 Safe transfer",
-        "description": "`safe_tx_hash` must be a transfer this Safe prepared (and not yet\nsubmitted) and `device_signature` D's signature over it. Needs\n`X-Passkey-Token` from a passkey assertion bound to action `tss_sign` and\nthe SafeTx hash (lowercase hex, no 0x). The vault reads the destination,\namount and nonce from the prepared row, recomputes the hash, checks D's\nsignature and the on-chain nonce, adds V's signature last, and relays:\nthe owner's server-custody Ethereum treasury wallet (not an owner) pays\ngas, deploying the Safe through the pinned factory first if needed, then\nsubmitting `execTransaction`. 400 when that wallet lacks gas on the\nchain; 409 if the nonce moved or the transaction was already submitted.\nAudited `multisig_safe.executed`; fires `wallet.transfer.sent`.\n",
+        "description": "`safe_tx_hash` must be a transfer this Safe prepared (and not yet\nsubmitted) and `device_signature` D's signature over it. Needs\n`X-Passkey-Token` from a passkey assertion bound to action `tss_sign` and\nthe SafeTx hash (lowercase hex, no 0x). The vault reads the destination,\namount and nonce from the prepared row, recomputes the hash, re-runs the\nsanctions screen on the destination, checks D's signature and the\non-chain nonce, records the send in the spend ledger at its value (so it\ncounts toward daily caps), adds V's signature last, and relays:\nthe owner's server-custody Ethereum treasury wallet (not an owner) pays\ngas, deploying the Safe through the pinned factory first if needed, then\nsubmitting `execTransaction`. 400 when that wallet lacks gas on the\nchain; 409 if the nonce moved or the transaction was already submitted.\nAudited `multisig_safe.executed`; fires `wallet.transfer.sent`.\n",
         "operationId": "executeMultisigSafeSend",
         "security": [
           {
@@ -11921,7 +11935,17 @@
         },
         "responses": {
           "201": {
-            "description": "Session opened"
+            "description": "Session opened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TssSignBeginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -11964,31 +11988,21 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": [
-                  "session_id",
-                  "client_commitments",
-                  "client_signature_share"
-                ],
-                "properties": {
-                  "session_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "client_commitments": {
-                    "type": "string"
-                  },
-                  "client_signature_share": {
-                    "type": "string"
-                  }
-                }
+                "$ref": "#/components/schemas/TssSignCompleteRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Signature"
+            "description": "Signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TssSignCompleteResponse"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -12053,6 +12067,13 @@
                   },
                   "signature": {
                     "type": "string"
+                  },
+                  "signatures": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Every signature from `sign/complete` (`signatures`), when the\ntransaction has several payloads (Bitcoin inputs). `signature`\nis then the first.\n"
                   }
                 }
               }
@@ -15691,7 +15712,7 @@
           "Platform"
         ],
         "summary": "Bootstrap resources for a connected user",
-        "description": "Executes a template to create vault, agent, and policies for the connected user. Returns a claim URL and token for the user to claim their resources.",
+        "description": "Executes a template to create vault, agent, and policies for the connected user. Returns a claim URL and token for the user to claim their resources.\n\nA template agent with raw signing turned on is created with\n`raw_signing_enabled: true` and `raw_signing_policy: approve`, so each raw\nsignature waits for a human approval until the end user changes the policy.\n",
         "security": [
           {
             "BearerAuth": []
@@ -17416,7 +17437,7 @@
           "Platform"
         ],
         "summary": "Add agents to a bootstrapped connection",
-        "description": "Provision an additional agent on a connection that has already been\nbootstrapped, from a template belonging to the same app. `plt_` auth only.\n\nOne agent per call. A template declaring more than one agent is refused\nwith 400: each agent's API key is returned once and cannot be re-issued\nto a platform app, so batching them would put several unrecoverable\ncredentials in a single response.\n\nBootstrap refuses a second run (409) because it also creates the vault,\nthe policies and the plan tier, none of which should happen twice. This\nroute applies only the agent portion of a template: its `agents`, their\nper-agent `signing_keys`, `eoa` and `runtime`. `vault`, `policies`,\n`automations` and `entitlements` in the spec are ignored, and new agents\nattach to the vault the connection already has.\n\nConfiguration comes from a template rather than from fields on the\nrequest so that the agent portion of a spec has exactly one reader,\nshared with bootstrap.\n\nCapped per connection by `max_agents_per_connection` on the platform app\n(unset means a built-in default, not unlimited: an agent with signing\nkeys costs a KMS key per chain). The whole batch is checked before\nanything is created, so a template that would overshoot is refused\nrather than partly applied.\n",
+        "description": "Provision an additional agent on a connection that has already been\nbootstrapped, from a template belonging to the same app. `plt_` auth only.\n\nOne agent per call. A template declaring more than one agent is refused\nwith 400: each agent's API key is returned once and cannot be re-issued\nto a platform app, so batching them would put several unrecoverable\ncredentials in a single response.\n\nBootstrap refuses a second run (409) because it also creates the vault,\nthe policies and the plan tier, none of which should happen twice. This\nroute applies only the agent portion of a template: its `agents`, their\nper-agent `signing_keys`, `eoa` and `runtime`. `vault`, `policies`,\n`automations` and `entitlements` in the spec are ignored, and new agents\nattach to the vault the connection already has.\n\nConfiguration comes from a template rather than from fields on the\nrequest so that the agent portion of a spec has exactly one reader,\nshared with bootstrap.\n\nCapped per connection by `max_agents_per_connection` on the platform app\n(unset means a built-in default, not unlimited: an agent with signing\nkeys costs a KMS key per chain). The whole batch is checked before\nanything is created, so a template that would overshoot is refused\nrather than partly applied.\n\nAgents added here always start with `raw_signing_enabled: false`, even if\nthe template's agent asks for raw signing: no end user consented on this\ncall. The end user turns it on through\n`PATCH /v1/platform/connections/{connectionId}/agents/{agentId}` with\ntheir re-auth token.\n",
         "operationId": "addConnectionAgents",
         "security": [
           {
@@ -42346,11 +42367,6 @@
           "recovery_proof": {
             "type": "string",
             "description": "Hex 65-byte signature by R over its proof-of-possession digest."
-          },
-          "kit_sealed": {
-            "type": "boolean",
-            "default": false,
-            "description": "The page sealed a recovery kit holding D and R before calling. With\nR's proof, records kit coverage for generation 1.\n"
           }
         }
       },
@@ -42502,11 +42518,6 @@
           "recovery_proof": {
             "type": "string",
             "description": "Hex 65-byte signature by R over its proof-of-possession digest."
-          },
-          "kit_sealed": {
-            "type": "boolean",
-            "default": false,
-            "description": "Records kit coverage at creation. The dashboard sends false and seals\nthe kit after the Safe exists (so the kit can name V and the Safe's\ninitializer and salt), then confirms it with `POST /v1/keys/{safe_id}/kit`.\n"
           }
         }
       },
@@ -42547,7 +42558,7 @@
           },
           "deploy_status": {
             "type": "string",
-            "description": "`pending` until the first send deploys the Safe, then `deployed`."
+            "description": "`pending` until the first send deploys the Safe and contract code is seen at the address, then `deployed`."
           },
           "owners": {
             "description": "V, D and R (lowercase 0x EVM addresses and hex SEC1 public keys), threshold 2.",
@@ -47995,7 +48006,8 @@
               "cloud_sdk",
               "s3",
               "custom"
-            ]
+            ],
+            "description": "`postgres` / `mysql`: the connection URL must set\n`sslmode=verify-full` (Postgres) or `ssl-mode=VERIFY_IDENTITY`\n(MySQL) for TLS, or `sslmode=disable` / `ssl-mode=DISABLED` for a\nplaintext connection pinned to the resolved public IP. Any other\nmode, including leaving it unset (the drivers default to\n`prefer`), is refused with 400 when the binding is executed or\ntested.\n"
           },
           "config": {
             "type": "object",
@@ -48083,7 +48095,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Agent-supplied headers permitted in execute params. Defaults to content-type, accept, user-agent, idempotency-key."
+            "description": "Agent-supplied headers permitted in execute params (http, graphql,\ncustom and grpc bindings); any other agent header is dropped.\nDefaults to content-type, accept, user-agent, idempotency-key. On\ngrpc bindings the `grpc-*` and `connect-*` protocol headers (for\nexample `Connect-Protocol-Version`, `grpc-timeout`) always pass,\nexcept names containing `auth` or `host`.\n"
           },
           "allow_mutations": {
             "type": "boolean",
@@ -52979,6 +52991,137 @@
           },
           "org_webhooks_note": {
             "type": "string"
+          }
+        }
+      },
+      "TssSignBeginResponse": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "key_id",
+          "message_digest",
+          "server_commitments",
+          "chain",
+          "wallet_address",
+          "signing_payload",
+          "signing_payloads",
+          "server_commitments_all",
+          "expires_at"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message_digest": {
+            "type": "string",
+            "description": "Hex SHA-256 of the message; what the passkey token was bound to."
+          },
+          "server_commitments": {
+            "type": "string",
+            "description": "Base64 FROST signing commitments from the vault (first payload)."
+          },
+          "chain": {
+            "type": "string"
+          },
+          "wallet_address": {
+            "type": "string",
+            "description": "The wallet the transaction must spend from."
+          },
+          "signing_payload": {
+            "type": "string",
+            "description": "Base64 bytes the threshold signature covers, derived from the message by the\nchain's rule (Solana: the message; XRPL: its signing data; Cardano: blake2b-256\nof the body; Bitcoin: the first input's BIP341 sighash). The device derives them\nitself and refuses on mismatch.\n"
+          },
+          "signing_payloads": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every payload (Base64), one per input for a Bitcoin transaction;\n`signing_payload` is the first. The device signs each with its own round.\n"
+          },
+          "server_commitments_all": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The vault's commitments, one per payload; `server_commitments` is the first."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TssSignCompleteRequest": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "client_commitments",
+          "client_signature_share"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_commitments": {
+            "type": "string",
+            "description": "Base64 FROST signing commitments from the client."
+          },
+          "client_signature_share": {
+            "type": "string",
+            "description": "Base64 FROST signature share from the client."
+          },
+          "client_commitments_all": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "One per payload, in order, when the transaction has several (Bitcoin\ninputs). The single fields are then ignored.\n"
+          },
+          "client_signature_shares_all": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "One per payload, in order, alongside `client_commitments_all`."
+          }
+        }
+      },
+      "TssSignCompleteResponse": {
+        "type": "object",
+        "required": [
+          "key_id",
+          "message_digest",
+          "signature",
+          "signature_hex",
+          "signatures"
+        ],
+        "properties": {
+          "key_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message_digest": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string",
+            "description": "Base64 64-byte signature over the (first) payload: Ed25519, or BIP340 for a Taproot key."
+          },
+          "signature_hex": {
+            "type": "string"
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every signature (Base64), one per payload; `signature` is the first."
           }
         }
       },

@@ -42,6 +42,35 @@ openapi-generator generate \
 import spec from "@1claw/openapi-spec/openapi.json";
 ```
 
+## What's in the spec (v0.61.76)
+
+Matches the vault as of 2026-10-19. No paths added or removed; the router and
+the spec list the same operations (`scripts/check-openapi-router-sync.sh`).
+
+- **`approval_id` on the self-custody prepares**: `POST /v1/treasury/wallets/{chain}/tss/prepare`,
+  `.../multisig/prepare` and `/v1/treasury/multisig-safes/{safe_id}/prepare` now run
+  the transaction policy and `treasury_send` consensus, and can answer 202 with
+  `pending_approval_id`. Retry with `approval_id` once approved.
+- **`kit_sealed` removed** from `CreateMultisigWalletRequest` and
+  `CreateMultisigSafeRequest`. Kit coverage is recorded only by `POST /v1/keys/{key_id}/kit`
+  with a kit proof.
+- **`X-Auth-Confirm`** (re-auth purpose `tss.key.wrap_add`, strong factor) on
+  `POST /v1/keys/{key_id}/client-share/rewrap`, and on `PUT /v1/keys/{key_id}/client-share`
+  when the key already has a wrap for that generation.
+- **Multi-payload FROST signing** (Bitcoin inputs): new `TssSignBeginResponse`,
+  `TssSignCompleteRequest` and `TssSignCompleteResponse` schemas, shared by the user
+  and agent sign routes, with `signing_payloads`, `server_commitments_all`,
+  `client_commitments_all`, `client_signature_shares_all` and `signatures`;
+  `signatures` on both TSS broadcast requests.
+- **Execution bindings**: Postgres/MySQL URLs must use `sslmode=verify-full` /
+  `ssl-mode=VERIFY_IDENTITY` or `disable` (anything else is 400); binding `/test`
+  clamps `timeout_ms` to 1000..30000 and scrubs `error`; grpc protocol headers pass
+  the agent-header filter.
+- Description updates: agents added through `POST /v1/platform/connections/{connectionId}/agents`
+  start with raw signing off; bootstrap with raw signing sets `raw_signing_policy: approve`;
+  only owners/admins may create children of a Pay- or cards-enabled agent; Safe execute
+  re-screens and records the send at its value.
+
 ## What's in the spec (v0.61.0)
 
 Additive only — no path or parameter renames, so generated clients keep compiling.
