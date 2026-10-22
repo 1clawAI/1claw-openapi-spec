@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.76",
+    "version": "0.61.77",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -6493,6 +6493,7 @@
         ],
         "summary": "Create a share link for a secret",
         "operationId": "createShare",
+        "description": "Users and agents can both create shares. The caller needs read access\nto the secret (a policy granting `read` on its path, or being the vault's\ncreator); an agent must also be bound to the secret's vault.\n\n**Agents** may use `anyone_with_link`, `user`, `agent` and `creator`, but\nnot `external_email` (`403`). `creator` is only valid for an agent: it\nresolves to a `user` share to the human who created the agent, so the\nresponse's `recipient_type` is `user`. `user` and `agent` recipients must\nbe in the caller's org. When a share an agent created is opened, the\nagent's human creator gets the access notification email.\n\nShares count toward the monthly share limit of the secret's org, whoever\ncreated them, and creation is rate-limited to 10 per minute per org\n(`429`).\n",
         "x-agentcash-auth": {
           "mode": "paid"
         },
@@ -6535,11 +6536,20 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
           "402": {
             "$ref": "#/components/responses/PaymentRequired"
           },
+          "403": {
+            "description": "No read access to the secret, agent not bound to its vault, an agent\nasked for `external_email`, or a user asked for `creator`.\n"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "description": "More than 10 shares created in the last minute in this org."
           }
         }
       }
@@ -29535,6 +29545,11 @@
                     "type": "string",
                     "format": "uuid",
                     "description": "Consensus approval to spend on this creation.\nApproving an enrollment creates an agent, so it is\ngated on `agent.create` exactly as POST /v1/agents\nis. Orgs without a control-plane consensus policy\nnever need this.\n"
+                  },
+                  "grant_requested_access": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Grant the `requested_access` the agent asked for at\nenroll (default true). False gives the agent the default\nonboarding grant (`examples/**` in `default`) instead.\nIgnored when the enrollment asked for nothing.\n"
                   }
                 }
               }
@@ -29543,7 +29558,42 @@
         },
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Agent created. `api_key` is shown once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "agent_id",
+                    "api_key",
+                    "vault_ids"
+                  ],
+                  "properties": {
+                    "agent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "api_key": {
+                      "type": "string"
+                    },
+                    "vault_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "granted_access": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/GrantedAccess"
+                        }
+                      ],
+                      "description": "Present when the enrollment asked for access and it was granted."
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthenticated"
@@ -29675,6 +29725,18 @@
                     },
                     "description": {
                       "type": "string"
+                    },
+                    "requested_access": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/RequestedAccess"
+                        }
+                      ],
+                      "description": "The access the agent asked for at enroll, if any."
+                    },
+                    "requested_access_whole_vault": {
+                      "type": "boolean",
+                      "description": "Present and true when the requested path covers the whole vault (`**`, `**/*` or `*`)."
                     }
                   }
                 }
@@ -36862,6 +36924,75 @@
           "public_key": {
             "type": "string",
             "description": "Pairing ceremony. The agent's own Ed25519 public key (`ssh-ed25519 AAAA…`\nor base64 of the raw 32 bytes). Its `SHA256:` fingerprint is shown to the\nhuman on the approval page for visual verification, and the agent\ncollects its API key itself by polling\n`GET /v1/agents/enroll/{pairing_id}/status?poll=<poll_token>` — no key\nin an email, nothing to copy. `1claw agent enroll --pair` does all of this.\n"
+          },
+          "requested_access": {
+            "$ref": "#/components/schemas/RequestedAccess"
+          }
+        }
+      },
+      "RequestedAccess": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "description": "The access an enrolling agent asks for. Validated at enroll (`400` on a\nbad request): the vault name is 1-64 characters and may not name a system\nvault (`__*`), the path is a secret path pattern of 1-256 characters with\nno traversal, and permissions are a non-empty subset of read, write,\ndelete, list. Nothing is granted at enroll. The approve page shows the\nvault, path and permissions; on approval (unless the human sets\n`grant_requested_access: false`) exactly this is granted: the vault is\ncreated if the org has none by that name, an allow policy for the agent\nis created on the path, and the vault is bound to the agent. That\nreplaces the default onboarding grant (`examples/**` in `default`).\n",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "default": "default",
+            "description": "Vault name. Created on approval if missing.",
+            "example": "Harness"
+          },
+          "path": {
+            "type": "string",
+            "description": "Secret path pattern in that vault.",
+            "example": "harness/**"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "delete",
+                "list"
+              ]
+            },
+            "default": [
+              "read",
+              "write"
+            ]
+          }
+        }
+      },
+      "GrantedAccess": {
+        "type": "object",
+        "description": "What was granted on approval for a `requested_access` request.",
+        "properties": {
+          "vault": {
+            "type": "string"
+          },
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vault_created": {
+            "type": "boolean",
+            "description": "True when the vault was created for this grant."
+          },
+          "path": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "granted": {
+            "type": "boolean",
+            "description": "Always true when present."
           }
         }
       },
@@ -36939,6 +37070,14 @@
             "items": {
               "type": "string"
             }
+          },
+          "granted_access": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GrantedAccess"
+              }
+            ],
+            "description": "Returned with `api_key` on the first poll after approval, when the\nenrollment asked for access and the human granted it.\n"
           }
         }
       },
@@ -40456,7 +40595,8 @@
               "external_email",
               "anyone_with_link",
               "creator"
-            ]
+            ],
+            "description": "`creator` is for agent callers only (a share to the human who created\nthe agent). `external_email` is for human callers only.\n"
           },
           "recipient_id": {
             "type": "string",

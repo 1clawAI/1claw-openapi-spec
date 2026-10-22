@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.76"
+    version: "0.61.77"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -4275,6 +4275,21 @@ paths:
             tags: [Sharing]
             summary: Create a share link for a secret
             operationId: createShare
+            description: |
+                Users and agents can both create shares. The caller needs read access
+                to the secret (a policy granting `read` on its path, or being the vault's
+                creator); an agent must also be bound to the secret's vault.
+
+                **Agents** may use `anyone_with_link`, `user`, `agent` and `creator`, but
+                not `external_email` (`403`). `creator` is only valid for an agent: it
+                resolves to a `user` share to the human who created the agent, so the
+                response's `recipient_type` is `user`. `user` and `agent` recipients must
+                be in the caller's org. When a share an agent created is opened, the
+                agent's human creator gets the access notification email.
+
+                Shares count toward the monthly share limit of the secret's org, whoever
+                created them, and creation is rate-limited to 10 per minute per org
+                (`429`).
             x-agentcash-auth:
                 mode: paid
             x-payment-info:
@@ -4301,10 +4316,18 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/ShareResponse"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
                 "402":
                     $ref: "#/components/responses/PaymentRequired"
+                "403":
+                    description: |
+                        No read access to the secret, agent not bound to its vault, an agent
+                        asked for `external_email`, or a user asked for `creator`.
                 "404":
                     $ref: "#/components/responses/NotFound"
+                "429":
+                    description: More than 10 shares created in the last minute in this org.
 
     /v1/share/{share_id}:
         get:
@@ -19261,9 +19284,32 @@ paths:
                                         gated on `agent.create` exactly as POST /v1/agents
                                         is. Orgs without a control-plane consensus policy
                                         never need this.
+                                grant_requested_access:
+                                    type: boolean
+                                    default: true
+                                    description: |
+                                        Grant the `requested_access` the agent asked for at
+                                        enroll (default true). False gives the agent the default
+                                        onboarding grant (`examples/**` in `default`) instead.
+                                        Ignored when the enrollment asked for nothing.
             responses:
                 '200':
-                    description: Success
+                    description: Agent created. `api_key` is shown once.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [agent_id, api_key, vault_ids]
+                                properties:
+                                    agent_id: { type: string, format: uuid }
+                                    api_key: { type: string }
+                                    vault_ids:
+                                        type: array
+                                        items: { type: string }
+                                    granted_access:
+                                        allOf:
+                                            - $ref: "#/components/schemas/GrantedAccess"
+                                        description: Present when the enrollment asked for access and it was granted.
                 '401':
                     description: Unauthenticated
                 '403':
@@ -19345,6 +19391,13 @@ paths:
                                         type: string
                                         description: Pairing only — the agent key's `SHA256:` fingerprint to verify visually.
                                     description: { type: string }
+                                    requested_access:
+                                        allOf:
+                                            - $ref: "#/components/schemas/RequestedAccess"
+                                        description: The access the agent asked for at enroll, if any.
+                                    requested_access_whole_vault:
+                                        type: boolean
+                                        description: Present and true when the requested path covers the whole vault (`**`, `**/*` or `*`).
                 '404':
                     description: Not found
     /v1/agents/{agent_id}/channels/{channel_id}/refresh-webhook:
@@ -23898,6 +23951,56 @@ components:
                         collects its API key itself by polling
                         `GET /v1/agents/enroll/{pairing_id}/status?poll=<poll_token>` — no key
                         in an email, nothing to copy. `1claw agent enroll --pair` does all of this.
+                requested_access:
+                    $ref: "#/components/schemas/RequestedAccess"
+
+        RequestedAccess:
+            type: object
+            required: [path]
+            description: |
+                The access an enrolling agent asks for. Validated at enroll (`400` on a
+                bad request): the vault name is 1-64 characters and may not name a system
+                vault (`__*`), the path is a secret path pattern of 1-256 characters with
+                no traversal, and permissions are a non-empty subset of read, write,
+                delete, list. Nothing is granted at enroll. The approve page shows the
+                vault, path and permissions; on approval (unless the human sets
+                `grant_requested_access: false`) exactly this is granted: the vault is
+                created if the org has none by that name, an allow policy for the agent
+                is created on the path, and the vault is bound to the agent. That
+                replaces the default onboarding grant (`examples/**` in `default`).
+            properties:
+                vault:
+                    type: string
+                    default: default
+                    description: Vault name. Created on approval if missing.
+                    example: Harness
+                path:
+                    type: string
+                    description: Secret path pattern in that vault.
+                    example: "harness/**"
+                permissions:
+                    type: array
+                    items:
+                        type: string
+                        enum: [read, write, delete, list]
+                    default: [read, write]
+
+        GrantedAccess:
+            type: object
+            description: What was granted on approval for a `requested_access` request.
+            properties:
+                vault: { type: string }
+                vault_id: { type: string, format: uuid }
+                vault_created:
+                    type: boolean
+                    description: True when the vault was created for this grant.
+                path: { type: string }
+                permissions:
+                    type: array
+                    items: { type: string }
+                granted:
+                    type: boolean
+                    description: Always true when present.
 
         EnrollAgentResponse:
             type: object
@@ -23945,6 +24048,12 @@ components:
                 vault_ids:
                     type: array
                     items: { type: string }
+                granted_access:
+                    allOf:
+                        - $ref: "#/components/schemas/GrantedAccess"
+                    description: |
+                        Returned with `api_key` on the first poll after approval, when the
+                        enrollment asked for access and the human granted it.
 
         # --- Agents ---
 
@@ -26468,6 +26577,9 @@ components:
                     type: string
                     enum:
                         [user, agent, external_email, anyone_with_link, creator]
+                    description: |
+                        `creator` is for agent callers only (a share to the human who created
+                        the agent). `external_email` is for human callers only.
                 recipient_id:
                     type: string
                     format: uuid
