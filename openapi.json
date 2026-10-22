@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.77",
+    "version": "0.61.78",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -36935,7 +36935,7 @@
         "required": [
           "path"
         ],
-        "description": "The access an enrolling agent asks for. Validated at enroll (`400` on a\nbad request): the vault name is 1-64 characters and may not name a system\nvault (`__*`), the path is a secret path pattern of 1-256 characters with\nno traversal, and permissions are a non-empty subset of read, write,\ndelete, list. Nothing is granted at enroll. The approve page shows the\nvault, path and permissions; on approval (unless the human sets\n`grant_requested_access: false`) exactly this is granted: the vault is\ncreated if the org has none by that name, an allow policy for the agent\nis created on the path, and the vault is bound to the agent. That\nreplaces the default onboarding grant (`examples/**` in `default`).\n",
+        "description": "The access an enrolling agent asks for. Validated at enroll (`400` on a\nbad request): the vault name is 1-64 characters and may not name a system\nvault (`__*`), the path is a secret path pattern of 1-256 characters with\nno traversal, and permissions are a non-empty subset of read, write,\ndelete, share (`list` is accepted and granted as `read`). Nothing is\ngranted at enroll. If the grant would be refused (for example a new\nvault over the plan's vault limit) the approve call fails before the\nagent is created and the pairing stays pending. The approve page shows the\nvault, path and permissions; on approval (unless the human sets\n`grant_requested_access: false`) exactly this is granted: the vault is\ncreated if the org has none by that name, an allow policy for the agent\nis created on the path, and the vault is bound to the agent. That\nreplaces the default onboarding grant (`examples/**` in `default`).\n",
         "properties": {
           "vault": {
             "type": "string",
@@ -36956,6 +36956,7 @@
                 "read",
                 "write",
                 "delete",
+                "share",
                 "list"
               ]
             },
