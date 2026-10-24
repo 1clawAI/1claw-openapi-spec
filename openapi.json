@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Claw API",
-    "version": "0.61.78",
+    "version": "0.61.79",
     "description": "Secure secret management for AI agents. Provides vaults, secrets,\npolicy-based access control, agent identity, Intents API,\nsharing, billing, and audit logging. Automations (workflow_spec,\nwebhook tokens, event triggers, Assist), cloud runtimes with\ninteractive shell sessions, agent memory, and discovery.\n\n## Domains\n\n`api.1claw.co` is canonical: it is the OIDC issuer, the `aud` the API\nmints, and the first entry in `servers` — a generated client takes its\nbase URL from there, and the previous ordering pointed every SDK at the\ndomain the issuer had already left. `api.1claw.xyz` still answers and is\nstill accepted on token validation, because tokens minted before the\nmove carry it; it is never minted now.\n\nOne deliberate exception: the Shroud attestation identity token is\nrequested from GCP with `audience: https://api.1claw.xyz`, so\n`/v1/shroud/attestation` reports that as its `expected_audience`. That\nis accurate rather than stale — the audience is a verification contract\nwith anyone already checking the token, and moving it is a breaking\nchange for them, not a rename.\n\nAll endpoints require JWT Bearer authentication unless marked with\n`security: []`.\n",
     "contact": {
       "email": "ops@1claw.co"
@@ -6606,7 +6606,7 @@
         "tags": [
           "Sharing"
         ],
-        "summary": "Revoke a share link",
+        "summary": "Revoke a share link (creator, or an owner or admin of the share's org)",
         "operationId": "revokeShare",
         "parameters": [
           {
@@ -6643,6 +6643,45 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/shares/org": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "List every share on the org's secrets (owner or admin)",
+        "description": "Lists the shares on secrets your org owns, including ones agents\ncreated. Owner or admin only. Each item carries `created_by` and\n`created_by_type`.\n",
+        "operationId": "listOrgShares",
+        "parameters": [
+          {
+            "name": "created_by_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "user",
+                "agent"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Org share list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -12264,7 +12303,7 @@
           "Key Custody"
         ],
         "summary": "Compute the SafeTx hash for a call from a passkey Safe",
-        "description": "Runs the sanctions screen and spend policies on the call, reads the\nSafe's on-chain nonce (0 if not yet deployed), and returns the SafeTx\nhash — the raw 32 bytes are the WebAuthn challenge to sign with\n`userVerification: \"required\"`.\n",
+        "description": "Runs wallet access, the sanctions screen, spend policies, the Cedar/OPA\ntransaction policy and `treasury_send` consensus on the call (a consensus\nhold answers 202 with `pending_approval_id`; call again with `approval_id`\nonce approved), reads the Safe's on-chain nonce (0 if not yet deployed),\nand returns the SafeTx\nhash — the raw 32 bytes are the WebAuthn challenge to sign with\n`userVerification: \"required\"`.\n",
         "operationId": "preparePasskeySafeTx",
         "security": [
           {
@@ -12291,6 +12330,11 @@
                   "data": {
                     "type": "string",
                     "description": "Hex calldata, optional."
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "An approved `treasury_send` consensus request, when the org requires one."
                   }
                 }
               }
@@ -12383,6 +12427,11 @@
                     "type": "string",
                     "format": "uuid",
                     "description": "Pass back from a grant or revoke prepare; activates / revokes the grant on success."
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The approved `treasury_send` consensus request passed to `prepare`; spent when the send is recorded."
                   },
                   "authenticator_data": {
                     "type": "string",
@@ -29544,7 +29593,7 @@
                   "approval_id": {
                     "type": "string",
                     "format": "uuid",
-                    "description": "Consensus approval to spend on this creation.\nApproving an enrollment creates an agent, so it is\ngated on `agent.create` exactly as POST /v1/agents\nis. Orgs without a control-plane consensus policy\nnever need this.\n"
+                    "description": "Consensus approval to spend on this creation.\nApproving an enrollment creates an agent, so it is\ngated on `agent.create` exactly as POST /v1/agents\nis. Granting a `requested_access` is also gated on\n`policy.create` (and `vault.create` when the vault\ndoes not exist yet). Orgs without a control-plane\nconsensus policy never need this.\n"
                   },
                   "grant_requested_access": {
                     "type": "boolean",
@@ -29902,6 +29951,7 @@
         ],
         "summary": "Rotate the agent's EVM signer key. Generates a new secp256k1 key, builds a swapOwner UserOp on the Safe, signs with the old key, submits to bundler, a",
         "operationId": "rotate_signer_key",
+        "description": "Temporarily unavailable. Answers 501 while the flow is rebuilt; the agent's current signer keeps working.",
         "responses": {
           "200": {
             "description": "Success"
@@ -29914,6 +29964,9 @@
           },
           "404": {
             "description": "Not found"
+          },
+          "501": {
+            "description": "Signer rotation is temporarily unavailable"
           }
         }
       }
@@ -40716,6 +40769,19 @@
           },
           "is_accepted": {
             "type": "boolean"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Set on `GET /v1/shares/org`."
+          },
+          "created_by_type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent"
+            ],
+            "description": "Set on `GET /v1/shares/org`."
           }
         }
       },

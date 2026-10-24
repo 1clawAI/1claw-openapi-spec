@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.78"
+    version: "0.61.79"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -4361,7 +4361,7 @@ paths:
                     $ref: "#/components/responses/NotFound"
         delete:
             tags: [Sharing]
-            summary: Revoke a share link
+            summary: Revoke a share link (creator, or an owner or admin of the share's org)
             operationId: revokeShare
             parameters:
                 - name: share_id
@@ -4386,6 +4386,32 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/ShareListResponse"
+
+    /v1/shares/org:
+        get:
+            tags: [Sharing]
+            summary: List every share on the org's secrets (owner or admin)
+            description: |
+                Lists the shares on secrets your org owns, including ones agents
+                created. Owner or admin only. Each item carries `created_by` and
+                `created_by_type`.
+            operationId: listOrgShares
+            parameters:
+                - name: created_by_type
+                  in: query
+                  required: false
+                  schema:
+                      type: string
+                      enum: [user, agent]
+            responses:
+                "200":
+                    description: Org share list
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ShareListResponse"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
 
     /v1/shares/inbound:
         get:
@@ -8062,8 +8088,11 @@ paths:
             tags: [Key Custody]
             summary: Compute the SafeTx hash for a call from a passkey Safe
             description: |
-                Runs the sanctions screen and spend policies on the call, reads the
-                Safe's on-chain nonce (0 if not yet deployed), and returns the SafeTx
+                Runs wallet access, the sanctions screen, spend policies, the Cedar/OPA
+                transaction policy and `treasury_send` consensus on the call (a consensus
+                hold answers 202 with `pending_approval_id`; call again with `approval_id`
+                once approved), reads the Safe's on-chain nonce (0 if not yet deployed),
+                and returns the SafeTx
                 hash — the raw 32 bytes are the WebAuthn challenge to sign with
                 `userVerification: "required"`.
             operationId: preparePasskeySafeTx
@@ -8080,6 +8109,10 @@ paths:
                                 to: { type: string }
                                 value_wei: { type: string }
                                 data: { type: string, description: 'Hex calldata, optional.' }
+                                approval_id:
+                                    type: string
+                                    format: uuid
+                                    description: An approved `treasury_send` consensus request, when the org requires one.
             responses:
                 "200":
                     description: What to sign
@@ -8137,6 +8170,10 @@ paths:
                                     type: string
                                     format: uuid
                                     description: Pass back from a grant or revoke prepare; activates / revokes the grant on success.
+                                approval_id:
+                                    type: string
+                                    format: uuid
+                                    description: The approved `treasury_send` consensus request passed to `prepare`; spent when the send is recorded.
                                 authenticator_data: { type: string, description: Base64url. }
                                 client_data_json: { type: string, description: Base64url. }
                                 signature: { type: string, description: Base64url DER ECDSA signature. }
@@ -19282,8 +19319,10 @@ paths:
                                         Consensus approval to spend on this creation.
                                         Approving an enrollment creates an agent, so it is
                                         gated on `agent.create` exactly as POST /v1/agents
-                                        is. Orgs without a control-plane consensus policy
-                                        never need this.
+                                        is. Granting a `requested_access` is also gated on
+                                        `policy.create` (and `vault.create` when the vault
+                                        does not exist yet). Orgs without a control-plane
+                                        consensus policy never need this.
                                 grant_requested_access:
                                     type: boolean
                                     default: true
@@ -19494,9 +19533,12 @@ paths:
             tags: [Agents]
             summary: "Rotate the agent's EVM signer key. Generates a new secp256k1 key, builds a swapOwner UserOp on the Safe, signs with the old key, submits to bundler, a"
             operationId: rotate_signer_key
+            description: Temporarily unavailable. Answers 501 while the flow is rebuilt; the agent's current signer keeps working.
             responses:
                 '200':
                     description: Success
+                '501':
+                    description: Signer rotation is temporarily unavailable
                 '401':
                     description: Unauthenticated
                 '403':
@@ -26667,6 +26709,14 @@ components:
                     type: boolean
                 is_accepted:
                     type: boolean
+                created_by:
+                    type: string
+                    format: uuid
+                    description: Set on `GET /v1/shares/org`.
+                created_by_type:
+                    type: string
+                    enum: [user, agent]
+                    description: Set on `GET /v1/shares/org`.
 
         ShareListResponse:
             type: object
