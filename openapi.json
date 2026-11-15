@@ -6581,6 +6581,15 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-Share-Passphrase",
+            "in": "header",
+            "required": false,
+            "description": "Passphrase for a passphrase-protected share. Repeated wrong passphrases lock the share (429).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6599,6 +6608,77 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "description": "Too many wrong passphrases; the share is locked"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Access a passphrase-protected shared secret (passphrase in the body)",
+        "operationId": "accessShareWithPassphrase",
+        "security": [],
+        "x-agentcash-auth": {
+          "mode": "paid"
+        },
+        "x-payment-info": {
+          "protocols": [
+            "x402"
+          ],
+          "pricingMode": "fixed",
+          "price": "0.0045"
+        },
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "passphrase"
+                ],
+                "properties": {
+                  "passphrase": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shared secret value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSecretResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "description": "Too many wrong passphrases; the share is locked"
           }
         }
       },
