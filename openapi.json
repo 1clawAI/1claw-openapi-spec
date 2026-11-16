@@ -41335,8 +41335,47 @@
       "SubscriptionResponse": {
         "type": "object",
         "properties": {
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "tier": {
             "type": "string"
+          },
+          "free_limits_grandfathered_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Set for free orgs created before 2026-11-17, which keep the previous Free limits until this instant (2027-01-01T00:00:00Z). Null otherwise."
+          },
+          "upcoming_free_limits": {
+            "type": "object",
+            "description": "The current Free plan limits, which a grandfathered org moves to at free_limits_grandfathered_until.",
+            "properties": {
+              "requests_per_month": {
+                "type": "integer"
+              },
+              "signatures_per_month": {
+                "type": "integer"
+              },
+              "vaults": {
+                "type": "integer"
+              },
+              "agents": {
+                "type": "integer"
+              },
+              "secrets": {
+                "type": "integer"
+              },
+              "max_automations": {
+                "type": "integer"
+              },
+              "automation_runs_per_month": {
+                "type": "integer"
+              }
+            }
           },
           "interval": {
             "type": "string"
