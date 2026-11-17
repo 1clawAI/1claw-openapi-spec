@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
     title: 1Claw API
-    version: "0.61.79"
+    version: "0.61.80"
     description: |
         Secure secret management for AI agents. Provides vaults, secrets,
         policy-based access control, agent identity, Intents API,
@@ -31677,8 +31677,29 @@ components:
                 model_pattern: { type: string }
                 input_micro_usd_per_mtok: { type: integer, format: int64 }
                 output_micro_usd_per_mtok: { type: integer, format: int64 }
-                source: { type: string }
+                source:
+                    type: string
+                    description: Where the row came from, e.g. `stripe_sync`, `pearl_sync` (Pearl's catalog, synced hourly), or `org` for an override.
                 updated_at: { type: string, format: date-time }
+                cached_input_micro_usd_per_mtok:
+                    type: [integer, "null"]
+                    format: int64
+                    description: Prompt-cache read rate, micro-USD per million tokens. Set on Pearl rows; null elsewhere.
+                capabilities:
+                    type: object
+                    additionalProperties: true
+                    description: >
+                        The model's published capabilities from the provider catalog (Pearl rows):
+                        `features` (e.g. `json_mode`, `tools`), `input_modalities`, `max_output_length`,
+                        `context_length`. Shroud refuses a request needing a capability the model lacks
+                        with 400 before calling the provider. `{}` on other rows.
+                is_active:
+                    type: boolean
+                    description: False once the provider stops listing the model. Inactive rows are never used to price or route.
+                synced_at:
+                    type: [string, "null"]
+                    format: date-time
+                    description: When a catalog sync last confirmed this row. Managed Pearl refuses with 503 `pearl_prices_stale` when this is over 24 hours old.
         AiSpendTotals:
             type: object
             properties:
